@@ -25,18 +25,14 @@ def get_similar_html(
     rows = load_books_with_embeddings()
     registry.bulk_add_from_db(rows)
 
-    task = registry.get_book_by_name(file)
-    if not task:
+    book_task = registry.get_book_by_name(file)
+    if not book_task:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    if not task.embedding:
+    if not book_task.embedding:
         raise HTTPException(status_code=400, detail="Book has no embedding")
 
-    results = registry.find_similar_books(
-        embedding=task.embedding,
-        limit=limit,
-        exclude_same_author=exclude_same_author
-    )
+    results = registry.find_similar_books(book_task, limit, exclude_same_author)
 
     elapsed = time.perf_counter() - start
 
