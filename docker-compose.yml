@@ -1,0 +1,16 @@
+services:
+  book-sim:
+    image: book-sim
+    build: .
+    container_name: book-sim
+    volumes:
+      - /mnt/data/librusec/lib/lib.rus.ec:/books
+      - ./db:/data
+      - .:/app
+
+    environment:
+      LIB_URL: https://lib.some.com
+      BOOK_FOLDER: /books
+      DB_FILE: /data/data.db
+      MODEL_NAME: all-MiniLM-L6-v2
+      MAX_WORKERS: 7

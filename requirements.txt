@@ -1,0 +1,8 @@
+websockets
+sentence-transformers
+rich
+requests
+numpy
+flask
+lxml
+aiohttp

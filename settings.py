@@ -1,0 +1,26 @@
+from pathlib import Path
+import os
+
+BASE_DIR = Path(__file__).resolve().parent
+
+LIB_URL = os.getenv("LIB_URL", "https://lib.some.com")
+
+DB_FILE = Path(os.getenv(
+    "DB_FILE",
+    str(BASE_DIR / "data.db")
+))
+
+BOOK_FOLDER = os.getenv(
+    "BOOK_FOLDER",
+    "/mnt/data/librusec/lib/lib.rus.ec/"
+)
+
+MODEL_NAME = os.getenv(
+    "MODEL_NAME",
+    "all-MiniLM-L6-v2"
+)
+
+MAX_WORKERS = int(os.getenv(
+    "MAX_WORKERS",
+    "7"
+))
