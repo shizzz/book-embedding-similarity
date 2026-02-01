@@ -2,7 +2,7 @@ services:
   book-sim:
     image: book-sim
     build: .
-    command: uvicorn http_api:app --host 0.0.0.0 --port 8000
+    command: -m uvicorn http_api:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     container_name: book-sim
