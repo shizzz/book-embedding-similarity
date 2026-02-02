@@ -21,7 +21,7 @@ class BaseWorker:
         self.show_ui = show_ui
 
         if self.show_ui:
-            self.ui = StatsUI()
+            self.ui = StatsUI(max_workers = self.max_workers)
         
     async def stat_books(self):
         raise NotImplementedError("stat_books must be implemented by subclass")
