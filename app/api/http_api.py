@@ -6,7 +6,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 from app.db import DBManager
 from app.models import BookRegistry
-from app.settings import LIB_URL
+from app.settings.config import LIB_URL
 
 app = FastAPI(title="Book Similarity HTML API")
 db = DBManager()

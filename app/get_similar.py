@@ -2,7 +2,7 @@ import argparse
 import time
 from app.models import BookRegistry, BookTask
 from app.db import DBManager
-from app.settings import LIB_URL
+from app.settings.config import LIB_URL
 
 db = DBManager()
 registry = BookRegistry()

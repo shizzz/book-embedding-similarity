@@ -5,7 +5,7 @@ from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Tuple
 from app.models import BookTask
-from app.settings import DB_FILE
+from app.settings.config import DB_FILE
 
 class DBManager:
     def __init__(self):

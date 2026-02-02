@@ -10,7 +10,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from app.settings import MAX_WORKERS
+from app.settings.config import MAX_WORKERS
 
 class StatsUI:
     def __init__(self, max_workers: int = MAX_WORKERS):
