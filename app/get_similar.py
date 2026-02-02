@@ -29,7 +29,6 @@ def print_similar_books(
         print(f"{percent:6.2f},{book.file_name},{book.title},{url}")
 
 async def main():
-    tasks = TaskRegistry()
     books = BookRegistry()
 
     start = time.perf_counter()
@@ -55,9 +54,8 @@ async def main():
         limit=100,
         exclude_same_authors=False,
         step_percent=5)
-    service.run()
-    similars = service.get_result()
     
+    similars = service.run()
     db.save_similar(book_task.file_name, similars)
 
     print_similar_books(

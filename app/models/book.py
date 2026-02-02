@@ -1,7 +1,8 @@
 import asyncio
 from dataclasses import dataclass
-from threading import Lock
 import zipfile
+import pickle
+import numpy as np
 from typing import Optional, List, Tuple
 from app.settings.config import BOOK_FOLDER
 from app.models.queue import QueueRecord
@@ -15,9 +16,34 @@ class BookTask:
     embedding: Optional[str] = None
     authors: Optional[List[str]] = None
     queue: Optional[QueueRecord] = None
+    _norm_embedding: Optional[np.ndarray] = None
 
     completed: bool = False
     in_progress: bool = False
+        
+    @property
+    def norm_embedding(self) -> Optional[np.ndarray]:
+        if self._norm_embedding is not None:
+            return self._norm_embedding
+
+        if self.embedding is None:
+            return None
+
+        try:
+            emb = pickle.loads(self.embedding)
+
+            if not isinstance(emb, np.ndarray):
+                return None
+
+            norm = np.linalg.norm(emb)
+            if norm < 1e-9:
+                return None
+
+            self._norm_embedding = (emb / norm).astype(np.float32)
+            return self._norm_embedding
+
+        except Exception:
+            return None
 
     def get_file_bytes_from_zip(self) -> bytes:
         zip_path = f"{BOOK_FOLDER}/{self.archive_name}"
@@ -25,7 +51,6 @@ class BookTask:
         with zipfile.ZipFile(zip_path, "r") as archive:
             with archive.open(self.file_name) as f:
                 return f.read()
-
 
 class BookRegistry:
     def __init__(self):
@@ -39,7 +64,36 @@ class BookRegistry:
 
     def add_books(self, books: list[BookTask]):
         self.books = books
-        
+
+    def add_books_preload(self, books: list[BookTask]):
+        self.books = books
+        self.embedding_dim = None
+
+        for book in books:
+            if book.embedding is None:
+                continue
+
+            try:
+                emb = pickle.loads(book.embedding)
+                if not isinstance(emb, np.ndarray):
+                    continue
+
+                if self.embedding_dim is None:
+                    self.embedding_dim = emb.shape[0]
+                elif emb.shape[0] != self.embedding_dim:
+                    continue
+
+                norm = np.linalg.norm(emb)
+                if norm < 1e-9:
+                    continue
+
+                norm_emb = (emb / norm).astype(np.float32)
+                self.valid_embeddings.append(norm_emb)
+                self.valid_books.append(book)
+
+            except Exception:
+                continue
+
     def add_book(
         self,
         archive_name: str,

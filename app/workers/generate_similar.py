@@ -20,7 +20,6 @@ class GenerateSimilarWorker(BaseWorker):
             limit=100,
             exclude_same_authors=False,
             step_percent=5)
-        service.run()
-        similar = service.get_result()
-
+        
+        similar = service.run()
         self.db.save_similar(task.book.file_name, similar)

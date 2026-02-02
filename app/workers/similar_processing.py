@@ -25,8 +25,7 @@ class SimilarProcessQueueWorker(BaseWorker):
             exclude_same_authors=task.queueRecord.exclude_same_author,
             step_percent=5,
             queue = task.queueRecord)
-        service.run()
-        similar = service.get_result()
         
+        similar = service.run()    
         self.db.save_similar(book.file_name, similar)
         self.db.dequeue_process(task.queueRecord.book)
