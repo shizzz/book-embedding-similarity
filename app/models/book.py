@@ -1,16 +1,10 @@
+import asyncio
 from dataclasses import dataclass
 from threading import Lock
-import pickle
 import zipfile
-import numpy as np
 from typing import Optional, List, Tuple
 from app.settings.config import BOOK_FOLDER
-
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    # нормализуем оба вектора
-    a_norm = a / np.linalg.norm(a)
-    b_norm = b / np.linalg.norm(b)
-    return float(np.dot(a_norm, b_norm))
+from app.models.queue import QueueRecord
 
 @dataclass
 class BookTask:
@@ -20,6 +14,7 @@ class BookTask:
     title: Optional[str] = None
     embedding: Optional[str] = None
     authors: Optional[List[str]] = None
+    queue: Optional[QueueRecord] = None
 
     completed: bool = False
     in_progress: bool = False
@@ -34,12 +29,17 @@ class BookTask:
 
 class BookRegistry:
     def __init__(self):
-        self._books: List[BookTask] = []
-        self._lock = Lock()
+        self.books: List[BookTask] = []
 
-    # =====================
-    # ADD
-    # =====================
+    def empty(self):
+        return len(self.books) == 0
+
+    def bookCount(self) -> int:
+        return len(self.books)
+
+    def add_books(self, books: list[BookTask]):
+        self.books = books
+        
     def add_book(
         self,
         archive_name: str,
@@ -74,27 +74,40 @@ class BookRegistry:
                         in_progress=False
                     )
                 )
+
+    def bulk_add_from_queue(self, rows: list[tuple]):
+        with self._lock:
+            for archive, book, progress, book_count, exclude_same_author in rows:
+                self._books.append(
+                    BookTask(
+                        archive_name = archive,
+                        file_name = book,
+                        queue = QueueRecord(
+                            book = book,
+                            progress = progress,
+                            book_count = book_count,
+                            exclude_same_author = exclude_same_author
+                        ),
+                        completed = False,
+                        in_progress = False
+                    )
+                )
     
     def get_book_by_name(self, file_name: str, archive_name: str = None) -> BookTask | None:
-        with self._lock:
-            for book in self._books:
-                if book.file_name == file_name:
-                    if archive_name is None or book.archive_name == archive_name:
-                        return book
-        return None
-    
-    def get_next_book(self) -> Optional[BookTask]:
-        with self._lock:
-            for book in self._books:
-                if not book.completed and not book.in_progress:
-                    book.in_progress = True
+        for book in self.books:
+            if book.file_name == file_name:
+                if archive_name is None or book.archive_name == archive_name:
                     return book
         return None
+    
+    async def get_next_book(self) -> BookTask | None:
+        try:
+            return await self.queue.get()
+        except asyncio.CancelledError:
+            return None
 
-    def mark_completed(self, book: BookTask):
-        with self._lock:
-            book.in_progress = False
-            book.completed = True
+    def mark_completed(self):
+        self.completed += 1
 
     def stats(self) -> Tuple[int, int]:
         with self._lock:
@@ -105,37 +118,3 @@ class BookRegistry:
     def has_pending(self) -> bool:
         with self._lock:
             return any(not b.completed and not b.in_progress for b in self._books)
-
-    def find_similar_books(
-        self,
-        source: BookTask,
-        top_k: int = 50,
-        exclude_same_authors: bool = True
-    ) -> List[Tuple[BookTask, float]]:
-        candidates = []
-
-        with self._lock:
-            for book in self._books:
-                if book.embedding is None:
-                    continue
-
-                if source.file_name == book.file_name:
-                    continue
-
-                if source.title == book.title:
-                    continue
-
-                if exclude_same_authors and source.authors and book.authors:
-                    if set(source.authors) & set(book.authors):
-                        continue
-                    
-                query_emb = pickle.loads(source.embedding)
-                book_emb  = pickle.loads(book.embedding)
-
-                score = cosine_similarity(query_emb, book_emb)
-
-                candidates.append((book, score))
-
-        # Сортируем по убыванию score и берём top_k
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        return candidates[:top_k]

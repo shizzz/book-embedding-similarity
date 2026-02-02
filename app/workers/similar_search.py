@@ -1,0 +1,64 @@
+import pickle
+import numpy as np
+from typing import List, Tuple
+from app.workers import BaseWorker
+from app.models import BookTask, Task
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    # нормализуем оба вектора
+    a_norm = a / np.linalg.norm(a)
+    b_norm = b / np.linalg.norm(b)
+    return float(np.dot(a_norm, b_norm))
+
+class SimilarSearchWorker(BaseWorker):
+    def __init__(
+            self, 
+            source: BookTask, 
+            top_k: int, 
+            step_percent: int, 
+            exclude_same_authors: bool, 
+            **kwargs):
+        super().__init__(**kwargs)
+        self.__source = source
+        self.__top_k = top_k
+        self.__exclude_same_authors = exclude_same_authors
+        self.__step_percent = step_percent
+        self.__candidates = []
+        self.__current = 0
+        self.__step = 0
+
+    def get_result(self) -> List[Tuple[BookTask, float]]:
+        self.__candidates.sort(key=lambda x: x[1], reverse=True)
+        return self.__candidates[:self.__top_k]
+   
+    async def stat_books(self):
+        total = self.registry.total
+        self.__step = total * self.__step_percent // 100
+        return
+
+    def process_book(self, task: Task):
+        self.__current += 1
+        if task.book.embedding is None:
+            return
+
+        if self.__source.file_name == task.book.file_name:
+            return
+
+        if self.__source.title == task.book.title:
+            return
+
+        if self.__exclude_same_authors and self.__source.authors and task.book.authors:
+            if set(self.__source.authors) & set(task.book.authors):
+                return
+            
+        query_emb = pickle.loads(self.__source.embedding)
+        book_emb  = pickle.loads(task.book.embedding)
+
+        score = cosine_similarity(query_emb, book_emb)
+
+        self.__candidates.append((task.book, score))
+
+        if self.__source.queue is not None:
+            if (self.__current + 1) % self.__step == 0:
+                percent = self.__current // self.__step
+                self.db.update_process_percent(self.__source.file_name, percent)

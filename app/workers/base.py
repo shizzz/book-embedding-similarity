@@ -3,25 +3,18 @@ from asyncio import create_task, gather
 from rich.live import Live
 from app.utils import StatsUI
 from app.db import DBManager
-from app.models import BookRegistry
+from app.models import TaskRegistry
 from app.settings.config import MAX_WORKERS
 
 class BaseWorker:
     def __init__(
         self,
-        registry: BookRegistry = None,
+        registry: TaskRegistry = None,
         max_workers: int = MAX_WORKERS,
         show_ui: bool = True,
         sleepy: bool = False
     ):
-        """
-        stat_process: функция для подготовки реестра (statBooks)
-        worker_process: функция обработки одной книги (process_book)
-        registry: BookRegistry (если None, создается новый)
-        max_workers: количество параллельных воркеров
-        sleepy: bool, использовать задержки
-        """
-        self.registry = registry or BookRegistry()
+        self.registry = registry or TaskRegistry()
         self.db = DBManager()
         self.max_workers = max_workers
         self.sleepy = sleepy
@@ -30,37 +23,61 @@ class BaseWorker:
         if self.show_ui:
             self.ui = StatsUI()
         
-    def stat_books(self):
+    async def stat_books(self):
         raise NotImplementedError("stat_books must be implemented by subclass")
 
     def process_book(self, task):
         raise NotImplementedError("process_book must be implemented by subclass")
     
-    async def _worker(self, worker_id: int, live: Live):
+    async def _sleepyWorker(self):
         while True:
-            task = self.registry.get_next_book()
-            if task is None:
-                if self.sleepy:
-                    asyncio.sleep(1)
-                else:
-                    if self.show_ui:
-                        await self.ui.set_thread(worker_id, live, "---")
-                    break
+            try:
+                await asyncio.to_thread(self.process_book, None)
+            except Exception as error:
+                print(f"ERROR processing task: {error}")
+
+            await asyncio.sleep(1)
+
+    async def _worker(self, worker_id: int, live: Live):
+        while not self.registry.queue.empty():
+            task = await self.registry.queue.get()
 
             try:
                 if self.show_ui:
-                    await self.ui.set_thread(worker_id, live, task.file_name)
+                    await self.ui.set_thread(worker_id, live, task.name)
 
                 await asyncio.to_thread(self.process_book, task)
 
                 if self.show_ui:
                     await self.ui.done(live)
-                self.registry.mark_completed(task)
             except Exception as error:
                 if self.show_ui:
                     await self.ui.error(live)
-                self.registry.mark_completed(task)
-                print(f"ERROR processing {task.file_name}: {error}")
+                print(f"ERROR processing {task.name}: {error}")
+            finally:
+                self.registry.queue.task_done()
+                self.registry.mark_completed()
+
+    async def _createWorker(self, worker_id: int, live: Live):
+        if self.sleepy:
+            await self._sleepyWorker()
+        else:
+            await self._worker(worker_id, live)
+
+    async def _executeWorkers(self):
+        if self.show_ui:
+            with Live(self.ui.layout(), refresh_per_second=5, console=self.ui.console) as live:
+                tasks = [
+                    create_task(self._createWorker(i, live))
+                    for i in range(1, self.max_workers + 1)
+                ]
+                await gather(*tasks)
+        else:
+            tasks = [
+                create_task(self._createWorker(i, None))
+                for i in range(1, self.max_workers + 1)
+            ]
+            await gather(*tasks)
 
     async def run(self):
         print("Prepare...")
@@ -70,28 +87,16 @@ class BaseWorker:
 
         # подготовка реестра
         print("Stat books...")
-        await asyncio.to_thread(self.stat_books)
+        await self.stat_books()
 
-        total, completed = self.registry.stats()
+        total = self.registry.total
+        completed = self.registry.completed
+
         remaining = total - completed
         if self.show_ui:
             await self.ui.init(total, remaining)
 
         print(f"Starting processing for {remaining} books...")
-
-        if self.show_ui:
-            with Live(self.ui.layout(), refresh_per_second=5, console=self.ui.console) as live:
-                tasks = [
-                    create_task(self._worker(i, live))
-                    for i in range(1, self.max_workers + 1)
-                ]
-                await gather(*tasks)
-        else:
-            tasks = [
-                create_task(self._worker(i, None))
-                for i in range(1, self.max_workers + 1)
-            ]
-            await gather(*tasks)
-
+        await self._executeWorkers()
 
         print("All books processed!")

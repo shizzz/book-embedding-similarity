@@ -1,11 +1,12 @@
 import argparse
+import asyncio
 import time
-from app.models import BookRegistry, BookTask
+from app.models import BookRegistry, BookTask, TaskRegistry
+from app.services.similar_search_service import SimilarSearchService
 from app.db import DBManager
 from app.settings.config import LIB_URL
 
 db = DBManager()
-registry = BookRegistry()
 
 def make_lib_url(file_name: str) -> str:
     ex_file = file_name.removesuffix(".fb2")
@@ -27,16 +28,19 @@ def print_similar_books(
 
         print(f"{percent:6.2f},{book.file_name},{book.title},{url}")
 
-def main():
+async def main():
+    tasks = TaskRegistry()
+    books = BookRegistry()
+
     start = time.perf_counter()
     parser = argparse.ArgumentParser(description="Показать топ-50 похожих книг")
     parser.add_argument("file_name", type=str, help="Имя файла книги")
     args = parser.parse_args()
 
-    rows = db.load_books_with_embeddings()
-    registry.bulk_add_from_db(rows)
+    rows = await db.load_books_with_embeddings()
+    books.add_books(rows)
 
-    book_task = registry.get_book_by_name(args.file_name)
+    book_task = books.get_book_by_name(args.file_name)
     if not book_task:
         print(f"Книга {args.file_name} не найдена в реестре")
         return
@@ -44,8 +48,17 @@ def main():
     if not book_task.embedding:
         print(f"Для книги {args.file_name} нет embedding")
         return
+
+    service = SimilarSearchService(
+        source=book_task,
+        registry=books,
+        limit=100,
+        exclude_same_authors=False,
+        step_percent=5)
+    service.run()
+    similars = service.get_result()
     
-    similars = registry.find_similar_books(book_task, 100, False)
+    db.save_similar(book_task.file_name, similars)
 
     print_similar_books(
         source_file=book_task.file_name,
@@ -54,4 +67,4 @@ def main():
     )
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -1,14 +1,20 @@
-from app.models import BookTask
+import asyncio
+import gc
+from app.models import Task
 from app.workers import BaseWorker
+from app.workers.similar_processing import SimilarProcessQueueWorker
 
 class BackgroundProcessingWorker(BaseWorker):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def stat_books(self):
-        rows = self.db.load_books_with_embeddings()
-        self.registry.bulk_add_from_db(rows)
+    async def stat_books(self):
+        return
 
-    def process_book(self, task: BookTask):
-        similar = self.registry.find_similar_books(task, 50, False)
-        self.db.save_similar(task, similar)
+    def process_book(self, task: Task):
+        has_q = self.db.has_queue()
+        if has_q:
+            worker = SimilarProcessQueueWorker()
+            asyncio.run(worker.run())
+            del worker
+            gc.collect()

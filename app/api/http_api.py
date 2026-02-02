@@ -115,8 +115,8 @@ def similar_page(
 async def similar_events(
     file: str,
     limit: int = 50,
-    exclude_same_author: bool = True,
-    force: bool = False
+    exclude_same_author: bool = False,
+    force: bool = True
 ):
     async def event_stream():
         start = time.perf_counter()
