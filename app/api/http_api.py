@@ -74,7 +74,7 @@ def base_page(
 
         <script>
             const es = new EventSource(
-                "/similar/events?file={file}&limit={limit}&exclude_same_author{exclude_same_author}&force{force}"
+                "/similar/events?file={file}&limit={limit}&exclude_same_author={exclude_same_author}&force={force}"
             );
 
             es.onmessage = (e) => {{
