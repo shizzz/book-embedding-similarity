@@ -19,7 +19,7 @@ def make_lib_url(file_name: str) -> str:
 
 def render_similar_table(
     base_book: str,
-    rows: List[Tuple[str, float]],
+    rows: List[Tuple[str, float, str]],
     elapsed: float
 ) -> str:
     html = f"""
@@ -31,16 +31,18 @@ def render_similar_table(
             <th>#</th>
             <th>Score (%)</th>
             <th>Файл</th>
+            <th>Название</th>
             <th>Ссылка</th>
         </tr>
     """
 
-    for i, (file_name, score) in enumerate(rows, 1):
+    for i, (file_name, score, title) in enumerate(rows, 1):
         html += f"""
         <tr>
             <td>{i}</td>
             <td>{score * 100:.2f}</td>
             <td>{file_name}</td>
+            <td>{title}</td>
             <td>
                 <a href="{make_lib_url(file_name)}" target="_blank">Открыть</a>
             </td>

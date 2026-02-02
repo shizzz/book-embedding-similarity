@@ -315,9 +315,10 @@ class DBManager:
     def get_similar_rows(self, book: str, limit: int):
         with self.connection() as conn:
             return conn.execute("""
-                SELECT similar_book, score
-                FROM similar
-                WHERE book = ?
-                ORDER BY score DESC
+                SELECT s.similar_book, s.score, b.title
+                FROM similar s
+                JOIN books b ON b.book = s.similar_book
+                WHERE s.book = ?
+                ORDER BY s.score DESC
                 LIMIT ?
             """, (book, limit)).fetchall()
