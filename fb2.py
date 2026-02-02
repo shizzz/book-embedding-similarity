@@ -1,14 +1,5 @@
 from lxml import etree
-import zipfile
 from typing import List, Optional
-from settings import BOOK_FOLDER
-
-def get_file_bytes_from_zip(book) -> bytes:
-    zip_path = f"{BOOK_FOLDER}/{book.archive_name}"
-
-    with zipfile.ZipFile(zip_path, "r") as archive:
-        with archive.open(book.file_name) as f:
-            return f.read()
 
 class FB2Book:
     NS = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}

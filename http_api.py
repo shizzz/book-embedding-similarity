@@ -1,12 +1,16 @@
 import time
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import HTMLResponse
-from db import load_books_with_embeddings
+import json
+import asyncio
+from typing import List, Tuple
+from fastapi import FastAPI, Query
+from fastapi.responses import HTMLResponse, StreamingResponse
+from db import DBManager
 
 from book import BookRegistry, BookTask
 from settings import LIB_URL
 
 app = FastAPI(title="Book Similarity HTML API")
+db = DBManager()
 registry = BookRegistry()
 
 def make_lib_url(file_name: str) -> str:
@@ -14,68 +18,142 @@ def make_lib_url(file_name: str) -> str:
     return f"{LIB_URL}/#/extended?page=1&limit=20&ex_file={ex_file}"
 
 
-@app.get("/similar", response_class=HTMLResponse)
-def get_similar_html(
-    file: str = Query(..., description="FB2 file name"),
-    limit: int = Query(50, ge=1, le=100),
-    exclude_same_author: bool = Query(True)
-):
-    start = time.perf_counter()
-
-    rows = load_books_with_embeddings()
-    registry.bulk_add_from_db(rows)
-
-    book_task = registry.get_book_by_name(file)
-    if not book_task:
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    if not book_task.embedding:
-        raise HTTPException(status_code=400, detail="Book has no embedding")
-
-    results = registry.find_similar_books(book_task, limit, exclude_same_author)
-
-    elapsed = time.perf_counter() - start
-
-    # HTML page
+def render_similar_table(
+    base_book: str,
+    rows: List[Tuple[str, float]],
+    elapsed: float
+) -> str:
     html = f"""
-    <html>
-        <head>
-            <title>Similar Books for {file}</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; }}
-                table {{ border-collapse: collapse; width: 80%; }}
-                th, td {{ border: 1px solid #ddd; padding: 8px; }}
-                th {{ background-color: #f2f2f2; }}
-            </style>
-        </head>
-        <body>
-            <h2>Top {limit} similar books for <code>{file}</code></h2>
-            <p>Elapsed time: {elapsed:.3f} sec</p>
-            <table>
-                <tr>
-                    <th>#</th>
-                    <th>Score (%)</th>
-                    <th>File</th>
-                    <th>Title</th>
-                    <th>Link</th>
-                </tr>
+    <h2>Похожие книги для <code>{base_book}</code></h2>
+    <p>Время выполнения: {elapsed:.3f} сек</p>
+
+    <table border="1" cellpadding="6" cellspacing="0">
+        <tr>
+            <th>#</th>
+            <th>Score (%)</th>
+            <th>Файл</th>
+            <th>Ссылка</th>
+        </tr>
     """
 
-    for i, (book, score) in enumerate(results, 1):
+    for i, (file_name, score) in enumerate(rows, 1):
         html += f"""
-            <tr>
-                <td>{i}</td>
-                <td>{score * 100:.2f}</td>
-                <td>{book.file_name}</td>
-                <td>{book.title}</td>
-                <td><a href="{make_lib_url(book.file_name)}" target="_blank">Open</a></td>
-            </tr>
+        <tr>
+            <td>{i}</td>
+            <td>{score * 100:.2f}</td>
+            <td>{file_name}</td>
+            <td>
+                <a href="{make_lib_url(file_name)}" target="_blank">Открыть</a>
+            </td>
+        </tr>
         """
 
-    html += """
-            </table>
-        </body>
+    html += "</table>"
+    return html
+
+def base_page(file: str, limit: int) -> str:
+    return f"""
+    <html>
+    <head>
+        <meta charset="utf-8"/>
+        <title>Similar books</title>
+    </head>
+    <body>
+        <h1>Поиск похожих книг</h1>
+        <p>Книга: <code>{file}</code></p>
+
+        <div id="status">Подготовка…</div>
+        <div id="progress"></div>
+        <div id="result"></div>
+
+        <script>
+            const es = new EventSource(
+                "/similar/events?file={file}&limit={limit}"
+            );
+
+            es.onmessage = (e) => {{
+                const data = JSON.parse(e.data);
+
+                if (data.type === "progress") {{
+                    document.getElementById("status").innerText =
+                        "Запрос в процессе";
+                    document.getElementById("progress").innerText =
+                        "Прогресс: " + data.progress + "%";
+                }}
+
+                if (data.type === "done") {{
+                    es.close();
+                    document.getElementById("status").innerText = "Готово";
+                    document.getElementById("progress").innerText = "";
+                    document.getElementById("result").innerHTML = data.html;
+                }}
+
+                if (data.type === "error") {{
+                    es.close();
+                    document.getElementById("status").innerText = "Ошибка";
+                    document.getElementById("result").innerText = data.message;
+                }}
+            }};
+        </script>
+    </body>
     </html>
     """
 
-    return HTMLResponse(content=html)
+# =========================================================
+# HTTP endpoints
+# =========================================================
+
+@app.get("/similar", response_class=HTMLResponse)
+def similar_page(
+    file: str = Query(..., description="FB2 file name"),
+    limit: int = Query(50, ge=1, le=100),
+):
+    # базовая HTML-страница
+    return HTMLResponse(base_page(file, limit))
+
+
+@app.get("/similar/events")
+async def similar_events(
+    file: str,
+    limit: int = 50,
+    exclude_same_author: bool = True,
+    force: bool = False
+):
+    async def event_stream():
+        start = time.perf_counter()
+
+        if not force and db.has_similar(file):
+            rows = db.get_similar_rows(file, limit)
+            html = render_similar_table(
+                file, rows, time.perf_counter() - start
+            )
+            yield f"data: {json.dumps({'type': 'done', 'html': html})}\n\n"
+            return
+
+        db.enqueue_process(file, limit, exclude_same_author)
+
+        # Ожидание генерации
+        while True:
+            in_q, progress = db.in_process_queue(file)
+
+            if in_q:
+                yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+                await asyncio.sleep(1)
+                continue
+
+            # Очередь исчезла → результат должен быть готов
+            if db.has_similar(file):
+                rows = db.get_similar_rows(file, limit)
+                html = render_similar_table(
+                    file, rows, time.perf_counter() - start
+                )
+                yield f"data: {json.dumps({'type': 'done', 'html': html})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Ошибка обработки'})}\n\n"
+            return
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"}
+    )

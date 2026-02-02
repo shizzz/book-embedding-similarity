@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from threading import Lock
 import pickle
+import zipfile
 import numpy as np
 from typing import Optional, List, Tuple
+from settings import BOOK_FOLDER
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     # нормализуем оба вектора
@@ -21,6 +23,13 @@ class BookTask:
 
     completed: bool = False
     in_progress: bool = False
+
+    def get_file_bytes_from_zip(self) -> bytes:
+        zip_path = f"{BOOK_FOLDER}/{self.archive_name}"
+
+        with zipfile.ZipFile(zip_path, "r") as archive:
+            with archive.open(self.file_name) as f:
+                return f.read()
 
 
 class BookRegistry:
@@ -87,19 +96,12 @@ class BookRegistry:
             book.in_progress = False
             book.completed = True
 
-    # =====================
-    # STATS
-    # =====================
     def stats(self) -> Tuple[int, int]:
         with self._lock:
             total = len(self._books)
             completed = sum(1 for b in self._books if b.completed)
             return total, completed
-
-    # =====================
-    # UTILS
-    # =====================
-    
+        
     def has_pending(self) -> bool:
         with self._lock:
             return any(not b.completed and not b.in_progress for b in self._books)

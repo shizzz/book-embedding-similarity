@@ -1,9 +1,10 @@
 import argparse
 from book import BookRegistry, BookTask
-from db import load_books_with_embeddings
+from db import DBManager
 from settings import LIB_URL
 import time
 
+db = DBManager()
 registry = BookRegistry()
 
 def make_lib_url(file_name: str) -> str:
@@ -32,7 +33,7 @@ def main():
     parser.add_argument("file_name", type=str, help="Имя файла книги")
     args = parser.parse_args()
 
-    rows = load_books_with_embeddings()
+    rows = db.load_books_with_embeddings()
     registry.bulk_add_from_db(rows)
 
     book_task = registry.get_book_by_name(args.file_name)

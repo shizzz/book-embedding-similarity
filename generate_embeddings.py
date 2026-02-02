@@ -3,14 +3,17 @@ import zipfile
 import asyncio
 from sentence_transformers import SentenceTransformer
 from worker import registry, main
-from db import load_books_only, update_book_authors, save_book_with_emb
-from fb2 import FB2Book, get_file_bytes_from_zip
+from fb2 import FB2Book
+from db import DBManager
+from book import BookTask
 from settings import BOOK_FOLDER, MODEL_NAME
+
+db = DBManager()
 
 model = SentenceTransformer(MODEL_NAME)
 
 def statBooks():
-    completed_books = load_books_only()
+    completed_books = db.load_books_only()
 
     for archive in os.listdir(BOOK_FOLDER):
         if not archive.lower().endswith(".zip"):
@@ -29,8 +32,8 @@ def statBooks():
                     completed=completed
                 )
 
-def generateEmbedding(task):
-    data = get_file_bytes_from_zip(task)
+def generateEmbedding(task: BookTask):
+    data = task.get_file_bytes_from_zip()
     book = FB2Book(data)
 
     text = book.extract_text()
@@ -41,7 +44,7 @@ def generateEmbedding(task):
 
     embedding = model.encode(text)
 
-    save_book_with_emb(
+    db.save_book_with_emb(
         task.file_name,
         task.archive_name,
         id,
@@ -49,7 +52,7 @@ def generateEmbedding(task):
         author,
         embedding)
     
-    update_book_authors(
+    db.update_book_authors(
         book=task.file_name,
         authors=authors
     )
