@@ -7,7 +7,7 @@ LIB_URL = os.getenv("LIB_URL", "https://lib.some.com")
 
 DB_FILE = Path(os.getenv(
     "DB_FILE",
-    str(BASE_DIR / "data.db")
+    str(BASE_DIR / "data/data.db")
 ))
 
 BOOK_FOLDER = os.getenv(

@@ -4,7 +4,7 @@ import pickle
 import zipfile
 import numpy as np
 from typing import Optional, List, Tuple
-from settings import BOOK_FOLDER
+from app.settings import BOOK_FOLDER
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     # нормализуем оба вектора

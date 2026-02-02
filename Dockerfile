@@ -1,29 +1,20 @@
-# ARM-compatible Python
-FROM python:3.11-slim
+FROM python:3.13-slim
 
-# ---------- system deps ----------
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# ---------- workdir ----------
 WORKDIR /app
 
-# ---------- python deps ----------
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ---------- app ----------
-COPY . .
+COPY app app
 
 # ---------- env defaults ----------
-ENV PYTHONUNBUFFERED=1 \
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
     LIB_URL=https://lib.ooosh.ru \
     DB_FILE=/app/data.db \
     BOOK_FOLDER=/books \
     MODEL_NAME=all-MiniLM-L6-v2 \
-    MAX_WORKERS=7
+    MAX_WORKERS=1
 
 # ---------- volumes ----------
 VOLUME ["/books", "/app"]

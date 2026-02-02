@@ -1,7 +1,7 @@
 import asyncio
-from worker import registry, main
-from db import DBManager
-from book import BookTask
+from app.workers import registry, worker_startup
+from app.db import DBManager
+from app.models import BookTask
 
 db = DBManager()
 
@@ -13,6 +13,8 @@ def getSimilar(task: BookTask):
     similar = registry.find_similar_books(task, 50, False)
     db.save_similar(task, similar)
 
-# ------------------ Entry ------------------
+def main():
+    asyncio.run(worker_startup(statBooks, getSimilar))
+
 if __name__ == "__main__":
-    asyncio.run(main(statBooks, getSimilar))
+    main()

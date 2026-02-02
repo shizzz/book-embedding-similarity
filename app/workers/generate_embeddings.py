@@ -2,11 +2,11 @@ import os
 import zipfile
 import asyncio
 from sentence_transformers import SentenceTransformer
-from worker import registry, main
-from fb2 import FB2Book
-from db import DBManager
-from book import BookTask
-from settings import BOOK_FOLDER, MODEL_NAME
+from app.workers import registry, worker_startup
+from app.utils import FB2Book
+from app.db import DBManager
+from app.models import BookTask
+from app.settings import BOOK_FOLDER, MODEL_NAME
 
 db = DBManager()
 
@@ -57,5 +57,8 @@ def generateEmbedding(task: BookTask):
         authors=authors
     )
 
+def main():
+    asyncio.run(worker_startup(statBooks, generateEmbedding))
+
 if __name__ == "__main__":
-    asyncio.run(main(statBooks, generateEmbedding))
+    main()

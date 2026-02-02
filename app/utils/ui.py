@@ -1,4 +1,5 @@
 import asyncio
+from rich.live import Live
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -9,7 +10,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from settings import MAX_WORKERS
+from app.settings import MAX_WORKERS
 
 class StatsUI:
     def __init__(self, max_workers: int = MAX_WORKERS):
@@ -40,8 +41,6 @@ class StatsUI:
             total=0,
         )
 
-    # ---------- rendering ----------
-
     def _make_table(self) -> Table:
         table = Table(title="WS Library Scanner", expand=True)
         table.add_column("Metric")
@@ -65,9 +64,7 @@ class StatsUI:
         grid.add_row(self._make_info())
         grid.add_row(self.progress)
         return grid
-
-    # ---------- public API ----------
-
+    
     async def init(self, total: int, remaining: int):
         async with self.lock:
             self.stats["Total"] = total
@@ -77,12 +74,12 @@ class StatsUI:
 
         self.progress.update(self.progress_task, total=remaining)
 
-    async def set_thread(self, worker_id: int, name: str, live):
+    async def set_thread(self, worker_id: int, live: Live, name: str):
         async with self.lock:
             self.stats[f"Thread {worker_id}"] = name
         live.update(self.layout())
 
-    async def done(self, live):
+    async def done(self, live: Live):
         async with self.lock:
             self.stats["Done"] += 1
             self.stats["Remaining"] -= 1
@@ -90,7 +87,7 @@ class StatsUI:
         self.progress.update(self.progress_task, advance=1)
         live.update(self.layout())
 
-    async def error(self, live):
+    async def error(self, live: Live):
         async with self.lock:
             self.stats["Errors"] += 1
 

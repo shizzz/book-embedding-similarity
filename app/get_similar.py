@@ -1,8 +1,8 @@
 import argparse
-from book import BookRegistry, BookTask
-from db import DBManager
-from settings import LIB_URL
 import time
+from app.models import BookRegistry, BookTask
+from app.db import DBManager
+from app.settings import LIB_URL
 
 db = DBManager()
 registry = BookRegistry()

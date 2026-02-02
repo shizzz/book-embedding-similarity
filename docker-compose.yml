@@ -1,5 +1,5 @@
 services:
-  book-sim:
+  api:
     image: book-sim
     build: .
     command: -m uvicorn http_api:app --host 0.0.0.0 --port 8000
@@ -10,10 +10,24 @@ services:
       - /mnt/data/librusec/lib/lib.rus.ec:/books
       - ./db:/data
       - .:/app
-
     environment:
       LIB_URL: https://lib.some.com
       BOOK_FOLDER: /books
       DB_FILE: /data/data.db
       MODEL_NAME: all-MiniLM-L6-v2
-      MAX_WORKERS: 7
+      MAX_WORKERS: 1
+  worker:
+    image: book-sim
+    build: .
+    command: background_processing.py
+    container_name: worker
+    volumes:
+      - /mnt/data/librusec/lib/lib.rus.ec:/books
+      - ./db:/data
+      - .:/app
+    environment:
+      LIB_URL: https://lib.some.com
+      BOOK_FOLDER: /books
+      DB_FILE: /data/data.db
+      MODEL_NAME: all-MiniLM-L6-v2
+      MAX_WORKERS: 1

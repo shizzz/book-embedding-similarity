@@ -4,10 +4,9 @@ import asyncio
 from typing import List, Tuple
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
-from db import DBManager
-
-from book import BookRegistry, BookTask
-from settings import LIB_URL
+from app.db import DBManager
+from app.models import BookRegistry
+from app.settings import LIB_URL
 
 app = FastAPI(title="Book Similarity HTML API")
 db = DBManager()

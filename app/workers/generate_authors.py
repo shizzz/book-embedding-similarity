@@ -1,8 +1,8 @@
 import asyncio
-from worker import registry, main
-from fb2 import FB2Book
-from db import DBManager
-from book import BookTask
+from app.workers import registry, worker_startup
+from app.utils import FB2Book
+from app.db import DBManager
+from app.models import BookTask
 
 db = DBManager()
 
@@ -20,5 +20,8 @@ def updateAuthor(task: BookTask):
         authors=authors
     )
 
+def main():
+    asyncio.run(worker_startup(statBooks, updateAuthor))
+
 if __name__ == "__main__":
-    asyncio.run(main(statBooks, updateAuthor))
+    main()
