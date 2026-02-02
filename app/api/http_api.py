@@ -52,7 +52,12 @@ def render_similar_table(
     html += "</table>"
     return html
 
-def base_page(file: str, limit: int) -> str:
+def base_page(
+        file: str,
+        limit: int,
+        exclude_same_author: bool,
+        force: bool
+        ) -> str:
     return f"""
     <html>
     <head>
@@ -69,7 +74,7 @@ def base_page(file: str, limit: int) -> str:
 
         <script>
             const es = new EventSource(
-                "/similar/events?file={file}&limit={limit}"
+                "/similar/events?file={file}&limit={limit}&exclude_same_author{exclude_same_author}&force{force}"
             );
 
             es.onmessage = (e) => {{
@@ -108,9 +113,11 @@ def base_page(file: str, limit: int) -> str:
 def similar_page(
     file: str = Query(..., description="FB2 file name"),
     limit: int = Query(50, ge=1, le=100),
+    exclude_same_author: bool = False,
+    force: bool = False
 ):
     # базовая HTML-страница
-    return HTMLResponse(base_page(file, limit))
+    return HTMLResponse(base_page(file, limit, exclude_same_author, force))
 
 
 @app.get("/similar/events")
