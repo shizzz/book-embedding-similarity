@@ -118,7 +118,7 @@ async def similar_events(
     file: str,
     limit: int = 50,
     exclude_same_author: bool = False,
-    force: bool = True
+    force: bool = False
 ):
     async def event_stream():
         start = time.perf_counter()
