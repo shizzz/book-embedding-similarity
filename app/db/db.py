@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Tuple
-from app.models import Book
+from app.models import Book, Feedback
 from app.settings.config import DB_FILE
 
 class DBManager:
@@ -79,7 +79,16 @@ class DBManager:
                 FOREIGN KEY (book) REFERENCES books(book),
                 FOREIGN KEY (similar_book) REFERENCES books(book)
             );
-
+                               
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_file_name TEXT NOT NULL,
+                candidate_file_name TEXT NOT NULL,
+                label INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(source_file_name, candidate_file_name)
+            );
+                               
             CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
             CREATE INDEX IF NOT EXISTS idx_embeddings_book ON embeddings(book);
             CREATE INDEX IF NOT EXISTS idx_similar_book ON similar(book);
@@ -274,3 +283,31 @@ class DBManager:
             """, (book, limit)).fetchall()
 
             return [(similar_book, score, title) for similar_book, score, title in rows]
+
+    async def submit_feedback(self, fb: Feedback):   
+        with self.connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO feedback 
+                (source_file_name, candidate_file_name, label)
+                VALUES (?, ?, ?)
+            """, (fb.source_file_name, fb.candidate_file_name, fb.label))
+            conn.commit()
+    
+    def  fetch_feedbacks(self, book: str):
+        feedback_dict = {}
+
+        with self.connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT candidate_file_name, AVG(label) as avg_label
+                FROM feedback
+                WHERE source_file_name = ?
+                GROUP BY candidate_file_name
+            """, (book,))
+            
+            for row in cursor:
+                candidate_fn, avg_label = row
+                if avg_label is not None:
+                    feedback_dict[candidate_fn] = float(avg_label)
+
+        return feedback_dict

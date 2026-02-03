@@ -25,7 +25,9 @@ class SimilarSearchService:
         if self.__source.embedding is None:
             return []
 
-        candidates = []               # ← только здесь храним результаты
+        feedback_dict = self.__db.fetch_feedbacks(self.__source.file_name)
+
+        candidates = []
         current = 0
         step = max(1, self.__total * self.__step_percent // 100)
 
@@ -39,7 +41,6 @@ class SimilarSearchService:
                 archive, book, title, embedding, authors_csv = row
                 authors = authors_csv.split(',') if authors_csv else []
 
-                # Быстрые фильтры — отсеиваем до десериализации
                 if book == self.__source.file_name or title == self.__source.title:
                     continue
                 if self.__exclude_same_authors and self.__source.authors and authors:
@@ -48,21 +49,20 @@ class SimilarSearchService:
 
                 try:
                     emb = pickle.loads(embedding)
-                    norm = np.linalg.norm(emb)
-                    if norm < 1e-9:
-                        continue
+                    norm = np.linalg.norm(emb) + 1e-12
                     emb_norm = (emb / norm).astype(np.float32)
-                    score = np.dot(emb_norm, self.__source.embedding)
+                    cosine = np.dot(emb_norm, self.__source.embedding)
 
-                    candidates.append((
-                        score,
-                        Book(
-                            archive_name=archive,
-                            file_name=book,
-                            title=title,
-                            authors=authors
-                        )
-                    ))
+                    # ─── Буст берём из словаря (O(1)) ───
+                    boost = feedback_dict.get(book, 0.0)
+                    adjusted_score = cosine + boost * 0.4   # или cosine * (1 + boost * 0.5)
+
+                    candidates.append((adjusted_score, Book(
+                        archive_name=archive,
+                        file_name=book,
+                        title=title,
+                        authors=authors
+                    )))
 
                 except Exception:
                     continue
@@ -71,15 +71,12 @@ class SimilarSearchService:
                     percent = min(99, current * 100 // self.__total)
                     progress_callback(percent)
 
-            candidates.sort(key=lambda x: x[0], reverse=True)
+        # Финальная сортировка уже по adjusted_score
+        candidates.sort(key=lambda x: x[0], reverse=True)
 
-            top_candidates = [
-                (score, book)
-                for score, book in candidates[:self.__limit]
-            ]
-
+        top_candidates = candidates[:self.__limit]
 
         if progress_callback:
-            progress_callback(100)  
+            progress_callback(100)
 
         return top_candidates

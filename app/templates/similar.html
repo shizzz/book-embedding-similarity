@@ -67,9 +67,43 @@
             document.getElementById("status").className = "error";
             document.getElementById("progress").innerText = "";
         };
+    
+        document.addEventListener('click', async function(e) {
+            if (e.target.classList.contains('like-btn') || e.target.classList.contains('dislike-btn')) {
+                e.preventDefault();
+                const btn = e.target;
+                const row = btn.closest('tr');
+                if (!row) return;
 
-        // Для отладки в консоли
-        console.log("Подключение к SSE для книги:", file);
+                const candidate = row.dataset.candidate;
+                const action = btn.dataset.action;
+
+                try {
+                    const resp = await fetch('/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            source_file_name: '{{ file | e }}',  // из контекста страницы
+                            candidate_file_name: candidate,
+                            label: parseInt(action)
+                        })
+                    });
+
+                    if (resp.ok) {
+                        row.querySelectorAll('button').forEach(b => {
+                            b.style.opacity = '0.4';
+                            b.disabled = true;
+                        });
+                        btn.style.opacity = '1';
+                        btn.style.fontWeight = 'bold';
+                    } else {
+                        alert('Ошибка отправки');
+                    }
+                } catch (err) {
+                    alert('Ошибка сети: ' + err.message);
+                }
+            }
+        });
     </script>
 </body>
 </html>

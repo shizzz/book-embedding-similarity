@@ -4,13 +4,14 @@ import asyncio
 from typing import List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from contextlib import asynccontextmanager
 
 from app.db import DBManager
-from app.models import Book
+from app.models import Book, Feedback
 from app.settings.config import LIB_URL, BASE_DIR
 from app.services.similar_search_service import SimilarSearchService
 
@@ -42,6 +43,11 @@ class TaskState:
 
 tasks: dict[str, TaskState] = {}
 
+def remove_task(file_name: str):
+    if file_name in tasks:
+        tasks[file_name].done_event.set()
+        del tasks[file_name]
+
 def update_progress(file: str, percent: int):
     if file in tasks:
         tasks[file].set_progress(percent)
@@ -51,37 +57,28 @@ def make_lib_url(file_name: str) -> str:
     return f"{LIB_URL}/#/extended?page=1&limit=20&ex_file={ex_file}"
 
 def render_similar_table(
+    request: Request,
     base_book: Book,
     rows: List[Tuple[str, float, str]],
     elapsed: float
-) -> str:
-    html = f"""
-    <h2>Похожие книги для <code>{base_book.title}</code></h2>
-    <p class="elapsed">Время выполнения: {elapsed:.3f} сек</p>
+) -> HTMLResponse:
+    # Подготавливаем данные для шаблона
+    prepared_rows = [
+        {"file_name": file_name, "score": score, "title": title}
+        for file_name, score, title in rows
+    ]
 
-    <table border="1" cellpadding="6" cellspacing="0">
-        <tr>
-            <th>#</th>
-            <th>Score (%)</th>
-            <th>Файл</th>
-            <th>Название</th>
-            <th>Ссылка</th>
-        </tr>
-    """
-
-    for i, (base_book.file_name, score, title) in enumerate(rows, 1):
-        html += f"""
-        <tr>
-            <td>{i}</td>
-            <td>{score * 100:.2f}</td>
-            <td>{base_book.file_name}</td>
-            <td>{title}</td>
-            <td><a href="{make_lib_url(base_book.file_name)}" target="_blank">Открыть</a></td>
-        </tr>
-        """
-
-    html += "</table>"
-    return html
+    return templates.TemplateResponse(
+        "similar_table.html",
+        {
+            "request": request,
+            "base_book": base_book,
+            "rows": prepared_rows,
+            "elapsed": elapsed,
+            "source_file_name": base_book.file_name,
+            "make_lib_url": make_lib_url,  # передаём функцию, если нужно
+        }
+    )
 
 def compute_similar(book: Book, limit: int, exclude_same_author: bool):
     state = tasks[book.file_name]
@@ -106,10 +103,17 @@ def compute_similar(book: Book, limit: int, exclude_same_author: bool):
     except Exception as e:
         state.set_error(str(e))
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("App init...")
+    db.init_db()
+    print("App init finished")
+    yield
+
+app.router.lifespan_context = lifespan
 # =========================================================
 # HTTP endpoints
 # =========================================================
-
 @app.get("/similar", response_class=HTMLResponse)
 def similar_page(
     request: Request,
@@ -129,11 +133,9 @@ def similar_page(
         }
     )
 
-# ──────────────────────────────────────────────
-# SSE эндпоинт
-# ──────────────────────────────────────────────
 @app.get("/similar/events")
 async def similar_events(
+    request: Request,
     file: str,
     limit: int = 50,
     exclude_same_author: bool = False,
@@ -143,20 +145,24 @@ async def similar_events(
         start = time.perf_counter()
         book = db.get_book(file)
 
-        if not book:         
+        if not book:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
-
-        # Кэш в БД (оставляем, т.к. это полезно)
-        if not force and db.has_similar(book.file_name):
-            rows = db.get_similar_rows(book.file_name, limit)
-            html = render_similar_table(book, rows, time.perf_counter() - start)
-            yield f"data: {json.dumps({'type': 'done', 'html': html})}\n\n"
             return
 
-        # Получаем или создаём состояние задачи
+        if force:
+            remove_task(book.file_name)
+
+        # Кэш-вариант
+        if not force and db.has_similar(book.file_name):
+            rows = db.get_similar_rows(book.file_name, limit)
+            # ← здесь был пропуск elapsed
+            elapsed = time.perf_counter() - start
+            response = render_similar_table(request, book, rows, elapsed)
+            yield f"data: {json.dumps({'type': 'done', 'html': response.body.decode()})}\n\n"
+            return
+
         if book.file_name not in tasks:
             tasks[book.file_name] = TaskState()
-            # Запускаем вычисление ОДИН раз — fire-and-forget
             loop = asyncio.get_running_loop()
             loop.run_in_executor(
                 executor,
@@ -166,7 +172,6 @@ async def similar_events(
 
         state = tasks[book.file_name]
 
-        # Ждём прогресса / результата
         while True:
             if state.error:
                 yield f"data: {json.dumps({'type': 'error', 'message': state.error})}\n\n"
@@ -174,23 +179,23 @@ async def similar_events(
 
             if state.result is not None:
                 elapsed = time.perf_counter() - start
-                html = render_similar_table(book, state.result, elapsed)
-                yield f"data: {json.dumps({'type': 'done', 'html': html})}\n\n"
-                # Опционально: сохраняем в БД для кэша
-                # db.save_similar_results(file, [(score, BookTask(...)) for ...])
+                response = render_similar_table(request, book, state.result, elapsed)
+                yield f"data: {json.dumps({'type': 'done', 'html': response.body.decode()})}\n\n"
                 break
 
-            # Показываем текущий прогресс
             yield f"data: {json.dumps({'type': 'progress', 'progress': state.progress})}\n\n"
 
-            # Ждём либо события завершения, либо таймаут для polling
             try:
                 await asyncio.wait_for(state.done_event.wait(), timeout=1.2)
             except asyncio.TimeoutError:
                 continue
 
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache"}
-    )
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.post("/feedback")
+async def submit_feedback(fb: Feedback):
+    try:
+        await db.submit_feedback(fb)
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
