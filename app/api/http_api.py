@@ -16,7 +16,6 @@ from app.settings.config import LIB_URL, BASE_DIR
 from app.services.similar_search_service import SimilarSearchService
 
 app = FastAPI(title="Book Similarity HTML API")
-app.mount("/static/css", StaticFiles(directory=f"{BASE_DIR}/static"), name="static")
 templates = Jinja2Templates(directory=f"{BASE_DIR}/templates")
 db = DBManager()
 
