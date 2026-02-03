@@ -1,17 +1,30 @@
 import sqlite3
 import pickle
-import time
 import asyncio
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Tuple
-from app.models import BookTask, QueueRecord
+from app.models import Book
 from app.settings.config import DB_FILE
 
 class DBManager:
     def __init__(self):
         self.db_file = DB_FILE
 
+    embeddings_query: str = """
+                SELECT
+                    b.archive,
+                    b.book,
+                    b.title,
+                    e.embedding,
+                    GROUP_CONCAT(a.name, ',') AS authors_csv
+                FROM books b
+                JOIN embeddings e ON e.book = b.book
+                LEFT JOIN book_authors ba ON ba.book = b.book
+                LEFT JOIN authors a ON a.id = ba.author_id
+                GROUP BY b.archive, b.book, b.title, e.embedding;
+            """
+        
     @contextmanager
     def connection(self):
         conn = sqlite3.connect(self.db_file)
@@ -67,15 +80,6 @@ class DBManager:
                 FOREIGN KEY (similar_book) REFERENCES books(book)
             );
 
-            CREATE TABLE IF NOT EXISTS process_queue (
-                book TEXT PRIMARY KEY,
-                progress INTEGER NOT NULL DEFAULT 0,
-                started_at REAL NOT NULL,
-                book_count INTEGER NOT NULL,
-                exclude_same_author BOOL NOT NULL,
-                FOREIGN KEY (book) REFERENCES books(book)
-            );
-
             CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
             CREATE INDEX IF NOT EXISTS idx_embeddings_book ON embeddings(book);
             CREATE INDEX IF NOT EXISTS idx_similar_book ON similar(book);
@@ -84,29 +88,7 @@ class DBManager:
             CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id);
             """)
 
-    def save_book(self, book, archive, id, title, author):
-        with self.connection() as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO books
-                (book, archive, id, title, author, added_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                book,
-                archive,
-                id,
-                title,
-                author,
-                datetime.now().isoformat()
-            ))
-
-    def save_embeddings(self, book, emb_vector):
-        with self.connection() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO embeddings(book, embedding) VALUES (?, ?)",
-                (book, pickle.dumps(emb_vector))
-            )
-
-    def save_book_with_emb(self, book, archive, id, title, author, emb_vector):
+    def save_book(self, book, archive, id, title, author, emb_vector):
         with self.connection() as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO books
@@ -128,7 +110,7 @@ class DBManager:
     def save_similar(
         self,
         source: str,
-        similars: List[Tuple[BookTask, float]],
+        similars: List[Tuple[float, Book]],
     ):
         with self.connection() as conn:
             cur = conn.cursor()
@@ -136,8 +118,8 @@ class DBManager:
             cur.executemany(
                 "INSERT INTO similar (book, similar_book, score) VALUES (?, ?, ?)",
                 [
-                    (source, s.file_name, score)
-                    for s, score in similars
+                    (source, book.file_name, float(score))
+                    for score, book in similars
                 ]
             )
 
@@ -175,7 +157,7 @@ class DBManager:
 
         return await asyncio.to_thread(_load)
 
-    async def load_books_with_embeddings(self) -> list[BookTask]:
+    async def load_books_with_embeddings(self) -> list[Book]:
         with self.connection() as conn:
             rows = conn.execute("""
                 SELECT
@@ -195,19 +177,18 @@ class DBManager:
             """).fetchall()
 
             return [
-                BookTask(
+                Book(
                     archive_name=archive,
                     file_name=book,
                     title=title,
                     embedding=embedding,
                     authors=authors_csv.split(",") if authors_csv else None,
-                    completed=processed == 1,
-                    in_progress=False
+                    completed=bool(processed)
                 )
                 for archive, book, title, embedding, authors_csv, processed in rows
             ]
-
-    async def load_books_with_authors(self) -> list[BookTask]:
+        
+    async def load_books_with_authors(self) -> list[Book]:
         query = """
             SELECT
                 b.archive,
@@ -225,49 +206,54 @@ class DBManager:
             rows = cursor.fetchall()
 
             return [
-                BookTask(
+                Book(
                     archive_name=archive,
                     file_name=book,
                     title=title,
-                    completed=processed == 1,
-                    in_progress=False
+                    completed=bool(processed)
                 )
                 for archive, book, title, processed in rows
             ]
-                
-    def get_queue(self) -> list[QueueRecord]:
+                  
+    def get_book(self, book: str) -> Book | None:
         with self.connection() as conn:
-            rows = conn.execute("""
+            row = conn.execute("""
                 SELECT
-                    q.book,
-                    q.progress,
-                    q.book_count,
-                    q.exclude_same_author
-                FROM process_queue q
-            """).fetchall()
+                    b.archive,
+                    b.book,
+                    b.title,
+                    e.embedding,
+                    GROUP_CONCAT(a.name, ',') AS authors_csv,
+                    EXISTS (
+                        SELECT 1 FROM similar s WHERE s.book = b.book
+                    ) AS processed
+                FROM books b
+                JOIN embeddings e ON e.book = b.book
+                LEFT JOIN book_authors ba ON ba.book = b.book
+                LEFT JOIN authors a ON a.id = ba.author_id
+                WHERE b.book = ?
+                GROUP BY b.archive, b.book, b.title, e.embedding
+            """, (book,)).fetchone()
 
-            return [
-                QueueRecord(
-                    book = book,
-                    progress = progress,
-                    book_count = book_count,
-                    exclude_same_author = exclude_same_author
-                )
-                for book, progress, book_count, exclude_same_author in rows
-            ]
-        
+            if row is None:
+                return None
+
+            archive, book_from_db, title, embedding, authors_csv, processed = row
+
+            return Book(
+                archive_name=archive,
+                file_name=book_from_db,
+                title=title,
+                embedding=embedding,
+                authors=authors_csv.split(",") if authors_csv else None,
+                completed=bool(processed)
+            )
+
     def finished_books_count(self) -> int:
         with self.connection() as conn:
             return conn.execute(
                 "SELECT COUNT(*) FROM embeddings"
             ).fetchone()[0]
-
-    def is_book_in_db(self, archive: str, book: str) -> bool:
-        with self.connection() as conn:
-            return conn.execute(
-                "SELECT 1 FROM books WHERE archive = ? AND book = ? LIMIT 1",
-                (archive, book)
-            ).fetchone() is not None
 
     def has_similar(self, book: str) -> bool:
         with self.connection() as conn:
@@ -276,45 +262,9 @@ class DBManager:
                 (book,)
             ).fetchone() is not None
 
-    def has_queue(self) -> bool:
+    def get_similar_rows(self, book: str, limit: int) -> List[Tuple[str, float, str]]:
         with self.connection() as conn:
-            return conn.execute("SELECT 1 FROM process_queue LIMIT 1").fetchone() is not None
-        
-    def in_process_queue(self, book: str) -> bool:
-        with self.connection() as conn:
-            cur = conn.execute(
-                "SELECT progress FROM process_queue WHERE book = ?",
-                (book,)
-            )
-            row = cur.fetchone()
-            return row is not None, (row[0] if row else 0)
-
-    def enqueue_process(self, book: str, book_count: int, exclude_same_author: bool):
-        with self.connection() as conn:
-            conn.execute("""
-                INSERT OR IGNORE INTO process_queue
-                (book, progress, started_at, book_count, exclude_same_author)
-                VALUES (?, 0, ?, ?, ?)
-            """, (book, time.time(), book_count, exclude_same_author))
-
-    def dequeue_process(self, book: str):
-        with self.connection() as conn:
-            conn.execute(
-                "DELETE FROM process_queue WHERE book = ?",
-                (book,)
-            )
-
-    def update_process_percent(self, book: str, percent: int):
-        with self.connection() as conn:
-            conn.execute(
-                "UPDATE process_queue SET progress = ? WHERE book = ?",
-                (percent, book)
-            )
-            conn.commit()
-
-    def get_similar_rows(self, book: str, limit: int):
-        with self.connection() as conn:
-            return conn.execute("""
+            rows = conn.execute("""
                 SELECT s.similar_book, s.score, b.title
                 FROM similar s
                 JOIN books b ON b.book = s.similar_book
@@ -322,3 +272,5 @@ class DBManager:
                 ORDER BY s.score DESC
                 LIMIT ?
             """, (book, limit)).fetchall()
+
+            return [(similar_book, score, title) for similar_book, score, title in rows]

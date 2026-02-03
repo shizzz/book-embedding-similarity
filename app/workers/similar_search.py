@@ -2,10 +2,9 @@ import pickle
 import numpy as np
 from typing import List, Tuple
 from app.workers import BaseWorker
-from app.models import BookTask, Task
+from app.models import Book, Task
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    # нормализуем оба вектора
     a_norm = a / np.linalg.norm(a)
     b_norm = b / np.linalg.norm(b)
     return float(np.dot(a_norm, b_norm))
@@ -13,7 +12,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 class SimilarSearchWorker(BaseWorker):
     def __init__(
             self, 
-            source: BookTask, 
+            source: Book, 
             top_k: int, 
             step_percent: int, 
             exclude_same_authors: bool, 
@@ -27,7 +26,7 @@ class SimilarSearchWorker(BaseWorker):
         self.__current = 0
         self.__step = 0
 
-    def get_result(self) -> List[Tuple[BookTask, float]]:
+    def get_result(self) -> List[Tuple[Book, float]]:
         self.__candidates.sort(key=lambda x: x[1], reverse=True)
         return self.__candidates[:self.__top_k]
    
@@ -57,8 +56,3 @@ class SimilarSearchWorker(BaseWorker):
         score = cosine_similarity(query_emb, book_emb)
 
         self.__candidates.append((task.book, score))
-
-        if self.__source.queue is not None:
-            if (self.__current + 1) % self.__step == 0:
-                percent = self.__current // self.__step
-                self.db.update_process_percent(self.__source.file_name, percent)

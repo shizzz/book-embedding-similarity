@@ -17,17 +17,4 @@ services:
       DB_FILE: /app/data/data.db
       MODEL_NAME: all-MiniLM-L6-v2
       MAX_WORKERS: 1
-  worker:
-    image: book-sim
-    command: -m app.background_processing
-    container_name: worker
-    volumes:
-      - /mnt/data/librusec/lib/lib.rus.ec:/books
-      - ./app/data:/app/data
-      - .:/app
-    environment:
-      LIB_URL: https://lib.some.com
-      BOOK_FOLDER: /books
-      DB_FILE: /app/data/data.db
-      MODEL_NAME: all-MiniLM-L6-v2
-      MAX_WORKERS: 1
+      

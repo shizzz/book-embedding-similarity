@@ -7,11 +7,10 @@ class GenerateSimilarWorker(BaseWorker):
         super().__init__(**kwargs)
 
     async def stat_books(self):
-        tasks = await self.db.load_books_with_embeddings()
-        await self.registry.fill_from_books(tasks, True)
+        books = await self.db.load_books_with_embeddings()
+        await self.registry.fill_from_books(books, True)
 
-        self.embeddings = BookRegistry()
-        self.embeddings.add_books(tasks)
+        self.embeddings = BookRegistry(books)
 
     def process_book(self, task: Task):
         service = SimilarSearchService(

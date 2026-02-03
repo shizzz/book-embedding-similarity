@@ -2,7 +2,7 @@ import os
 import zipfile
 from app.workers import BaseWorker
 from app.utils import FB2Book
-from app.models import BookTask, Task
+from app.models import Book, Task
 from app.settings.config import BOOK_FOLDER
 
 class GenerateEmbeddingsWorker(BaseWorker):
@@ -27,7 +27,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
                     
                     tasks.append(Task(
                         name=info.filename,
-                        book=BookTask(
+                        book=Book(
                             archive_name=archive,
                             file_name=info.filename
                         )
@@ -46,7 +46,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
         embedding = self.model.encode(text)
 
-        self.db.save_book_with_emb(
+        self.db.save_book(
             task.book.file_name,
             task.book.archive_name,
             id,

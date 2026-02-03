@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 import time
-from app.models import BookRegistry, BookTask, TaskRegistry
+from app.models import Book
 from app.services.similar_search_service import SimilarSearchService
 from app.db import DBManager
 from app.settings.config import LIB_URL
@@ -14,7 +14,7 @@ def make_lib_url(file_name: str) -> str:
 
 def print_similar_books(
     source_file: str,
-    similars: list[tuple[BookTask, float]],
+    similars: list[tuple[Book, float]],
     started_at: float
 ):
     elapsed = time.perf_counter() - started_at
@@ -22,35 +22,29 @@ def print_similar_books(
     print(f"\nТоп-50 похожих книг для {source_file}")
     print(f"Время выполнения: {elapsed:.3f} сек\n")
 
-    for book, score in similars:
+    for score, book in similars:
         percent = score * 100
         url = make_lib_url(book.file_name)
 
         print(f"{percent:6.2f},{book.file_name},{book.title},{url}")
 
 async def main():
-    books = BookRegistry()
-
     start = time.perf_counter()
     parser = argparse.ArgumentParser(description="Показать топ-50 похожих книг")
     parser.add_argument("file_name", type=str, help="Имя файла книги")
     args = parser.parse_args()
 
-    rows = await db.load_books_with_embeddings()
-    books.add_books(rows)
-
-    book_task = books.get_book_by_name(args.file_name)
+    book_task = db.get_book(args.file_name)
     if not book_task:
         print(f"Книга {args.file_name} не найдена в реестре")
         return
 
-    if not book_task.embedding:
+    if book_task.embedding is None:
         print(f"Для книги {args.file_name} нет embedding")
         return
 
     service = SimilarSearchService(
         source=book_task,
-        registry=books,
         limit=100,
         exclude_same_authors=False,
         step_percent=5)

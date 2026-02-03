@@ -1,5 +1,4 @@
-from .book import BookTask, BookRegistry
-from .queue import Queue, QueueRecord
+from .book import Book, BookRegistry
 from .task import Task, TaskRegistry
 
-__all__ = ["BookTask", "BookRegistry", "Queue", "QueueRecord", "Task", "TaskRegistry"]
+__all__ = ["Book", "BookRegistry", "Task", "TaskRegistry"]

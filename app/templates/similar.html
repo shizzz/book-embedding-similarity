@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Похожие книги — {{ file }}</title>
+    <link rel="stylesheet" href="/static/css/similar.css">
+</head>
+<body>
+    <h1>Поиск похожих книг</h1>
+    
+    <p>Книга: <code id="book-file">{{ file }}</code></p>
+
+    <div id="status" class="loading">Подготовка…</div>
+    <div id="progress"></div>
+    <div id="result"></div>
+
+    <script>
+        // Параметры из URL (передаются через Jinja или Query)
+        const urlParams = new URLSearchParams(window.location.search);
+        const file = "{{ file | e }}";  // экранирование на всякий случай
+        const limit = {{ limit }};
+        const exclude_same_author = {{ "true" if exclude_same_author else "false" }};
+        const force = {{ "true" if force else "false" }};
+
+        const es = new EventSource(
+            `/similar/events?file=${encodeURIComponent(file)}&limit=${limit}&exclude_same_author=${exclude_same_author}&force=${force}`
+        );
+
+        es.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+
+                if (data.type === "progress") {
+                    document.getElementById("status").innerText = "Идёт поиск похожих книг…";
+                    document.getElementById("status").className = "loading";
+                    document.getElementById("progress").innerText = `Прогресс: ${data.progress}%`;
+                }
+
+                else if (data.type === "done") {
+                    es.close();
+                    document.getElementById("status").innerText = "Готово!";
+                    document.getElementById("status").className = "";
+                    document.getElementById("progress").innerText = "";
+                    document.getElementById("result").innerHTML = data.html;
+                }
+
+                else if (data.type === "error") {
+                    es.close();
+                    document.getElementById("status").innerText = "Ошибка";
+                    document.getElementById("status").className = "error";
+                    document.getElementById("progress").innerText = "";
+                    document.getElementById("result").innerHTML = 
+                        `<p class="error">Не удалось обработать запрос: ${data.message || 'неизвестная ошибка'}</p>`;
+                }
+            } catch (err) {
+                console.error("Ошибка парсинга SSE:", err);
+                document.getElementById("status").innerText = "Ошибка соединения";
+                document.getElementById("status").className = "error";
+            }
+        };
+
+        es.onerror = function() {
+            console.error("Ошибка EventSource");
+            es.close();
+            document.getElementById("status").innerText = "Потеряно соединение с сервером";
+            document.getElementById("status").className = "error";
+            document.getElementById("progress").innerText = "";
+        };
+
+        // Для отладки в консоли
+        console.log("Подключение к SSE для книги:", file);
+    </script>
+</body>
+</html>
