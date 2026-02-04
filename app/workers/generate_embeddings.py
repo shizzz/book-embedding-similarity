@@ -3,6 +3,7 @@ import zipfile
 from app.workers import BaseWorker
 from app.utils import FB2Book
 from app.models import Book, Task
+from app.services import HNSWService
 from app.settings.config import BOOK_FOLDER
 
 class GenerateEmbeddingsWorker(BaseWorker):
@@ -33,6 +34,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
                         )
                     ))
         await self.registry.add(tasks)
+        hnswService = HNSWService()
+
+        # После обновления\добавления эмбедингов, индекс нужно перестроить
+        hnswService.delete_index_file()
 
     def process_book(self, task: Task):
         data = task.book.get_file_bytes_from_zip()

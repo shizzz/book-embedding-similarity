@@ -116,7 +116,7 @@ class DBManager:
                 (book, pickle.dumps(emb_vector))
             )
 
-    def save_similar(self, similars: List[Similar]):
+    def save_and_replace_similar(self, similars: List[Similar]):
         unique_files = list({similar.source_file_name for similar in similars})
         placeholders = ", ".join("?" * len(unique_files))
 
@@ -133,6 +133,24 @@ class DBManager:
                     for similar in similars
                 ]
             )
+            conn.commit()
+
+    def save_similar(self, similars: List[Similar]):
+        with self.connection() as conn:
+            cur = conn.cursor()
+            cur.executemany(
+                "INSERT INTO similar (book, similar_book, score) VALUES (?, ?, ?)",
+                [
+                    (similar.source_file_name, similar.candidate_file_name, float(similar.score))
+                    for similar in similars
+                ]
+            )
+            conn.commit()
+
+    def delete_similar(self):
+        with self.connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM similar",)
             conn.commit()
 
     def update_book_authors(self, book: str, authors: list[str]):

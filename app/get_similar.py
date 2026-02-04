@@ -51,7 +51,7 @@ async def main():
         step_percent=5)
     
     similars = service.run()
-    db.save_similar(similars)
+    db.save_and_replace_similar(similars)
 
     print_similar_books(
         source_file=book_task.file_name,

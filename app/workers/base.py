@@ -108,6 +108,7 @@ class BaseWorker:
 
         self.logger.info(f"Starting processing for {remaining} books...")
         await self._executeWorkers()
+        self.logger.info("Finalise")
         await self.fin()
 
         self.logger.info("All books processed!")

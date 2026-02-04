@@ -102,7 +102,7 @@ def compute_similar(book: Book, limit: int, exclude_same_author: bool):
         # Передаём callback
         similars = service.run(progress_callback=lambda p: update_progress(book.file_name, p))
 
-        db.save_similar(similars)
+        db.save_and_replace_similar(similars)
         state.set_done(similars)
 
     except Exception as e:
