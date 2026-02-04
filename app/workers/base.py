@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from asyncio import create_task, gather
 from rich.live import Live
 from app.utils import StatsUI
@@ -22,6 +23,12 @@ class BaseWorker:
 
         if self.show_ui:
             self.ui = StatsUI(max_workers = self.max_workers)
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        self.logger.addHandler(handler)
         
     async def stat_books(self):
         raise NotImplementedError("stat_books must be implemented by subclass")
@@ -29,12 +36,15 @@ class BaseWorker:
     def process_book(self, task):
         raise NotImplementedError("process_book must be implemented by subclass")
     
+    async def fin(self):
+        self.logger.info(f"Nothing to finalise")
+    
     async def _sleepyWorker(self):
         while True:
             try:
                 await asyncio.to_thread(self.process_book, None)
             except Exception as error:
-                print(f"ERROR processing task: {error}")
+                self.logger.error(f"ERROR processing task: {error}")
 
             await asyncio.sleep(1)
 
@@ -53,7 +63,7 @@ class BaseWorker:
             except Exception as error:
                 if self.show_ui:
                     await self.ui.error(live)
-                print(f"ERROR processing {task.name}: {error}")
+                self.logger.error(f"ERROR processing {task.name}: {error}")
             finally:
                 self.registry.queue.task_done()
                 self.registry.mark_completed()
@@ -80,13 +90,13 @@ class BaseWorker:
             await gather(*tasks)
 
     async def run(self):
-        print("Prepare...")
+        self.logger.info("Prepare...")
 
         # инициализация базы
         await asyncio.to_thread(self.db.init_db)
 
         # подготовка реестра
-        print("Stat books...")
+        self.logger.info("Stat books...")
         await self.stat_books()
 
         total = self.registry.total
@@ -96,7 +106,8 @@ class BaseWorker:
         if self.show_ui:
             await self.ui.init(total, remaining)
 
-        print(f"Starting processing for {remaining} books...")
+        self.logger.info(f"Starting processing for {remaining} books...")
         await self._executeWorkers()
+        await self.fin()
 
-        print("All books processed!")
+        self.logger.info("All books processed!")

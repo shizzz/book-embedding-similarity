@@ -1,6 +1,7 @@
 import time
 import json
 import asyncio
+import logging
 from typing import List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -11,20 +12,25 @@ from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 
 from app.db import DBManager
-from app.models import Book, FeedbackReq
+from app.models import Book, FeedbackReq, Similar
 from app.settings.config import LIB_URL, BASE_DIR
 from app.services.similar_search_service import SimilarSearchService
 
 app = FastAPI(title="Book Similarity HTML API")
 templates = Jinja2Templates(directory=f"{BASE_DIR}/templates")
 db = DBManager()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+logger.addHandler(handler)
 
 executor = ThreadPoolExecutor(max_workers=1)
 
 class TaskState:
     def __init__(self):
         self.progress: int = 0
-        self.result: Optional[List[Tuple[str, float, str]]] = None
+        self.result: Optional[List[Similar]] = None
         self.error: Optional[str] = None
         self.start_time: float = time.perf_counter()
         self.done_event = asyncio.Event()
@@ -32,8 +38,8 @@ class TaskState:
     def set_progress(self, percent: int):
         self.progress = percent
 
-    def set_done(self, rows: List[Tuple[str, float, str]]):
-        self.result = rows
+    def set_done(self, similars: List[Similar]):
+        self.result = similars
         self.done_event.set()
 
     def set_error(self, msg: str):
@@ -58,13 +64,16 @@ def make_lib_url(file_name: str) -> str:
 def render_similar_table(
     request: Request,
     base_book: Book,
-    rows: List[Tuple[str, float, str]],
+    similars: List[Similar],
     elapsed: float
 ) -> HTMLResponse:
     # Подготавливаем данные для шаблона
     prepared_rows = [
-        {"file_name": file_name, "score": score, "title": title}
-        for file_name, score, title in rows
+        {
+            "file_name": similar.candidate.file_name,
+            "score": similar.score,
+            "title": similar.candidate.title}
+        for similar in similars
     ]
 
     return templates.TemplateResponse(
@@ -91,22 +100,19 @@ def compute_similar(book: Book, limit: int, exclude_same_author: bool):
         )
 
         # Передаём callback
-        top = service.run(progress_callback=lambda p: update_progress(book.file_name, p))
+        similars = service.run(progress_callback=lambda p: update_progress(book.file_name, p))
 
-        # Подготавливаем строки для рендера
-        rows = [(b.file_name, score, b.title) for score, b in top]
-
-        db.save_similar(book.file_name, top)
-        state.set_done(rows)
+        db.save_similar(similars)
+        state.set_done(similars)
 
     except Exception as e:
         state.set_error(str(e))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("App init...")
+    logger.info("App init...")
     db.init_db()
-    print("App init finished")
+    logger.info("App init finished")
     yield
 
 app.router.lifespan_context = lifespan
@@ -153,10 +159,9 @@ async def similar_events(
 
         # Кэш-вариант
         if not force and db.has_similar(book.file_name):
-            rows = db.get_similar_rows(book.file_name, limit)
-            # ← здесь был пропуск elapsed
+            similars = db.get_similas(book.file_name, limit)
             elapsed = time.perf_counter() - start
-            response = render_similar_table(request, book, rows, elapsed)
+            response = render_similar_table(request, book, similars, elapsed)
             yield f"data: {json.dumps({'type': 'done', 'html': response.body.decode()})}\n\n"
             return
 

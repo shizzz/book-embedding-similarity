@@ -14,25 +14,20 @@ class SimilarSearchWorker(BaseWorker):
             self, 
             source: Book, 
             top_k: int, 
-            step_percent: int, 
             exclude_same_authors: bool, 
             **kwargs):
         super().__init__(**kwargs)
         self.__source = source
         self.__top_k = top_k
         self.__exclude_same_authors = exclude_same_authors
-        self.__step_percent = step_percent
         self.__candidates = []
         self.__current = 0
-        self.__step = 0
 
     def get_result(self) -> List[Tuple[Book, float]]:
         self.__candidates.sort(key=lambda x: x[1], reverse=True)
         return self.__candidates[:self.__top_k]
    
     async def stat_books(self):
-        total = self.registry.total
-        self.__step = total * self.__step_percent // 100
         return
 
     def process_book(self, task: Task):

@@ -2,7 +2,7 @@ import time
 import logging
 import numpy as np
 from typing import List, Tuple
-from app.models import Book, Feedbacks
+from app.models import Book, Feedbacks, Similar
 from app.db import DBManager
 import faiss
 
@@ -132,10 +132,15 @@ class BulkSimilarSearchService:
             boost = self.feedbacks.get_boost(source.file_name, book.file_name, self.__boos_factor)
             adjusted = similarity + boost
 
-            candidates.append((adjusted, book))
+            candidates.append((adjusted, source, book))
 
             if len(candidates) >= self.__limit * 3:
                 break
 
         candidates.sort(key=lambda x: x[0], reverse=True)
-        return candidates[:self.__limit]
+        top = candidates[:self.__limit]
+        
+        result = []
+        for score, source, book in top:
+            result.append(Similar.from_books(score, source, book))
+        return result

@@ -1,7 +1,7 @@
 import numpy as np
 import pickle
 from typing import List, Tuple
-from app.models import Book
+from app.models import Book, Similar
 from app.db import DBManager
 
 class SimilarSearchService:
@@ -21,13 +21,13 @@ class SimilarSearchService:
         self.__db = db
         self.__total = db.finished_books_count()
 
-    def run(self, progress_callback=None) -> List[Tuple[float, Book]]:
+    def run(self, progress_callback=None) -> List[Similar]:
         if self.__source.embedding is None:
             return []
 
         feedbacks = self.__db.fetch_feedbacks(self.__source.file_name)
 
-        candidates = []
+        candidates = []  # List[Tuple[float, str, str, str, List[str]]]
         current = 0
         step = max(1, self.__total * self.__step_percent // 100)
 
@@ -56,26 +56,30 @@ class SimilarSearchService:
                     boost = feedbacks.get_boost(self.__source.file_name, book)
                     adjusted = similarity + boost
 
-                    candidates.append((adjusted, Book(
-                        archive_name=archive,
-                        file_name=book,
-                        title=title,
-                        authors=authors
-                    )))
+                    candidates.append((adjusted, book, title, archive, authors))
 
-                except Exception:
+                except Exception as e:
                     continue
 
                 if progress_callback and current % step == 0:
                     percent = min(99, current * 100 // self.__total)
                     progress_callback(percent)
 
-        # Финальная сортировка уже по adjusted_score
         candidates.sort(key=lambda x: x[0], reverse=True)
+        top = candidates[:self.__limit]
 
-        top_candidates = candidates[:self.__limit]
+        result = []
+        for score, book, title, arch, authors in top:
+            result.append(Similar.from_books(
+                score, 
+                self.__source, 
+                Book(
+                    archive_name=arch, 
+                    file_name=book, 
+                    title=title, 
+                    authors=authors)))
 
         if progress_callback:
             progress_callback(100)
 
-        return top_candidates
+        return result

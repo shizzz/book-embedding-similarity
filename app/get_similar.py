@@ -1,7 +1,8 @@
 import argparse
 import asyncio
 import time
-from app.models import Book
+from typing import List
+from app.models import Similar
 from app.services.similar_search_service import SimilarSearchService
 from app.db import DBManager
 from app.settings.config import LIB_URL
@@ -14,7 +15,7 @@ def make_lib_url(file_name: str) -> str:
 
 def print_similar_books(
     source_file: str,
-    similars: list[tuple[Book, float]],
+    similars: List[Similar],
     started_at: float
 ):
     elapsed = time.perf_counter() - started_at
@@ -22,11 +23,11 @@ def print_similar_books(
     print(f"\nТоп-50 похожих книг для {source_file}")
     print(f"Время выполнения: {elapsed:.3f} сек\n")
 
-    for score, book in similars:
-        percent = score * 100
-        url = make_lib_url(book.file_name)
+    for similar in similars:
+        percent = similar.score * 100
+        url = make_lib_url(similar.candidate.file_name)
 
-        print(f"{percent:6.2f},{book.file_name},{book.title},{url}")
+        print(f"{percent:6.2f},{similar.candidate.file_name},{similar.candidate.title},{url}")
 
 async def main():
     start = time.perf_counter()
@@ -50,7 +51,7 @@ async def main():
         step_percent=5)
     
     similars = service.run()
-    db.save_similar(book_task.file_name, similars)
+    db.save_similar(similars)
 
     print_similar_books(
         source_file=book_task.file_name,

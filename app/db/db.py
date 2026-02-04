@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Tuple
-from app.models import Book, FeedbackReq, Feedback, Feedbacks
+from app.models import Book, FeedbackReq, Feedback, Feedbacks, Similar
 from app.settings.config import DB_FILE
 
 class DBManager:
@@ -116,21 +116,24 @@ class DBManager:
                 (book, pickle.dumps(emb_vector))
             )
 
-    def save_similar(
-        self,
-        source: str,
-        similars: List[Tuple[float, Book]],
-    ):
+    def save_similar(self, similars: List[Similar]):
+        unique_files = list({similar.source_file_name for similar in similars})
+        placeholders = ", ".join("?" * len(unique_files))
+
         with self.connection() as conn:
             cur = conn.cursor()
-            cur.execute("DELETE FROM similar WHERE book = ?", (source,))
+            cur.execute(
+                f"DELETE FROM similar WHERE book IN ({placeholders})",
+                list(unique_files)
+            )
             cur.executemany(
                 "INSERT INTO similar (book, similar_book, score) VALUES (?, ?, ?)",
                 [
-                    (source, book.file_name, float(score))
-                    for score, book in similars
+                    (similar.source_file_name, similar.candidate_file_name, float(similar.score))
+                    for similar in similars
                 ]
             )
+            conn.commit()
 
     def update_book_authors(self, book: str, authors: list[str]):
         with self.connection() as conn:
@@ -271,18 +274,48 @@ class DBManager:
                 (book,)
             ).fetchone() is not None
 
-    def get_similar_rows(self, book: str, limit: int) -> List[Tuple[str, float, str]]:
+    def get_similas(self, book: str, limit: int) -> List[Similar]:
         with self.connection() as conn:
             rows = conn.execute("""
-                SELECT s.similar_book, s.score, b.title
+                SELECT
+                    s.score, 
+                    b_source.archive as source_archive,
+                    b_source.book as source_book,
+                    b_source.title as source_title, 
+                    b_similar.archive as similar_archive,
+                    b_similar.book as similar_book,
+                    b_similar.title as similar_title
                 FROM similar s
-                JOIN books b ON b.book = s.similar_book
+                JOIN books b_source ON b_source.book = s.book
+                JOIN books b_similar ON b_similar.book = s.similar_book
                 WHERE s.book = ?
                 ORDER BY s.score DESC
                 LIMIT ?
             """, (book, limit)).fetchall()
 
-            return [(similar_book, score, title) for similar_book, score, title in rows]
+            return [
+                    (Similar.from_books(
+                        score,
+                        Book(
+                            archive_name=source_archive,
+                            file_name=source_book,
+                            title=source_title
+                        ),
+                        Book(
+                            archive_name=similar_archive,
+                            file_name=similar_book,
+                            title=similar_title
+                        ))) 
+                    for 
+                        score, 
+                        source_archive, 
+                        source_book, 
+                        source_title,
+                        similar_archive,
+                        similar_book,
+                        similar_title
+                    in rows
+                ]
 
     async def submit_feedback(self, fb: FeedbackReq):   
         with self.connection() as conn:
@@ -291,6 +324,9 @@ class DBManager:
                 (source_file_name, candidate_file_name, label)
                 VALUES (?, ?, ?)
             """, (fb.source_file_name, fb.candidate_file_name, fb.label))
+
+            conn.execute("DELETE FROM similar WHERE book = ?", (fb.source_file_name,))
+
             conn.commit()
     
     def fetch_feedbacks(self, book: str) -> Feedbacks:

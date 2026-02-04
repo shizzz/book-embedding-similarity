@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Tuple
 
 class FeedbackReq(BaseModel):
     source_file_name: str
@@ -30,24 +30,26 @@ class Feedback:
             )
         return None
         
+@dataclass(slots=True)
 class Feedbacks:
     feedbacks: List[Feedback]
+    _pair_to_boost: Dict[Tuple[str, str], float] = field(default_factory=dict, init=False)
 
-    def __init__(self, feedbacks: List[Feedback]):
-        self.feedbacks = feedbacks
+    def __post_init__(self):
+        self._pair_to_boost = {}
+        agg = {}
+        for fb in self.feedbacks:
+            key = (fb.source_file_name, fb.candidate_file_name)
+            if key not in agg:
+                agg[key] = []
+            agg[key].append(fb.label)
 
-    def get_boost(self, source_file_name: str, candidate_file_name: str, factor: float = 0.4) -> float:
-        relevant_labels = [
-            fb.label for fb in self.feedbacks
-            if fb.source_file_name == source_file_name
-            and fb.candidate_file_name == candidate_file_name
-        ]
+        for key, labels in agg.items():
+            avg = sum(labels) / len(labels)
+            self._pair_to_boost[key] = avg
 
-        if not relevant_labels:
-            return 0.0
-
-        avg_label = sum(relevant_labels) / len(relevant_labels)
-        count = len(relevant_labels)
-        trust = min(count / 5.0, 1.0)  # доверие растёт до 5 оценок
-
-        return avg_label * factor * trust
+    def get_boost(self, source_fn: str, cand_fn: str, factor: float = 0.4) -> float:
+            key = (source_fn, cand_fn)
+            avg = self._pair_to_boost.get(key, 0.0)
+            trust = 1.0
+            return avg * factor * trust
