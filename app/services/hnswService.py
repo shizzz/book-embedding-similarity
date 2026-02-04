@@ -3,25 +3,19 @@ import faiss
 import time
 import numpy as np
 from tqdm import tqdm
-from app.settings.config import BASE_DIR
+from app.settings.config import BASE_DIR, HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH
 
 class HNSWService:
     def __init__(
         self,
         embeddings: list | np.ndarray,  # Вектора для генерации (если файла нет)
         embedding_dim: int,
-        m: int = 32,                    # M для HNSW
-        ef_construction: int = 80,      # efConstruction
-        ef_search: int = 64,            # efSearch (для поиска, не влияет на построение)
         index_file: str = f"{BASE_DIR}/data/hnsw_index.index",  # Путь к файлу
         batch_size: int = None,        # Для батчевого добавления
         logger = None
     ):
         self.embeddings = np.ascontiguousarray(embeddings).astype(np.float32)
         self.embedding_dim = embedding_dim
-        self.m = m
-        self.ef_construction = ef_construction
-        self.ef_search = ef_search
         self.index_file = index_file
         self._index = None
         self.logger = logger
@@ -31,7 +25,7 @@ class HNSWService:
             self.batch_size = batch_size
 
     def __estimate_hnsw_memory_gb(self, ntotal: int, dim: int, overhead_factor: float = 1.12) -> float:
-        bytes_per_vector = (dim * 4) + (self.m * 8)
+        bytes_per_vector = (dim * 4) + (HNSW_M * 8)
         total_bytes = ntotal * bytes_per_vector
         total_bytes_with_overhead = total_bytes * overhead_factor
         gb = total_bytes_with_overhead / (1024 ** 3)
@@ -55,12 +49,12 @@ class HNSWService:
         if self.embeddings.shape[1] != self.embedding_dim:
             raise ValueError(f"Размерность embeddings ({self.embeddings.shape[1]}) не совпадает с embedding_dim ({self.embedding_dim})")
 
-        index = faiss.IndexHNSWFlat(self.embedding_dim, self.m)
-        index.hnsw.efConstruction = self.ef_construction
-        index.hnsw.efSearch = self.ef_search
+        index = faiss.IndexHNSWFlat(self.embedding_dim, HNSW_M, faiss.METRIC_INNER_PRODUCT)
+        index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
+        index.hnsw.efSearch = HNSW_EF_SEARCH
 
         n_total = self.embeddings.shape[0]
-        if self.logger: self.logger.info(f"Генерация HNSW: {n_total:,} векторов, dim={self.embedding_dim}, M={self.m}, efConstruction={self.ef_construction}")
+        if self.logger: self.logger.info(f"Генерация HNSW: {n_total:,} векторов, dim={self.embedding_dim}, M={HNSW_M}, efConstruction={HNSW_EF_CONSTRUCTION}")
 
         with tqdm(total=n_total, desc="Добавление векторов в HNSW", unit="vec", unit_scale=True) as pbar:
             for i in range(0, n_total, self.batch_size):
@@ -81,9 +75,9 @@ class HNSWService:
             f"  • время построения          : {build_time:.2f} сек\n"
             f"  • количество векторов       : {index.ntotal:,}\n"
             f"  • размерность               : {index.d}\n"
-            f"  • M (связи на узел)         : {self.m}\n"
-            f"  • efConstruction            : {self.ef_construction}\n"
-            f"  • efSearch (по умолчанию)   : {self.ef_search}\n"
+            f"  • M (связи на узел)         : {HNSW_M}\n"
+            f"  • efConstruction            : {HNSW_EF_CONSTRUCTION}\n"
+            f"  • efSearch (по умолчанию)   : {HNSW_EF_SEARCH}\n"
             f"  • память                    : ~ {mem_gb:.1f}–{mem_gb*1.15:.1f} GB"
         )
             
@@ -103,8 +97,7 @@ class HNSWService:
         if index.d != self.embedding_dim:
             raise ValueError(f"Размерность загруженного индекса ({index.d}) не совпадает с embedding_dim ({self.embedding_dim})")
 
-        # efSearch можно перезадать, если нужно
-        index.hnsw.efSearch = self.ef_search
+        index.hnsw.efSearch = HNSW_EF_SEARCH
 
         if self.logger: self.logger.info(f"Индекс загружен из '{self.index_file}' (ntotal: {index.ntotal:,})")
         return index

@@ -4,25 +4,17 @@ from typing import List
 from app.services.hnswService import HNSWService
 from app.models import Book, Feedbacks, Similar
 from app.db import DBManager
-from app.settings.config import SIMILARS_PER_BOOK
+from app.settings.config import SIMILARS_PER_BOOK, FEEDBACK_BOOST_FACTOR
 
 class BulkSimilarSearchService:
     def __init__(
         self,
         limit: int = SIMILARS_PER_BOOK,
         exclude_same_authors: bool = False,
-        ef_search: int = 64,
-        ef_construction: int = 200,
-        m: int = 32,
-        boos_factor: float = 0.4,
         logger = None
     ):
         self.__limit = limit
         self.__exclude_same_authors = exclude_same_authors
-        self.__ef_search = ef_search
-        self.__ef_construction = ef_construction
-        self.__m = m
-        self.__boos_factor = boos_factor
 
         self.__db = DBManager()
         self.index = None
@@ -81,11 +73,7 @@ class BulkSimilarSearchService:
         self.valid_embeddings = np.vstack(valid_emb_list).astype(np.float32)
         if self.logger: self.logger.info(f"Массив: {self.valid_embeddings.shape}, ~{self.valid_embeddings.nbytes / 1024**2:.1f} MiB")
 
-        if self.logger: self.logger.info(f"Построение HNSW (M={self.__m}, efSearch={self.__ef_search})...")
         hnswService = HNSWService(
-            m=self.__m,
-            ef_construction=self.__ef_construction,
-            ef_search=self.__ef_search,
             embedding_dim=self.embedding_dim,
             embeddings=self.valid_embeddings,
             logger=self.logger
@@ -128,16 +116,12 @@ class BulkSimilarSearchService:
             if self.__should_skip(source, candidate):
                 continue
 
-            similarity = float(dist)  # cosine
+            similarity = 1.0 - dist / 2.0
 
-            # Фидбек — быстрый доступ по словарю
-            boost = self.feedbacks.get_boost(source.file_name, candidate.file_name, self.__boos_factor)
+            boost = self.feedbacks.get_boost(source.file_name, candidate.file_name, FEEDBACK_BOOST_FACTOR)
             adjusted = similarity + boost
 
             candidates.append((adjusted, source, candidate))
-
-            if len(candidates) >= self.__limit * 3:
-                break
 
         candidates.sort(key=lambda x: x[0], reverse=True)
         top = candidates[:self.__limit]

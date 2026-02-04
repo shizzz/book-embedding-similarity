@@ -8,7 +8,7 @@ from app.settings.config import SIMILARS_PER_BOOK, DATABASE_QUEUE_BATCH_SIZE
 
 
 class GenerateSimilarWorker(BaseWorker):
-    __service: BulkSimilarSearchService
+    _service: BulkSimilarSearchService
     _limit: int = SIMILARS_PER_BOOK
 
     def __init__(self, **kwargs):
@@ -72,7 +72,7 @@ class GenerateSimilarWorker(BaseWorker):
     async def stat_books(self):
         self.logger.info(f"Очистка таблицы similar")
         self.db.delete_similar()
-        self.__service = BulkSimilarSearchService(
+        self._service = BulkSimilarSearchService(
             limit=self._limit,
             exclude_same_authors=False,
             logger=self.logger
@@ -80,7 +80,7 @@ class GenerateSimilarWorker(BaseWorker):
         await self.registry.fill_from_books(self.__service.valid_books, True)
 
     def process_book(self, task: Task):
-        similar = self.__service.run(task.book)
+        similar = self._service.run(task.book)
         self._queue.put(similar)
 
     async def fin(self):
