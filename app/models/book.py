@@ -59,6 +59,8 @@ class Book:
                 return f.read()
 
 class BookRegistry:
+    books: list[Book]
+    
     def __init__(self, books: list[Book] = None):
         if books:
             self.books = books

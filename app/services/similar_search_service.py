@@ -25,7 +25,7 @@ class SimilarSearchService:
         if self.__source.embedding is None:
             return []
 
-        feedback_dict = self.__db.fetch_feedbacks(self.__source.file_name)
+        feedbacks = self.__db.fetch_feedbacks(self.__source.file_name)
 
         candidates = []
         current = 0
@@ -51,13 +51,12 @@ class SimilarSearchService:
                     emb = pickle.loads(embedding)
                     norm = np.linalg.norm(emb) + 1e-12
                     emb_norm = (emb / norm).astype(np.float32)
-                    cosine = np.dot(emb_norm, self.__source.embedding)
+                    similarity = np.dot(emb_norm, self.__source.embedding)
 
-                    # ─── Буст берём из словаря (O(1)) ───
-                    boost = feedback_dict.get(book, 0.0)
-                    adjusted_score = cosine + boost * 0.4   # или cosine * (1 + boost * 0.5)
+                    boost = feedbacks.get_boost(self.__source.file_name, book)
+                    adjusted = similarity + boost
 
-                    candidates.append((adjusted_score, Book(
+                    candidates.append((adjusted, Book(
                         archive_name=archive,
                         file_name=book,
                         title=title,

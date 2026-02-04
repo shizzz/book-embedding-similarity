@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 
 from app.db import DBManager
-from app.models import Book, Feedback
+from app.models import Book, FeedbackReq
 from app.settings.config import LIB_URL, BASE_DIR
 from app.services.similar_search_service import SimilarSearchService
 
@@ -192,7 +192,7 @@ async def similar_events(
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @app.post("/feedback")
-async def submit_feedback(fb: Feedback):
+async def submit_feedback(fb: FeedbackReq):
     try:
         await db.submit_feedback(fb)
         return {"status": "ok"}

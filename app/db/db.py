@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Tuple
-from app.models import Book, Feedback
+from app.models import Book, FeedbackReq, Feedback, Feedbacks
 from app.settings.config import DB_FILE
 
 class DBManager:
@@ -166,7 +166,7 @@ class DBManager:
 
         return await asyncio.to_thread(_load)
 
-    async def load_books_with_embeddings(self) -> list[Book]:
+    def load_books_with_embeddings(self) -> List[Book]:
         with self.connection() as conn:
             rows = conn.execute("""
                 SELECT
@@ -284,7 +284,7 @@ class DBManager:
 
             return [(similar_book, score, title) for similar_book, score, title in rows]
 
-    async def submit_feedback(self, fb: Feedback):   
+    async def submit_feedback(self, fb: FeedbackReq):   
         with self.connection() as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO feedback 
@@ -293,21 +293,45 @@ class DBManager:
             """, (fb.source_file_name, fb.candidate_file_name, fb.label))
             conn.commit()
     
-    def  fetch_feedbacks(self, book: str):
-        feedback_dict = {}
-
+    def fetch_feedbacks(self, book: str) -> Feedbacks:
+        feedbacks: List[Feedback] = []
         with self.connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT candidate_file_name, AVG(label) as avg_label
+                SELECT
+                    source_file_name,
+                    candidate_file_name,
+                    label,
+                    created_at
                 FROM feedback
                 WHERE source_file_name = ?
                 GROUP BY candidate_file_name
             """, (book,))
-            
-            for row in cursor:
-                candidate_fn, avg_label = row
-                if avg_label is not None:
-                    feedback_dict[candidate_fn] = float(avg_label)
 
-        return feedback_dict
+            for row in cursor.fetchall():
+                fb = Feedback.from_row(row)
+                if fb:
+                    feedbacks.append(fb)
+        
+        return Feedbacks(feedbacks=feedbacks)
+    
+    def fetch_feedbacks_all(self) -> Feedbacks:
+        feedbacks: List[Feedback] = []
+        with self.connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    source_file_name,
+                    candidate_file_name,
+                    label,
+                    created_at
+                FROM feedback
+                ORDER BY created_at DESC
+            """)
+
+            for row in cursor.fetchall():
+                fb = Feedback.from_row(row)
+                if fb:
+                    feedbacks.append(fb)
+        
+        return Feedbacks(feedbacks=feedbacks)
