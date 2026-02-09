@@ -96,6 +96,7 @@ def compute_similar(book: Book, embedding: bytes, limit: int, exclude_same_autho
             limit=limit,
             exclude_same_authors=exclude_same_author,
             step_percent=1,
+            mode="index"
         )
 
         # Передаём callback
