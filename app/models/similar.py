@@ -2,12 +2,11 @@ from dataclasses import dataclass
 from typing import Optional
 from app.models.book import Book
 
-
 @dataclass(frozen=True, slots=True)
 class Similar:
     score: float
-    source_file_name: str
-    candidate_file_name: str
+    book_id: int
+    similar_book_id: int
     source: Optional[Book] = None
     candidate: Optional[Book] = None
 
@@ -15,13 +14,13 @@ class Similar:
     def from_files(
         cls,
         score: float,
-        source_file_name: str,
-        candidate_file_name: str,
+        book_id: int,
+        similar_book_id: int,
     ) -> "Similar":
         return cls(
             score=score,
-            source_file_name=source_file_name,
-            candidate_file_name=candidate_file_name,
+            book_id=book_id,
+            similar_book_id=similar_book_id,
         )
 
     @classmethod
@@ -33,23 +32,14 @@ class Similar:
     ) -> "Similar":
         return cls(
             score=score,
-            source_file_name=source.file_name,
-            candidate_file_name=candidate.file_name,
+            book_id=source.id,
+            similar_book_id=candidate.id,
             source=source,
             candidate=candidate,
         )
 
-    def fetch_books(self, db) -> None:
-        from app.db import DBManager
-        db = DBManager()
-
-        if self.source is None:
-            self.source = db.get_book(self.source_file_name)
-        if self.candidate is None:
-            self.candidate = db.get_book(self.candidate_file_name)
-
     def __str__(self):
-        return f"{self.score:.3f} — {self.source_file_name} → {self.candidate_file_name}"
+        return f"{self.score:.3f} — {self.book_id} → {self.similar_book_id}"
 
     def __repr__(self):
-        return f"Similar({self.score:.3f}, {self.source_file_name!r} → {self.candidate_file_name!r})"
+        return f"Similar({self.score:.3f}, {self.book_id!r} → {self.similar_book_id!r})"

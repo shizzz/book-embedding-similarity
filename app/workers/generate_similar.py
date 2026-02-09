@@ -1,9 +1,11 @@
 import queue
 import threading
 from tqdm import tqdm
+from typing import Tuple, List
 from app.workers import BaseWorker
 from app.services import BulkSimilarSearchService
-from app.models import Task
+from app.models import Task, Book
+from app.db import db, BookRepository, EmbeddingsRepository, SimilarRepository, FeedbackRepository
 from app.settings.config import SIMILARS_PER_BOOK, DATABASE_QUEUE_BATCH_SIZE
 
 
@@ -28,11 +30,13 @@ class GenerateSimilarWorker(BaseWorker):
                 self._queue.task_done()
 
                 if len(buffer) >= self._queue_batch_size:
-                    self.db.save_similar(buffer)
+                    with db() as conn:
+                        SimilarRepository.save(conn, buffer)
                     buffer = []
             except queue.Empty:
                 if buffer:
-                    self.db.save_similar(buffer)
+                    with db() as conn:
+                        SimilarRepository.save(conn, buffer)
                     buffer = []
                 continue
 
@@ -42,25 +46,26 @@ class GenerateSimilarWorker(BaseWorker):
         approx_total = self._queue.unfinished_tasks * self._limit
 
         with tqdm(total=approx_total, desc="Сброс оставшихся записей", unit=" rows", unit_scale=True) as pbar:
-            while True:
-                try:
-                    similar_list = self._queue.get_nowait()
-                    buffer.extend(similar_list)
-                    self._queue.task_done()
+            with db() as conn:
+                while True:
+                    try:
+                        similar_list = self._queue.get_nowait()
+                        buffer.extend(similar_list)
+                        self._queue.task_done()
 
-                    if len(buffer) >= self._queue_batch_size:
-                        self.db.save_similar(buffer)
-                        pbar.update(len(buffer))
-                        buffer = []
-                except queue.Empty:
-                    if buffer:
-                        self.db.save_similar(buffer)
-                        pbar.update(len(buffer))
-                        buffer = []
-                    break
-                except Exception as e:
-                    self.logger.error(f"Критическая ошибка при сбросе очереди: {e}", exc_info=True)
-                    break
+                        if len(buffer) >= self._queue_batch_size:
+                            SimilarRepository.save(conn, buffer)
+                            pbar.update(len(buffer))
+                            buffer = []
+                    except queue.Empty:
+                        if buffer:
+                            SimilarRepository.save(conn, buffer)
+                            pbar.update(len(buffer))
+                            buffer = []
+                        break
+                    except Exception as e:
+                        self.logger.error(f"Критическая ошибка при сбросе очереди: {e}", exc_info=True)
+                        break
 
         while not self._queue.empty():
             try:
@@ -71,16 +76,48 @@ class GenerateSimilarWorker(BaseWorker):
 
     async def stat_books(self):
         self.logger.info(f"Очистка таблицы similar")
-        self.db.delete_similar()
+
+        with db() as conn:
+            SimilarRepository().clear(conn)
+
+            self.logger.info(f"Получение всех книг из базы данных")
+            books_with_embeddings = list[Tuple[int, str, str, str, bytes]](BookRepository().get_all_with_embeddings(conn))
+
+            self.logger.info(f"Фильтрация книг и эмбеддингов по ID")
+            valid_books: List[Book] = []
+            valid_embeddings: List[bytes] = []
+
+            for book_id, archive, book_name, title, embedding in books_with_embeddings:
+                valid_books.append(Book(id=book_id, archive_name=archive, file_name=book_name, title=title))
+                valid_embeddings.append(embedding)
+
         self._service = BulkSimilarSearchService(
+            valid_books,
+            valid_embeddings,
             limit=self._limit,
             exclude_same_authors=False,
             logger=self.logger
         )
-        await self.registry.fill_from_books(self.__service.valid_books, True)
+
+        #self.logger.info(f"Фильтрация книг и эмбеддингов по ID для тестирования")
+        #valid_books_test = [b for b in books_with_embeddings if b[2] == "180865.fb2"]
+
+        self.logger.info(f"Добавление книг и эмбеддингов в очередь")
+        tasks: List[Task] = []
+        for book_id, archive, book_name, title, embedding in books_with_embeddings:
+            tasks.append(Task(
+                name=book_name,
+                book=Book(
+                    id=book_id,
+                    archive_name=archive,
+                    file_name=book_name,
+                    title=title),
+                embedding=embedding))
+        await self.registry.add(tasks)
+        del books_with_embeddings
 
     def process_book(self, task: Task):
-        similar = self._service.run(task.book)
+        similar = self._service.run(task.book, task.embedding)
         self._queue.put(similar)
 
     async def fin(self):

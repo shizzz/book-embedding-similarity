@@ -41,67 +41,14 @@ class DBManager:
     def init_db(self):
         with self.connection() as conn:
             conn.executescript("""
-            CREATE TABLE IF NOT EXISTS books (
-                book TEXT PRIMARY KEY,
-                archive TEXT,
-                id TEXT,
-                title TEXT,
-                author TEXT,
-                added_at TEXT
-            );
 
-            CREATE TABLE IF NOT EXISTS embeddings (
-                book TEXT PRIMARY KEY,
-                embedding BLOB,
-                FOREIGN KEY(book) REFERENCES books(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS processing (
-                book TEXT PRIMARY KEY
-            );
-
-            CREATE TABLE IF NOT EXISTS authors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS book_authors (
-                book TEXT NOT NULL,
-                author_id INTEGER NOT NULL,
-                FOREIGN KEY (book) REFERENCES books(book),
-                FOREIGN KEY (author_id) REFERENCES authors(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS similar (
-                book TEXT NOT NULL,
-                similar_book TEXT NOT NULL,
-                score FLOAT,
-                FOREIGN KEY (book) REFERENCES books(book),
-                FOREIGN KEY (similar_book) REFERENCES books(book)
-            );
-                               
-            CREATE TABLE IF NOT EXISTS feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_file_name TEXT NOT NULL,
-                candidate_file_name TEXT NOT NULL,
-                label INTEGER NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(source_file_name, candidate_file_name)
-            );
-                               
-            CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
-            CREATE INDEX IF NOT EXISTS idx_embeddings_book ON embeddings(book);
-            CREATE INDEX IF NOT EXISTS idx_similar_book ON similar(book);
-            CREATE INDEX IF NOT EXISTS idx_authors_id ON authors(id);
-            CREATE INDEX IF NOT EXISTS idx_book_authors_book ON book_authors(book);
-            CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id);
             """)
 
     def save_book(self, book, archive, id, title, author, emb_vector):
         with self.connection() as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO books
-                (book, archive, id, title, author, added_at)
+                (book, archive, uid, title, author, added_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 book,
@@ -117,7 +64,7 @@ class DBManager:
             )
 
     def save_and_replace_similar(self, similars: List[Similar]):
-        unique_files = list({similar.source_file_name for similar in similars})
+        unique_files = list({similar.book_id for similar in similars})
         placeholders = ", ".join("?" * len(unique_files))
 
         with self.connection() as conn:
@@ -129,7 +76,7 @@ class DBManager:
             cur.executemany(
                 "INSERT INTO similar (book, similar_book, score) VALUES (?, ?, ?)",
                 [
-                    (similar.source_file_name, similar.candidate_file_name, float(similar.score))
+                    (similar.book_id, similar.similar_book_id, float(similar.score))
                     for similar in similars
                 ]
             )
@@ -141,7 +88,7 @@ class DBManager:
             cur.executemany(
                 "INSERT INTO similar (book, similar_book, score) VALUES (?, ?, ?)",
                 [
-                    (similar.source_file_name, similar.candidate_file_name, float(similar.score))
+                    (similar.book_id, similar.similar_book_id, float(similar.score))
                     for similar in similars
                 ]
             )

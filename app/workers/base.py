@@ -3,7 +3,7 @@ import logging
 from asyncio import create_task, gather
 from rich.live import Live
 from app.utils import StatsUI
-from app.db import DBManager
+from app.db import Migrator
 from app.models import TaskRegistry
 from app.settings.config import MAX_WORKERS
 
@@ -16,7 +16,6 @@ class BaseWorker:
         sleepy: bool = False
     ):
         self.registry = registry or TaskRegistry()
-        self.db = DBManager()
         self.max_workers = max_workers
         self.sleepy = sleepy
         self.show_ui = show_ui
@@ -27,7 +26,7 @@ class BaseWorker:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        handler.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(message)s'))
         self.logger.addHandler(handler)
         
     async def stat_books(self):
@@ -93,7 +92,7 @@ class BaseWorker:
         self.logger.info("Prepare...")
 
         # инициализация базы
-        await asyncio.to_thread(self.db.init_db)
+        await asyncio.to_thread(Migrator().apply_schema)
 
         # подготовка реестра
         self.logger.info("Stat books...")

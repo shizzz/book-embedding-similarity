@@ -2,23 +2,21 @@ import time
 import json
 import asyncio
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 
-from app.db import DBManager
-from app.models import Book, FeedbackReq, Similar
+from app.db import db, SimilarRepository, BookRepository, FeedbackRepository, EmbeddingsRepository, Migrator
+from app.models import Book, FeedbackReq, Similar, Embedding
 from app.settings.config import LIB_URL, BASE_DIR
 from app.services.similar_search_service import SimilarSearchService
 
 app = FastAPI(title="Book Similarity HTML API")
 templates = Jinja2Templates(directory=f"{BASE_DIR}/templates")
-db = DBManager()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler()
@@ -88,12 +86,13 @@ def render_similar_table(
         }
     )
 
-def compute_similar(book: Book, limit: int, exclude_same_author: bool):
+def compute_similar(book: Book, embedding: bytes, limit: int, exclude_same_author: bool):
     state = tasks[book.file_name]
 
     try:
         service = SimilarSearchService(
             source=book,
+            embedding=Embedding.from_db(embedding),
             limit=limit,
             exclude_same_authors=exclude_same_author,
             step_percent=1,
@@ -102,7 +101,9 @@ def compute_similar(book: Book, limit: int, exclude_same_author: bool):
         # Передаём callback
         similars = service.run(progress_callback=lambda p: update_progress(book.file_name, p))
 
-        db.save_and_replace_similar(similars)
+        with db() as conn:
+            SimilarRepository().replace(conn, similars)
+
         state.set_done(similars)
 
     except Exception as e:
@@ -111,7 +112,7 @@ def compute_similar(book: Book, limit: int, exclude_same_author: bool):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("App init...")
-    db.init_db()
+    Migrator().apply_schema()
     logger.info("App init finished")
     yield
 
@@ -148,22 +149,25 @@ async def similar_events(
 ):
     async def event_stream():
         start = time.perf_counter()
-        book = db.get_book(file)
+        with db() as conn:
+            book = BookRepository().get_by_file(conn, file)
 
-        if not book:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
-            return
+            if not book:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
+                return
 
-        if force:
-            remove_task(book.file_name)
+            if force:
+                remove_task(book.file_name)
 
-        # Кэш-вариант
-        if not force and db.has_similar(book.file_name):
-            similars = db.get_similas(book.file_name, limit)
-            elapsed = time.perf_counter() - start
-            response = render_similar_table(request, book, similars, elapsed)
-            yield f"data: {json.dumps({'type': 'done', 'html': response.body.decode()})}\n\n"
-            return
+            # Кэш-вариант
+            if not force and SimilarRepository().has_similar(conn, book.id):
+                similars = SimilarRepository().get(conn, book.id, limit)
+                elapsed = time.perf_counter() - start
+                response = render_similar_table(request, book, similars, elapsed)
+                yield f"data: {json.dumps({'type': 'done', 'html': response.body.decode()})}\n\n"
+                return
+            
+            embedding_raw = EmbeddingsRepository().get(conn, book.id)
 
         if book.file_name not in tasks:
             tasks[book.file_name] = TaskState()
@@ -171,7 +175,7 @@ async def similar_events(
             loop.run_in_executor(
                 executor,
                 compute_similar,
-                book, limit, exclude_same_author
+                book, embedding_raw, limit, exclude_same_author
             )
 
         state = tasks[book.file_name]
@@ -199,7 +203,13 @@ async def similar_events(
 @app.post("/feedback")
 async def submit_feedback(fb: FeedbackReq):
     try:
-        await db.submit_feedback(fb)
+        with db() as conn:
+            source = BookRepository().get_by_file(conn, fb.source_file_name)
+            candidate = BookRepository().get_by_file(conn, fb.candidate_file_name)
+
+            FeedbackRepository.submit(conn, source.id, candidate.id)
+            SimilarRepository.delete(conn, source.id)
+            
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,28 +1,24 @@
 import os
 import faiss
-import time
 import numpy as np
 from tqdm import tqdm
+from typing import List, Tuple
+from app.models import Embedding
 from app.settings.config import BASE_DIR, HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH
 
 class HNSWService:
     def __init__(
         self,
-        embeddings: list | np.ndarray,  # Вектора для генерации (если файла нет)
-        embedding_dim: int,
         index_file: str = f"{BASE_DIR}/data/hnsw_index.index",  # Путь к файлу
         batch_size: int = None,        # Для батчевого добавления
         logger = None
     ):
-        self.embeddings = np.ascontiguousarray(embeddings).astype(np.float32)
-        self.embedding_dim = embedding_dim
         self.index_file = index_file
         self._index = None
         self.logger = logger
-        if not batch_size:
-            self.batch_size = len(embeddings) // 100
-        else:
-            self.batch_size = batch_size
+        self.batch_size = batch_size
+        self.embeddings = []
+        self.embedding_dim = 0
 
     def __estimate_hnsw_memory_gb(self, ntotal: int, dim: int, overhead_factor: float = 1.12) -> float:
         bytes_per_vector = (dim * 4) + (HNSW_M * 8)
@@ -31,21 +27,49 @@ class HNSWService:
         gb = total_bytes_with_overhead / (1024 ** 3)
         return gb
 
+    def load_emb(self, embeddings: List[Tuple[int, bytes]]):     
+        valid_embeddings = []
+
+        # можно и из памяти, но сейчас влом. Важно, чтобы сохранился индекс
+        with tqdm(total=len(embeddings), desc="Загружаем ембеддинги", unit=" строк\с", unit_scale=True) as pbar:
+            for embedding in embeddings:
+                emb = Embedding.from_db(embedding[1]).vec
+                valid_embeddings.append(emb)
+                pbar.update(1)
+
+        self.embeddings = np.ascontiguousarray(valid_embeddings).astype(np.float32)
+        self.embedding_dim = self.embeddings.shape[1]  # [кол-во_строк, размерность_вектора]
+        del valid_embeddings
+
     def get_index(self) -> faiss.IndexHNSWFlat:
+        if len(self.embeddings) == 0:
+            raise ValueError(f"Попытка сохранить индекс с пустым списокм векторов")
+        
+        if not self.batch_size:
+            self.batch_size = len(self.embeddings) // 100
+
         if self._index is not None:
-            return self._index  # Если уже загружен в память — отдаём сразу
+            return self._index
 
         if os.path.exists(self.index_file):
             if self.logger: self.logger.info(f"Файл '{self.index_file}' найден. Загружаем...")
-            self._index = self._load_from_file()
+            self._index = self.load_from_file()
         else:
             if self.logger: self.logger.info(f"Файл '{self.index_file}' не найден. Генерируем и сохраняем...")
-            self._index = self._generate_and_save()
+            self._index = self.generate_and_save()
 
         return self._index
+    
+    def check_index(self):
+        if os.path.exists(self.index_file):
+            return True
+        else:
+            return False
 
-    def _generate_and_save(self) -> faiss.IndexHNSWFlat:
-        start_build = time.perf_counter()
+    def generate_and_save(self) -> faiss.IndexHNSWFlat:
+        if len(self.embeddings) == 0:
+            raise ValueError(f"Попытка сохранить индекс с пустым списокм векторов")
+        
         if self.embeddings.shape[1] != self.embedding_dim:
             raise ValueError(f"Размерность embeddings ({self.embeddings.shape[1]}) не совпадает с embedding_dim ({self.embedding_dim})")
 
@@ -68,11 +92,9 @@ class HNSWService:
             dim=self.embedding_dim,
             overhead_factor=1.10          # консервативно 10%, можно 1.15
         )
-        build_time = time.perf_counter() - start_build
 
         if self.logger: self.logger.info(
             "HNSW индекс построен:\n"
-            f"  • время построения          : {build_time:.2f} сек\n"
             f"  • количество векторов       : {index.ntotal:,}\n"
             f"  • размерность               : {index.d}\n"
             f"  • M (связи на узел)         : {HNSW_M}\n"
@@ -87,15 +109,13 @@ class HNSWService:
 
         return index
 
-    def _load_from_file(self) -> faiss.IndexHNSWFlat:
+    def load_from_file(self) -> faiss.IndexHNSWFlat:
         if not os.path.exists(self.index_file):
             raise FileNotFoundError(f"Файл '{self.index_file}' не существует")
 
         index = faiss.read_index(self.index_file)
         if not isinstance(index, faiss.IndexHNSWFlat):
             raise TypeError("Загруженный индекс не является HNSWFlat")
-        if index.d != self.embedding_dim:
-            raise ValueError(f"Размерность загруженного индекса ({index.d}) не совпадает с embedding_dim ({self.embedding_dim})")
 
         index.hnsw.efSearch = HNSW_EF_SEARCH
 
