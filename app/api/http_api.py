@@ -2,7 +2,7 @@ import time
 import json
 import asyncio
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple, Literal
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, Query, Request, HTTPException
@@ -28,7 +28,7 @@ executor = ThreadPoolExecutor(max_workers=1)
 class TaskState:
     def __init__(self):
         self.progress: int = 0
-        self.result: Optional[List[Similar]] = None
+        self.result: Optional[List[Tuple[float, int, int]]] = None
         self.error: Optional[str] = None
         self.start_time: float = time.perf_counter()
         self.done_event = asyncio.Event()
@@ -36,7 +36,7 @@ class TaskState:
     def set_progress(self, percent: int):
         self.progress = percent
 
-    def set_done(self, similars: List[Similar]):
+    def set_done(self, similars: List[Tuple[float, int, int]]):
         self.result = similars
         self.done_event.set()
 
@@ -55,23 +55,27 @@ def update_progress(file: str, percent: int):
     if file in tasks:
         tasks[file].set_progress(percent)
 
-def make_lib_url(file_name: str) -> str:
-    ex_file = file_name.removesuffix(".fb2")
-    return f"{LIB_URL}/#/extended?page=1&limit=20&ex_file={ex_file}"
+SearchType = Literal["title", "author"]
+
+def make_lib_url(value: str, kind: SearchType) -> str:
+    return f"{LIB_URL}/#/{kind}?{kind}={value}"
 
 def render_similar_table(
     request: Request,
     base_book: Book,
-    similars: List[Similar],
+    similars: List[Tuple[float, int, int]],
     elapsed: float
 ) -> HTMLResponse:
-    # Подготавливаем данные для шаблона
+    similars_converted = Similar.to_similar_list(similars)
+
     prepared_rows = [
         {
             "file_name": similar.candidate.file_name,
             "score": similar.score,
-            "title": similar.candidate.title}
-        for similar in similars
+            "title": similar.candidate.title,
+            "authors": similar.candidate.authors
+        }
+        for similar in similars_converted
     ]
 
     return templates.TemplateResponse(
@@ -151,7 +155,7 @@ async def similar_events(
     async def event_stream():
         start = time.perf_counter()
         with db() as conn:
-            book = BookRepository().get_by_file(conn, file)
+            book = Book.map(BookRepository().get_by_file(conn, file))
 
             if not book:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
@@ -205,11 +209,11 @@ async def similar_events(
 async def submit_feedback(fb: FeedbackReq):
     try:
         with db() as conn:
-            source = BookRepository().get_by_file(conn, fb.source_file_name)
-            candidate = BookRepository().get_by_file(conn, fb.candidate_file_name)
+            source = Book.map(BookRepository().get_by_file(conn, fb.source_file_name))
+            candidate = Book.map(BookRepository().get_by_file(conn, fb.candidate_file_name))
 
-            FeedbackRepository.submit(conn, source.id, candidate.id)
-            SimilarRepository.delete(conn, source.id)
+            FeedbackRepository().submit(conn, source.id, candidate.id, fb.label)
+            SimilarRepository().delete(conn, source.id)
             
         return {"status": "ok"}
     except Exception as e:

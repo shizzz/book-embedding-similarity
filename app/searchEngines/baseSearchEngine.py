@@ -1,21 +1,24 @@
-from typing import List
-from app.models import Book, Similar
+from typing import List, Tuple
+from app.models import Book
 
 class BaseSearchEngine:
     def __init__(self, limit: int, exclude_same_authors: bool = False):
         self.limit = limit
         self.exclude_same_authors = exclude_same_authors
 
-    def _should_skip(self, source: Book, candidate: Book) -> bool:
-        if source.title is not None and candidate.title is not None and source.title == candidate.title:
+    def _should_skip(self, source: Book, candidate_name: str, candidate_title: str) -> bool:
+        if source.file_name is not None and source.file_name == candidate_name:
             return True
 
-        if self.exclude_same_authors and source.authors and candidate.authors:
-            if set(source.authors) & set(candidate.authors):
-                return True
+        if source.title is not None and source.title == candidate_title:
+            return True
+
+        # if self.exclude_same_authors and source.authors and candidate.authors:
+        #     if set(source.authors) & set(candidate.authors):
+        #         return True
 
         return False
 
-    def search(self, *args, **kwargs) -> List[Similar]:
+    def search(self, *args, **kwargs) -> List[Tuple[float, int, int]]:
         raise NotImplementedError()
 

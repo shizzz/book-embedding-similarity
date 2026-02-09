@@ -1,8 +1,5 @@
-# db/books.py
-import pickle
 from datetime import datetime
-from typing import Any, List, Optional, Tuple
-from app.models import Book
+from typing import Any, List, Tuple
 
 class BookRepository:
     GET_QUERY = """
@@ -14,23 +11,6 @@ class BookRepository:
         b.author
     FROM books b
     """
-
-    def _map(self, row) -> Book:
-        return Book(
-            id=row["id"],
-            archive_name=row["archive"],
-            file_name=row["book"],
-            title=row["title"],
-            authors=row["author"]
-        )
-    
-    def get(self, conn, id: int) -> Optional[Book]:
-        row = conn.execute(f"{self.GET_QUERY} WHERE b.id = ?",(id,)).fetchone()
-        return self._map(row) if row else None
-    
-    def get_all(self, conn) -> Optional[List[Book]]:
-        rows = conn.execute(self.GET_QUERY).fetchall()
-        return [self._map(row) for row in rows]
     
     def get_all_with_embeddings(self, conn) -> List[Tuple[int, str, str, str, bytes]]:
         cursor = conn.execute("""
@@ -47,11 +27,11 @@ class BookRepository:
         for row in cursor:
             yield (tuple[Any, ...](row))
 
-    def get_by_file(self, conn, book: str) -> Optional[Book]:
+    def get_by_file(self, conn, book: str) -> Any:
         row = conn.execute(f"{self.GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
-        return self._map(row) if row else None
+        return row if row else None
     
-    def get_many(self, conn, book_ids: list[int]) -> dict[int, Book]:
+    def get_many(self, conn, book_ids: list[int]) -> dict[int, Any]:
         if not book_ids:
             return {}
 
@@ -59,17 +39,13 @@ class BookRepository:
         rows = conn.execute(f"{self.GET_QUERY} WHERE id IN ({placeholders})",book_ids).fetchall()
 
         return {
-            row["id"]: self._map(row)
+            row["id"]: row
             for row in rows
         }
 
     def get_names(conn) -> list[str]:
         rows = conn.execute("SELECT book FROM books").fetchall()
         return [row[0] for row in rows]
-
-    def list_with_embeddings(self, conn) -> List[Book]:
-        rows = conn.execute(self.GET_QUERY + " GROUP BY b.book").fetchall()
-        return [self._map(r) for r in rows]
     
     def embeddings_cursor(self, conn):
         embeddings_cursor = conn.cursor()

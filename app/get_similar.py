@@ -1,8 +1,8 @@
 import argparse
 import asyncio
 import time
-from typing import List
-from app.models import Similar, Embedding
+from typing import List, Tuple
+from app.models import Similar, Embedding, Book
 from app.services.similar_search_service import SimilarSearchService
 from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository
 from app.settings.config import LIB_URL
@@ -13,7 +13,7 @@ def make_lib_url(file_name: str) -> str:
 
 def print_similar_books(
     source_file: str,
-    similars: List[Similar],
+    similars: List[Tuple[float, int, int]],
     started_at: float
 ):
     elapsed = time.perf_counter() - started_at
@@ -21,7 +21,9 @@ def print_similar_books(
     print(f"\nТоп-50 похожих книг для {source_file}")
     print(f"Время выполнения: {elapsed:.3f} сек\n")
 
-    for similar in similars:
+    similars_converted = Similar.to_similar_list(similars)
+
+    for similar in similars_converted:
         percent = similar.score * 100
         url = make_lib_url(similar.candidate.file_name)
 
@@ -45,7 +47,7 @@ async def main():
     args = parser.parse_args()
 
     with db() as conn:
-        book_task = BookRepository().get_by_file(conn, args.file_name)
+        book_task = Book.map(BookRepository().get_by_file(conn, args.file_name))
 
         if not book_task:
             print(f"Книга {args.file_name} не найдена в реестре")

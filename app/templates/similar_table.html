@@ -8,7 +8,7 @@
             <th>Score (%)</th>
             <th>Файл</th>
             <th>Название</th>
-            <th>Ссылка</th>
+            <th>Авторы</th>
             <th>Оценка</th>
         </tr>
     </thead>
@@ -18,8 +18,20 @@
             <td>{{ loop.index }}</td>
             <td>{{ (item.score * 100) | round(2) }}</td>
             <td>{{ item.file_name }}</td>
-            <td>{{ item.title }}</td>
-            <td><a href="{{ make_lib_url(item.file_name) }}" target="_blank">Открыть</a></td>
+            <td><a href="{{ make_lib_url(item.title, 'title') }}" target="_blank">{{ item.title }}</a></td>
+            <td class="authors">
+                {% if item.authors %}
+                    {% for author in item.authors %}
+                        <a href="{{ make_lib_url(author, 'author') }}"
+                        class="author-link"
+                        target="_blank">
+                            {{ author }}
+                        </a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
             <td class="feedback-cell">
                 <div class="feedback-buttons">
                     <button class="like-btn" data-action="1" title="Нравится">👍</button>

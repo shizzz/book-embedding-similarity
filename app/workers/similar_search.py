@@ -41,8 +41,8 @@ class SimilarSearchWorker(BaseWorker):
         if self.__source.title == task.book.title:
             return
 
-        if self.__exclude_same_authors and self.__source.authors and task.book.authors:
-            if set(self.__source.authors) & set(task.book.authors):
+        if self.__exclude_same_authors and self.__source.author and task.book.author:
+            if set(self.__source.author) & set(task.book.author):
                 return
             
         query_emb = pickle.loads(self.__source.embedding)

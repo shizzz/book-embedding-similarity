@@ -1,6 +1,6 @@
 import numpy as np
-from typing import List
-from app.models import Book, Similar, Embedding
+from typing import List, Tuple
+from app.models import Book, Embedding
 from app.db import db, BookRepository, FeedbackRepository, EmbeddingsRepository
 from .baseSearchEngine import BaseSearchEngine
 
@@ -19,7 +19,7 @@ class BruteforceSearchEngine(BaseSearchEngine):
         source: Book,
         embedding: Embedding,
         progress_callback=None
-    ) -> List[Similar]:
+    ) -> List[Tuple[float, int, int]]:
         with db() as conn:
             candidates = []
             current = 0
@@ -31,25 +31,19 @@ class BruteforceSearchEngine(BaseSearchEngine):
             for row in BookRepository().get_all_with_embeddings(conn):
                 current += 1
 
-                book_id, archive, book, title, embedding_bytes = row
-                candidate = Book(
-                    id=book_id,
-                    archive_name=archive,
-                    file_name=book,
-                    title=title
-                )
+                book_id, _, book, title, embedding_bytes = row
 
-                if self._should_skip(source, candidate):
+                if self._should_skip(source=source, candidate_name=book, candidate_title=title):
                     continue
 
                 try:
                     emb_norm = Embedding.from_db(embedding_bytes)
                     similarity = np.dot(emb_norm.vec, embedding.vec)
 
-                    boost = feedbacks.get_boost(source.id, candidate.id)
+                    boost = feedbacks.get_boost(source.id, book_id)
                     score = similarity + boost
 
-                    candidates.append((score, candidate))
+                    candidates.append((score, book_id))
 
                 except Exception:
                     continue
@@ -64,8 +58,8 @@ class BruteforceSearchEngine(BaseSearchEngine):
         if not top:
             return []
 
-        result: List[Similar] = []
+        result: List[Tuple[float, int, int]] = []
         for score, candidate in top:
-            result.append(Similar.from_books(score, source, candidate))
+            result.append((score, source.id, candidate))
 
         return result

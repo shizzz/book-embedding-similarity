@@ -1,9 +1,8 @@
 import time
 from typing import List, Tuple
-from app.models import Book, Similar, Embedding
+from app.models import Book, Embedding
 from app.db import db, BookRepository, FeedbackRepository, EmbeddingsRepository
 from app.services.hnswService import HNSWService
-from app.settings.config import FEEDBACK_BOOST_FACTOR
 from app.searchEngines import IndexSearchEngine, BruteforceSearchEngine
 
 class SimilarSearchService:
@@ -27,7 +26,7 @@ class SimilarSearchService:
         with db() as conn:
             self.__total = BookRepository.count_embeddings(conn)
 
-    def run(self, progress_callback=None) -> List[Similar]:
+    def run(self, progress_callback=None) -> List[Tuple[float, int, int]]:
         if self._embedding is None:
             return []
 

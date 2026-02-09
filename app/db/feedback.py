@@ -26,7 +26,6 @@ class FeedbackRepository:
             """,
             (source_book_id, candidate_book_id, label)
         )
-        conn.execute("DELETE FROM similar WHERE book_id = ?", (source_book_id,))
 
     def get(self, conn, book_id: int) -> Feedbacks:
         rows = conn.execute(

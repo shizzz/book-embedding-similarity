@@ -1,6 +1,9 @@
+from app.models.book import Book
+
+
 import numpy as np
 from typing import List, Sequence, Tuple
-from app.models import Book, Similar, Embedding, Feedbacks
+from app.models import Book, Embedding, Feedbacks
 from .baseSearchEngine import BaseSearchEngine
 from app.settings.config import FEEDBACK_BOOST_FACTOR
 
@@ -16,7 +19,7 @@ class IndexSearchEngine(BaseSearchEngine):
     ):
         super().__init__(limit, exclude_same_authors)
         self.index = index
-        self.books = list(books)
+        self.books = list[Book](books)
         self.feedbacks = feedbacks
         self.logger = logger
 
@@ -24,7 +27,7 @@ class IndexSearchEngine(BaseSearchEngine):
         self,
         source: Book,
         embedding: Embedding
-    ) -> List[Similar]:
+    ) -> List[Tuple[float, int, int]]:
         if self.index is None or self.index.ntotal == 0:
             return []
 
@@ -40,7 +43,7 @@ class IndexSearchEngine(BaseSearchEngine):
 
             candidate = self.books[idx]
 
-            if self._should_skip(source, candidate):
+            if self._should_skip(source=source, candidate_name=candidate.file_name, candidate_title=candidate.title):
                 continue
 
             similarity = float(score_raw)
@@ -55,9 +58,9 @@ class IndexSearchEngine(BaseSearchEngine):
         if not top:
             return []
 
-        result: List[Similar] = []
+        result: List[Tuple[float, int, int]] = []
         for score, candidate in top:
-            result.append(Similar.from_books(score, source, candidate))
+            result.append((score, source.id, candidate.id))
 
         return result
 

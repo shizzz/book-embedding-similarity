@@ -3,7 +3,7 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-LIB_URL = os.getenv("LIB_URL", "https://lib.some.com")
+LIB_URL = os.getenv("LIB_URL", "https://lib.ooosh.ru")
 
 DB_FILE = Path(os.getenv(
 "DB_FILE",

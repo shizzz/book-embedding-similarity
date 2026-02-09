@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from app.models import Book, Similar, Embedding
+from app.models import Book, Embedding
 from app.searchEngines import BaseSearchEngine
 
 class BulkSimilarSearchService:
@@ -15,6 +15,6 @@ class BulkSimilarSearchService:
         self.embeddings = embeddings
         self.logger = logger
 
-    def run(self, source_book: Book, source_embedding: bytes) -> List[Similar]:
+    def run(self, source_book: Book, source_embedding: bytes) -> List[Tuple[float, int, int]]:
         query_emb = Embedding.from_db(source_embedding)
         return self.engine.search(source_book, query_emb)

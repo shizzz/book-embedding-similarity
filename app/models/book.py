@@ -1,15 +1,18 @@
 from dataclasses import dataclass
 import zipfile
-from typing import List
+from typing import List, Dict, Any, Optional, Callable, TypeVar
 from app.settings.config import BOOK_FOLDER
 
 @dataclass
 class Book:
+    id: Optional[int]
     archive_name: str
     file_name: str
-    id: int = None
-    title: str = None
-    authors: str = None
+    title: Optional[str]
+    author: Optional[str]
+    authors: Optional[List[str]]
+
+    T = TypeVar("T")
 
     def __init__(
             self,
@@ -22,7 +25,39 @@ class Book:
         self.archive_name = archive_name
         self.file_name = file_name
         self.title = title
-        self.authors = authors
+        self.author = authors
+
+        self.authors = self._parse_authors(authors)
+
+    @classmethod
+    def map(cls, row) -> "Book":
+        return Book(
+            id=row["id"],
+            archive_name=row["archive"],
+            file_name=row["book"],
+            title=row["title"],
+            authors=row["author"]
+        )
+
+    def map_by_id(
+        rows: Dict[int, Any],
+        mapper: Callable[[Any], T],
+    ) -> Dict[int, T]:
+        return {
+            book_id: mapper(row)
+            for book_id, row in rows.items()
+        }
+
+    @staticmethod
+    def _parse_authors(author: str | None) -> List[str]:
+        if not author:
+            return []
+
+        return [
+            a.strip()
+            for a in author.split(",")
+            if a.strip()
+        ]
 
     def get_file_bytes_from_zip(self) -> bytes:
         zip_path = f"{BOOK_FOLDER}/{self.archive_name}"
@@ -31,6 +66,7 @@ class Book:
             with archive.open(self.file_name) as f:
                 return f.read()
 
+@dataclass
 class BookRegistry:
     books: list[Book]
     
