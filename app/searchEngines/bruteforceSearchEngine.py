@@ -1,36 +1,56 @@
-from .baseSearchEngine import BaseSearchEngine
+import numpy as np
 from typing import List
-from app.db import db, EmbeddingsRepository, FeedbackRepository, BookRepository
-from models import Book, Similar, Embedding
+from app.models import Book, Similar, Embedding
+from app.db import db, BookRepository, FeedbackRepository, EmbeddingsRepository
+from .baseSearchEngine import BaseSearchEngine
 
 class BruteforceSearchEngine(BaseSearchEngine):
+    def __init__(
+        self,
+        limit: int,
+        exclude_same_authors: bool = False,
+        step_percent: int = 5,
+    ):
+        super().__init__(limit, exclude_same_authors)
+        self._step_percent = step_percent
+
     def search(
         self,
-        source_book: Book,
-        source_embedding: bytes,
-        progress_callback=None,
+        source: Book,
+        embedding: Embedding,
+        progress_callback=None
     ) -> List[Similar]:
-        source_emb = Embedding.from_db(source_embedding)
-
         with db() as conn:
-            total = EmbeddingsRepository().count(conn)
-            step = max(1, total * self._step_percent // 100)
-
-            feedbacks = FeedbackRepository().get(conn, source_book.id)
             candidates = []
             current = 0
+            total = BookRepository.count_embeddings(conn)
+            step = max(1, total * self._step_percent // 100)
 
-            for book_id, embedding_bytes in EmbeddingsRepository().get_all(conn):
+            feedbacks = FeedbackRepository().get(conn, source.id)
+
+            for row in BookRepository().get_all_with_embeddings(conn):
                 current += 1
+
+                book_id, archive, book, title, embedding_bytes = row
+                candidate = Book(
+                    id=book_id,
+                    archive_name=archive,
+                    file_name=book,
+                    title=title
+                )
+
+                if self._should_skip(source, candidate):
+                    continue
 
                 try:
                     emb_norm = Embedding.from_db(embedding_bytes)
-                    similarity = float(np.dot(emb_norm.vec, source_emb.vec))
+                    similarity = np.dot(emb_norm.vec, embedding.vec)
 
-                    boost = feedbacks.get_boost(source_book.id, book_id)
+                    boost = feedbacks.get_boost(source.id, candidate.id)
                     score = similarity + boost
 
-                    candidates.append((score, book_id))
+                    candidates.append((score, candidate))
+
                 except Exception:
                     continue
 
@@ -39,26 +59,13 @@ class BruteforceSearchEngine(BaseSearchEngine):
                     progress_callback(percent)
 
         candidates.sort(key=lambda x: x[0], reverse=True)
-        top = candidates[:self._limit]
+        top = candidates[:self.limit]
 
-        return self._build_result(source_book, top)
+        if not top:
+            return []
 
-    def _build_result(
-        self,
-        source: Book,
-        scored_ids: List[tuple[float, int]],
-    ) -> List[Similar]:
-        result = []
-        ids = [book_id for _, book_id in scored_ids]
-
-        with db() as conn:
-            books = BookRepository().get_many(conn, ids)
-
-        for score, book_id in scored_ids:
-            candidate = books.get(book_id)
-            if candidate:
-                result.append(
-                    Similar.from_books(score, source, candidate)
-                )
+        result: List[Similar] = []
+        for score, candidate in top:
+            result.append(Similar.from_books(score, source, candidate))
 
         return result

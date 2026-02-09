@@ -1,21 +1,21 @@
-from abc import ABC, abstractmethod
-from typing import List, Optional, Callable
-from models import Book, Similar
+from typing import List
+from app.models import Book, Similar
 
-class BaseSearchEngine(ABC):
-    def __init__(
-        self,
-        limit: int,
-        step_percent: int = 5,
-    ):
-        self._limit = limit
-        self._step_percent = step_percent
+class BaseSearchEngine:
+    def __init__(self, limit: int, exclude_same_authors: bool = False):
+        self.limit = limit
+        self.exclude_same_authors = exclude_same_authors
 
-    @abstractmethod
-    def search(
-        self,
-        source_book: Book,
-        source_embedding: bytes,
-        progress_callback: Optional[Callable[[int], None]] = None,
-    ) -> List[Similar]:
-        pass
+    def _should_skip(self, source: Book, candidate: Book) -> bool:
+        if source.title is not None and candidate.title is not None and source.title == candidate.title:
+            return True
+
+        if self.exclude_same_authors and source.authors and candidate.authors:
+            if set(source.authors) & set(candidate.authors):
+                return True
+
+        return False
+
+    def search(self, *args, **kwargs) -> List[Similar]:
+        raise NotImplementedError()
+

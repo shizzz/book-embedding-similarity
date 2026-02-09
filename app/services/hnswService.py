@@ -33,7 +33,7 @@ class HNSWService:
         # можно и из памяти, но сейчас влом. Важно, чтобы сохранился индекс
         with tqdm(total=len(embeddings), desc="Загружаем ембеддинги", unit=" строк\с", unit_scale=True) as pbar:
             for embedding in embeddings:
-                emb = Embedding.from_db(embedding[1]).vec
+                emb = Embedding.from_db(embedding).vec
                 valid_embeddings.append(emb)
                 pbar.update(1)
 

@@ -1,5 +1,6 @@
 from .baseSearchEngine import BaseSearchEngine
-from .bruteforceSearchEngine import BruteforceSearchEngine
 from .indexSearchEngine import IndexSearchEngine
+from .bruteforceSearchEngine import BruteforceSearchEngine
 
-__all__ = ["BaseSearchEngine", "BruteforceSearchEngine", "IndexSearchEngine"]
+__all__ = ["BaseSearchEngine", "IndexSearchEngine", "BruteforceSearchEngine"]
+
