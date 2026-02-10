@@ -3,12 +3,11 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SITE_BASE_PATH = os.getenv("LIB_URL", "")
 LIB_URL = os.getenv("LIB_URL", "https://lib.ooosh.ru")
 
-DB_FILE = Path(os.getenv(
-"DB_FILE",
-    str(BASE_DIR / "data/data.db")
-))
+DB_FILE = Path(os.getenv("DB_FILE", str(BASE_DIR / "data/data.db")))
+INDEX_FILE = Path(os.getenv("INDEX_FILE", str(BASE_DIR / "data/hnsw_index.index")))
 
 BOOK_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/lib.rus.ec/")
 

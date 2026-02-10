@@ -13,8 +13,10 @@ services:
       - .:/app
     environment:
       LIB_URL: https://lib.some.com
+      SITE_BASE_PATH: ""
       BOOK_FOLDER: /books
       DB_FILE: /app/data/data.db
+      INDEX_FILE: /app/data/hnsw_index.index
       MODEL_NAME: all-MiniLM-L6-v2
       MAX_WORKERS: 1
       

@@ -4,13 +4,13 @@ import numpy as np
 from tqdm import tqdm
 from typing import List, Tuple
 from app.models import Embedding
-from app.settings.config import BASE_DIR, HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH
+from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, BASE_DIR
 
 class HNSW:
     def __init__(
         self,
-        index_file: str = f"{BASE_DIR}/data/hnsw_index.index",  # Путь к файлу
-        batch_size: int = None,        # Для батчевого добавления
+        index_file: str = f"{INDEX_FILE}",
+        batch_size: int = None,
         logger = None
     ):
         self.index_file = index_file

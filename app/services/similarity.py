@@ -50,7 +50,7 @@ class Similarity:
 
         try:
             engine = SimilarSearchEngineFactory.create(
-                SimilarSearchEngineFactory.BRUTEFORCE, limit, exclude_same_author, 1
+                SimilarSearchEngineFactory.INDEX, limit, exclude_same_author, 1
             )
             service = SimilarSearchService(
                 engine=engine,
