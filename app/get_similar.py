@@ -3,7 +3,8 @@ import asyncio
 import time
 from typing import List, Tuple
 from app.models import Similar, Embedding, Book
-from app.services.similar_search_service import SimilarSearchService
+from app.searchEngines import SimilarSearchEngine, SimilarSearchEngineFactory
+from app.services import SimilarSearchService
 from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository
 from app.settings.config import LIB_URL
 
@@ -61,17 +62,15 @@ async def main():
         
     embedding = Embedding.from_db(embedding_bytes)
 
-    mode = getattr(args, "mode", "bruteforce")
+    mode = getattr(args, "mode", SimilarSearchEngine.BRUTEFORCE)
     compare = getattr(args, "compare", False)
 
     def run_service(selected_mode: str):
+        engine = SimilarSearchEngineFactory.create(selected_mode, 100, False)
         service = SimilarSearchService(
+            engine=engine,
             source=book_task,
-            embedding=embedding,
-            limit=100,
-            exclude_same_authors=False,
-            step_percent=5,
-            mode=selected_mode,
+            embedding=embedding
         )
         local_start = time.perf_counter()
         result = service.run()
@@ -85,7 +84,7 @@ async def main():
 
     # Опциональное сравнение со вторым режимом
     if compare:
-        other_mode = "index" if mode == "bruteforce" else "bruteforce"
+        other_mode = SimilarSearchEngine.INDEX if mode == SimilarSearchEngine.BRUTEFORCE else SimilarSearchEngine.BRUTEFORCE
         try:
             _, elapsed_other = run_service(other_mode)
             print(f"Режим '{other_mode}' занял {elapsed_other:.3f} сек")

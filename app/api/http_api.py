@@ -13,7 +13,8 @@ from contextlib import asynccontextmanager
 from app.db import db, SimilarRepository, BookRepository, FeedbackRepository, EmbeddingsRepository, Migrator
 from app.models import Book, FeedbackReq, Similar, Embedding
 from app.settings.config import LIB_URL, BASE_DIR
-from app.services.similar_search_service import SimilarSearchService
+from app.searchEngines import SimilarSearchEngine, SimilarSearchEngineFactory
+from app.services import SimilarSearchService
 
 app = FastAPI(title="Book Similarity HTML API")
 templates = Jinja2Templates(directory=f"{BASE_DIR}/templates")
@@ -94,13 +95,11 @@ def compute_similar(book: Book, embedding: bytes, limit: int, exclude_same_autho
     state = tasks[book.file_name]
 
     try:
+        engine = SimilarSearchEngineFactory.create(SimilarSearchEngine.INDEX, limit, exclude_same_author, 1)
         service = SimilarSearchService(
+            engine=engine,
             source=book,
-            embedding=Embedding.from_db(embedding),
-            limit=limit,
-            exclude_same_authors=exclude_same_author,
-            step_percent=1,
-            mode="index"
+            embedding=Embedding.from_db(embedding)
         )
 
         # Передаём callback

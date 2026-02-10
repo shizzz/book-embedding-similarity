@@ -1,23 +1,26 @@
 import numpy as np
 from typing import List, Tuple
 from app.models import Book, Embedding
-from app.db import db, BookRepository, FeedbackRepository, EmbeddingsRepository
-from .baseSearchEngine import BaseSearchEngine
+from app.db import db, BookRepository
+from app.models.feedback import Feedback
+from .similarSearchEngine import SimilarSearchEngine
 
-class BruteforceSearchEngine(BaseSearchEngine):
+class BruteforceSimilarSearchEngine(SimilarSearchEngine):
     def __init__(
         self,
         limit: int,
         exclude_same_authors: bool = False,
         step_percent: int = 5,
     ):
-        super().__init__(limit, exclude_same_authors)
+        super().__init__(exclude_same_authors)
+        self._limit = limit
         self._step_percent = step_percent
 
     def search(
         self,
         source: Book,
         embedding: Embedding,
+        feedbacks: List[Feedback],
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         with db() as conn:
@@ -25,8 +28,6 @@ class BruteforceSearchEngine(BaseSearchEngine):
             current = 0
             total = BookRepository.count_embeddings(conn)
             step = max(1, total * self._step_percent // 100)
-
-            feedbacks = FeedbackRepository().get(conn, source.id)
 
             for row in BookRepository().get_all_with_embeddings(conn):
                 current += 1
@@ -53,7 +54,7 @@ class BruteforceSearchEngine(BaseSearchEngine):
                     progress_callback(percent)
 
         candidates.sort(key=lambda x: x[0], reverse=True)
-        top = candidates[:self.limit]
+        top = candidates[:self._limit]
 
         if not top:
             return []

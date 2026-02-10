@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Tuple
+from app.settings.config import FEEDBACK_BOOST_FACTOR
 
 class FeedbackReq(BaseModel):
     source_file_name: str
@@ -37,7 +38,7 @@ class Feedbacks:
             avg = sum(labels) / len(labels)
             self._pair_to_boost[key] = avg
 
-    def get_boost(self, source_fn: id, cand_fn: id, factor: float = 0.4) -> float:
+    def get_boost(self, source_fn: id, cand_fn: id, factor: float = FEEDBACK_BOOST_FACTOR) -> float:
             key = (source_fn, cand_fn)
             avg = self._pair_to_boost.get(key, 0.0)
             trust = 1.0

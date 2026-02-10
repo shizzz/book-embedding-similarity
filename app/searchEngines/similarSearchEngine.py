@@ -1,10 +1,14 @@
-from typing import List, Tuple
-from app.models import Book
+from typing import List, Tuple, Literal
+from app.models import Book, Embedding, Feedback
 
-class BaseSearchEngine:
-    def __init__(self, limit: int, exclude_same_authors: bool = False):
-        self.limit = limit
-        self.exclude_same_authors = exclude_same_authors
+class SimilarSearchEngine:
+    INDEX = "index" 
+    BRUTEFORCE = "bruteforce"
+    
+    EngineType = Literal[INDEX, BRUTEFORCE]
+
+    def __init__(self, exclude_same_authors: bool):
+        self._exclude_same_authors = exclude_same_authors
 
     def _should_skip(self, source: Book, candidate_name: str, candidate_title: str) -> bool:
         if source.file_name is not None and source.file_name == candidate_name:
@@ -19,6 +23,12 @@ class BaseSearchEngine:
 
         return False
 
-    def search(self, *args, **kwargs) -> List[Tuple[float, int, int]]:
+    def search(
+        self,
+        source: Book,
+        embedding: Embedding,
+        feedbacks: List[Feedback],
+        progress_callback=None
+    ) -> List[Tuple[float, int, int]]:
         raise NotImplementedError()
 

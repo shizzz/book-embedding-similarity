@@ -6,7 +6,7 @@ from typing import List, Tuple
 from app.models import Embedding
 from app.settings.config import BASE_DIR, HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH
 
-class HNSWService:
+class HNSW:
     def __init__(
         self,
         index_file: str = f"{BASE_DIR}/data/hnsw_index.index",  # Путь к файлу

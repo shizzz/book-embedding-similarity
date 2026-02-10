@@ -1,10 +1,10 @@
 import os
 import zipfile
 from tqdm import tqdm
+from types import Tuple
 from app.workers import BaseWorker
-from app.utils import FB2Book
+from app.utils import FB2Book, HNSW
 from app.models import Book, Task, Embedding
-from app.services import HNSWService
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository
 from app.settings.config import BOOK_FOLDER
 
@@ -12,11 +12,11 @@ class GenerateEmbeddingsWorker(BaseWorker):
     def __init__(self, model, **kwargs):
         super().__init__(**kwargs)
         self.model = model
-        self.hnswService = HNSWService(batch_size=10000)
+        self.hnsw = HNSW(batch_size=10000)
 
     async def stat_books(self):
         with db() as conn:
-            completed_books = set(BookRepository.get_names(conn))
+            completed_books = set[str](BookRepository.get_names(conn))
         tasks = []
   
         with tqdm(total=len(os.listdir(BOOK_FOLDER)), desc="Проверка архивов", unit=" с", unit_scale=True) as pbar:
@@ -42,7 +42,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         await self.registry.add(tasks)
 
         # После обновления\добавления эмбедингов, индекс нужно перестроить
-        self.hnswService.delete_index_file()
+        self.hnsw.delete_index_file()
 
     def process_book(self, task: Task):
         data = task.book.get_file_bytes_from_zip()
@@ -78,7 +78,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
     async def fin(self):
         with db() as conn:
-            embeddings = list(EmbeddingsRepository().get_all(conn))
+            embeddings = list[Tuple[int, bytes]](EmbeddingsRepository().get_all(conn))
             
-        self.hnswService.load_emb(embeddings)
-        self.hnswService.generate_and_save()
+        self.hnsw.load_emb(embeddings)
+        self.hnsw.generate_and_save()

@@ -3,10 +3,10 @@ import threading
 from tqdm import tqdm
 from typing import Tuple, List
 from app.workers import BaseWorker
-from app.services import BulkSimilarSearchService, HNSWService
+from app.services import BulkSimilarSearchService
 from app.models import Task, Book
-from app.db import db, BookRepository, SimilarRepository, FeedbackRepository
-from app.searchEngines import IndexSearchEngine
+from app.db import db, BookRepository, SimilarRepository
+from app.searchEngines import SimilarSearchEngine, SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK, DATABASE_QUEUE_BATCH_SIZE
 
 class GenerateSimilarWorker(BaseWorker):
@@ -83,9 +83,6 @@ class GenerateSimilarWorker(BaseWorker):
             self.logger.info(f"Получение всех книг из базы данных")
             books_with_embeddings = list[Tuple[int, str, str, str, bytes]](BookRepository().get_all_with_embeddings(conn))
 
-            feedbacks = FeedbackRepository().get_all(conn)
-            if self.logger: self.logger.info(f"Загружено {len(feedbacks.feedbacks)} записей фидбека")
-
             self.logger.info(f"Фильтрация книг и эмбеддингов по ID")
             valid_books: List[Book] = []
             valid_embeddings: List[bytes] = []
@@ -94,22 +91,7 @@ class GenerateSimilarWorker(BaseWorker):
                 valid_books.append(Book(id=book_id, archive_name=archive, file_name=book_name, title=title))
                 valid_embeddings.append(embedding)
 
-        index = None
-        hnswService = HNSWService(logger=self.logger)
-        if hnswService.check_index():
-            index = hnswService.load_from_file()
-        else:
-            hnswService.load_emb([(book_id, embedding) for book_id, _, _, _, embedding in books_with_embeddings])
-            index = hnswService.generate_and_save()
-
-        engine = IndexSearchEngine(
-            index=index,
-            books=valid_books,
-            feedbacks=feedbacks,
-            limit=SIMILARS_PER_BOOK,
-            exclude_same_authors=False,
-            logger=self.logger,
-        )
+        engine = SimilarSearchEngineFactory.create(SimilarSearchEngine.INDEX, SIMILARS_PER_BOOK, False, 1)
 
         self._service = BulkSimilarSearchService(
             engine,
