@@ -6,7 +6,7 @@ from app.workers import BaseWorker
 from app.services import BulkSimilarSearchService
 from app.models import Task, Book
 from app.db import db, BookRepository, SimilarRepository
-from app.searchEngines import SimilarSearchEngine, SimilarSearchEngineFactory
+from app.searchEngines import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK, DATABASE_QUEUE_BATCH_SIZE
 
 class GenerateSimilarWorker(BaseWorker):
@@ -91,7 +91,7 @@ class GenerateSimilarWorker(BaseWorker):
                 valid_books.append(Book(id=book_id, archive_name=archive, file_name=book_name, title=title))
                 valid_embeddings.append(embedding)
 
-        engine = SimilarSearchEngineFactory.create(SimilarSearchEngine.INDEX, SIMILARS_PER_BOOK, False, 1)
+        engine = SimilarSearchEngineFactory.create(SimilarSearchEngineFactory.INDEX, SIMILARS_PER_BOOK, False, 1)
 
         self._service = BulkSimilarSearchService(
             engine,

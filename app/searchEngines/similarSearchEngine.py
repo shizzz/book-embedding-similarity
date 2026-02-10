@@ -1,12 +1,7 @@
-from typing import List, Tuple, Literal
+from typing import List, Tuple
 from app.models import Book, Embedding, Feedback
 
 class SimilarSearchEngine:
-    INDEX = "index" 
-    BRUTEFORCE = "bruteforce"
-    
-    EngineType = Literal[INDEX, BRUTEFORCE]
-
     def __init__(self, exclude_same_authors: bool):
         self._exclude_same_authors = exclude_same_authors
 

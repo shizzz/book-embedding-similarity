@@ -1,3 +1,4 @@
+from typing import Literal
 from app.utils import HNSW
 from app.db import db, BookRepository
 from app.models import Book
@@ -7,15 +8,20 @@ from .bruteforceSimilarSearchEngine import BruteforceSimilarSearchEngine
 
 
 class SimilarSearchEngineFactory:
+    INDEX = "index" 
+    BRUTEFORCE = "bruteforce"
+    
+    EngineType = Literal[INDEX, BRUTEFORCE]
+
     @classmethod
     def create(
         cls,
-        mode: SimilarSearchEngine.EngineType,
+        mode: EngineType,
         limit: int,
         exclude_same_authors: bool,
         step_percent: int = 5,
     ) -> SimilarSearchEngine:
-        if mode == SimilarSearchEngine.INDEX:
+        if mode == SimilarSearchEngineFactory.INDEX:
             hnsw = HNSW()
             index = hnsw.load_from_file()
 
@@ -31,7 +37,7 @@ class SimilarSearchEngineFactory:
                 step_percent=step_percent,
             )
 
-        elif mode == SimilarSearchEngine.BRUTEFORCE:
+        elif mode == SimilarSearchEngineFactory.BRUTEFORCE:
             return BruteforceSimilarSearchEngine(
                 limit=limit,
                 exclude_same_authors=exclude_same_authors,
