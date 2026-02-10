@@ -1,9 +1,8 @@
 import asyncio
-from sentence_transformers import SentenceTransformer
 from app.workers import GenerateEmbeddingsWorker
-from app.settings.config import MODEL_NAME
+from app.utils import Model
 
 if __name__ == "__main__":
-    model = SentenceTransformer(MODEL_NAME)
-    worker = GenerateEmbeddingsWorker(model=model)
+    model = Model().get()
+    worker = GenerateEmbeddingsWorker(model=model, title="Generate embeddings")
     asyncio.run(worker.run())

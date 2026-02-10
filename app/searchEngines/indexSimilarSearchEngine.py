@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Sequence, Tuple
 from app.models import Book, Embedding
 from app.models.feedback import Feedback
-from app.hnsw import RerankerTrainer
+from app.hnsw.trainers import RerankerTrainer
 from .similarSearchEngine import SimilarSearchEngine
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):

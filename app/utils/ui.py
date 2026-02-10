@@ -13,8 +13,9 @@ from rich.progress import (
 from app.settings.config import MAX_WORKERS
 
 class StatsUI:
-    def __init__(self, max_workers: int = MAX_WORKERS):
+    def __init__(self, max_workers: int = MAX_WORKERS, title: str = "Library scanner"):
         self.max_workers = max_workers
+        self._label = title
 
         self.stats = {
             "Total": 0,
@@ -42,7 +43,7 @@ class StatsUI:
         )
 
     def _make_table(self) -> Table:
-        table = Table(title="WS Library Scanner", expand=True)
+        table = Table(title=self._label, expand=True)
         table.add_column("Metric")
         table.add_column("Value")
         table.add_row("Total", str(self.stats["Total"]))
@@ -86,6 +87,17 @@ class StatsUI:
 
         self.progress.update(self.progress_task, advance=1)
         live.update(self.layout())
+
+    async def update_total(self, total: int):
+        async with self.lock:
+            old_total = self.stats["Total"]
+            delta = total - old_total
+
+            self.stats["Total"] = total
+            self.stats["Remaining"] += delta
+
+            self.progress.update(self.progress_task, total=total)
+
 
     async def error(self, live: Live):
         async with self.lock:

@@ -20,6 +20,10 @@ class TaskRegistry:
             await self.queue.put(task)
         self.total += len(tasks)
 
+    async def add_one(self, task: Task):
+        await self.queue.put(task)
+        self.total += 1
+
     async def get(self) -> Task | None:
         try:
             return await self.queue.get()

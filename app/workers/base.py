@@ -2,6 +2,7 @@ import asyncio
 import logging
 from asyncio import create_task, gather
 from rich.live import Live
+from sympy import false
 from app.utils import StatsUI
 from app.db import Migrator
 from app.models import TaskRegistry
@@ -13,15 +14,18 @@ class BaseWorker:
         registry: TaskRegistry = None,
         max_workers: int = MAX_WORKERS,
         show_ui: bool = True,
-        sleepy: bool = False
+        sleepy: bool = False,
+        title: str = None,
+        async_queue: bool = False,
     ):
         self.registry = registry or TaskRegistry()
         self.max_workers = max_workers
         self.sleepy = sleepy
         self.show_ui = show_ui
+        self._queue_pulled = True
 
         if self.show_ui:
-            self.ui = StatsUI(max_workers = self.max_workers)
+            self.ui = StatsUI(max_workers=self.max_workers, title=title)
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -31,6 +35,9 @@ class BaseWorker:
         
     async def stat_books(self):
         raise NotImplementedError("stat_books must be implemented by subclass")
+
+    async def pull_queue(self):
+        return false
 
     def process_book(self, task):
         raise NotImplementedError("process_book must be implemented by subclass")
@@ -48,8 +55,12 @@ class BaseWorker:
             await asyncio.sleep(1)
 
     async def _worker(self, worker_id: int, live: Live):
-        while not self.registry.queue.empty():
+        while True:
             task = await self.registry.queue.get()
+            
+            if task is None:
+                self.registry.queue.task_done()
+                break
 
             try:
                 if self.show_ui:
@@ -80,12 +91,14 @@ class BaseWorker:
                     create_task(self._createWorker(i, live))
                     for i in range(1, self.max_workers + 1)
                 ]
+                tasks.append(create_task(self.pull_queue()))
                 await gather(*tasks)
         else:
             tasks = [
                 create_task(self._createWorker(i, None))
                 for i in range(1, self.max_workers + 1)
             ]
+            tasks.append(create_task(self.pull_queue()))
             await gather(*tasks)
 
     async def run(self):

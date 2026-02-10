@@ -1,47 +1,41 @@
-import os
+import time
 from typing import Any
-import zipfile
-from tqdm import tqdm
-from types import Tuple
+from typing import Tuple
 from app.workers import BaseWorker
 from app.utils import FB2Book
 from app.hnsw import HNSW
-from app.models import Book, Task, Embedding
+from app.models import Task, Embedding
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
-from app.settings.config import BOOK_FOLDER
+from app.searchEngines.bookSearch import BookSearchEngineFactory
+from app.settings.config import INPX_FOLDER
 
 class GenerateEmbeddingsWorker(BaseWorker):
     def __init__(self, model, **kwargs):
         super().__init__(**kwargs)
         self.model = model
         self.hnsw = HNSW(batch_size=10000)
+        self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, INPX_FOLDER)
 
     async def stat_books(self):
-        with db() as conn:
-            completed_books = set[str](BookRepository.get_names(conn))
-        tasks = []
-  
-        with tqdm(total=len(os.listdir(BOOK_FOLDER)), desc="Проверка архивов", unit=" с", unit_scale=True) as pbar:
-            for archive in os.listdir(BOOK_FOLDER):
-                if not archive.lower().endswith(".zip"):
-                    continue
+        return True
+
+    async def pull_queue(self):
+        self._queue_pulled = False
+        last_update = 0
+        
+        async for book in self.engine.search_books():
+            await self.registry.add_one(Task(
+                name=book.file_name,
+                book=book
+            ))
+
+            now = time.time()
+            if now - last_update >= 1:
+                await self.ui.update_total(self.registry.total)
+                last_update = now
                 
-                with zipfile.ZipFile(os.path.join(BOOK_FOLDER, archive)) as z:
-                    for info in z.infolist():
-                        if info.is_dir():
-                            continue
-                        if info.filename in completed_books:
-                            continue
-                        
-                        tasks.append(Task(
-                            name=info.filename,
-                            book=Book(
-                                archive_name=archive,
-                                file_name=info.filename
-                            )
-                        ))
-                pbar.update(1)
-        await self.registry.add(tasks)
+        await self.ui.update_total(self.registry.total)
+        self._queue_pulled = True
 
     def process_book(self, task: Task):
         data = task.book.get_file_bytes_from_zip()
@@ -49,9 +43,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
         text = book.extract_text()
         id = book.get_id()
-        authors = book.get_authors()
-        author = ", ".join(authors)
-        title = book.get_title()
+
+        title = task.book.title or book.get_title()
+        authors = task.book.authors or book.get_authors()
+        author = task.book.author or ", ".join(authors)
 
         embedding = self.model.encode(text)
 

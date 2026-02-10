@@ -2,17 +2,18 @@ from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
 
 SITE_BASE_PATH = os.getenv("LIB_URL", "")
 LIB_URL = os.getenv("LIB_URL", "https://lib.ooosh.ru")
 
-DB_FILE = Path(os.getenv("DB_FILE", str(BASE_DIR / "data/data.db")))
-INDEX_FILE = Path(os.getenv("INDEX_FILE", str(BASE_DIR / "data/index.faiss")))
-RERANKER_FILE = Path(os.getenv("RERANKER_FILE", str(BASE_DIR / "data/reranker.lgb")))
+DB_FILE = Path(os.getenv("DB_FILE", str(DATA_DIR / "data.db")))
+INDEX_FILE = Path(os.getenv("INDEX_FILE", str(DATA_DIR / "index.faiss")))
+RERANKER_FILE = Path(os.getenv("RERANKER_FILE", str(DATA_DIR / "reranker.lgb")))
+MODEL_NAME = os.getenv("MODEL_NAME","all-MiniLM-L6-v2")
 
 BOOK_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/lib.rus.ec/")
-
-MODEL_NAME = os.getenv("MODEL_NAME","all-MiniLM-L6-v2")
+INPX_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/librusec_local_fb2.inpx")
 
 MAX_WORKERS = int(os.getenv("MAX_WORKERS","7"))
 

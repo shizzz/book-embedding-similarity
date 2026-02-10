@@ -20,14 +20,18 @@ class Book:
             file_name: str,
             id: int = None,
             title: str = None,
-            authors: str = None):
+            author: str = None,
+            authors: List[str] = None):
         self.id = id
         self.archive_name = archive_name
         self.file_name = file_name
         self.title = title
-        self.author = authors
+        self.author = author
 
-        self.authors = self._parse_authors(authors)
+        if authors == None and author != None:
+            self.authors = self._parse_authors(author)
+        else:
+            self.authors = authors
 
     @classmethod
     def map(cls, row) -> "Book":
@@ -36,7 +40,7 @@ class Book:
             archive_name=row["archive"],
             file_name=row["book"],
             title=row["title"],
-            authors=row["author"]
+            author=row["author"]
         )
 
     def map_by_id(
