@@ -13,7 +13,8 @@ async def submit_feedback(fb: FeedbackReq):
             candidate = Book.map(BookRepository().get_by_file(conn, fb.candidate_file_name))
 
             FeedbackRepository().submit(conn, source.id, candidate.id, fb.label)
-            SimilarRepository().delete(conn, source.id)
+            if fb.label < 0:
+                SimilarRepository().delete(conn, source.id, candidate.id)
             
         return {"status": "ok"}
     except Exception as e:

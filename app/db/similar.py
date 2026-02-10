@@ -43,8 +43,8 @@ class SimilarRepository:
     def clear(self, conn):
         conn.execute(f"{self.DELETE_QUERY}")
     
-    def delete(self, conn, book_id: int):
-        conn.execute(f"{self.DELETE_QUERY} WHERE book_id = ?", (book_id,))
+    def delete(self, conn, book_id: int, similar_book_id: int):
+        conn.execute(f"{self.DELETE_QUERY} WHERE book_id = ? AND similar_book_id = ?", (book_id, similar_book_id, ))
 
     def delete_many(self, conn, similars: List[Tuple[float, int, int]]):
         books = list[int]({s[1] for s in similars})
