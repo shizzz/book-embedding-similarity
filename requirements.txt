@@ -8,4 +8,5 @@ lxml
 aiohttp
 fastapi
 faiss-cpu
+lightgbm
 uvicorn[standard]

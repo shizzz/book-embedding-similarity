@@ -4,19 +4,23 @@ import numpy as np
 from tqdm import tqdm
 from typing import List, Tuple
 from app.models import Embedding
-from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, BASE_DIR
+from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, RERANKER_FILE
+from .trainers.rerankerTrainer import RerankerTrainer
 
 class HNSW:
     def __init__(
         self,
         index_file: str = f"{INDEX_FILE}",
         batch_size: int = None,
-        logger = None
+        reranker_trainer: RerankerTrainer | None = None,
+        logger=None,
     ):
         self.index_file = index_file
-        self._index = None
-        self.logger = logger
         self.batch_size = batch_size
+        self.reranker_trainer = reranker_trainer
+        self.logger = logger
+
+        self._index = None
         self.embeddings = []
         self.embedding_dim = 0
 
@@ -132,3 +136,33 @@ class HNSW:
             if self.logger: self.logger.info(f"Файл '{self.index_file}' удалён.")
             self._index = None
             return True
+
+    def rebuild(
+        self,
+        feedbacks=None,
+        books=None,
+        train_reranker: bool = True,
+    ):
+        if self.logger:
+            self.logger.info("Запущен rebuild HNSW")
+
+        self.delete_index_file(force=True)
+        self._index = self.generate_and_save()
+
+        if (
+            train_reranker
+            and self.reranker_trainer
+            and feedbacks
+            and books
+        ):
+            if self.logger:
+                self.logger.info("Обучаем reranker по feedback")
+
+            self.reranker_trainer.train(
+                feedbacks=feedbacks,
+                embeddings=self.embeddings,
+                books=books
+            )
+
+        if self.logger:
+            self.logger.info("Rebuild завершён")

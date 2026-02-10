@@ -2,6 +2,7 @@ import numpy as np
 from typing import List, Sequence, Tuple
 from app.models import Book, Embedding
 from app.models.feedback import Feedback
+from app.hnsw import RerankerTrainer
 from .similarSearchEngine import SimilarSearchEngine
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
@@ -10,6 +11,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         index,
         books: Sequence[Book],
         limit: int,
+        reranker: RerankerTrainer = None,
         exclude_same_authors: bool = False,
         step_percent: int = 5,
         logger = None,
@@ -18,9 +20,34 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         self.index = index
         self.books = list[Book](books)
         self._limit = limit
+        self.reranker = reranker
         self._step_percent = step_percent
         self.logger = logger
 
+    def _rerank(
+        self,
+        source: Book,
+        candidates: list[tuple[float, Book]],
+    ):
+        if not self.reranker:
+            return candidates
+
+        X = []
+        valid = []
+
+        for sim, book in candidates:
+            X.append([
+                sim,
+                int(book.author == source.author),
+            ])
+            valid.append(book)
+
+        scores = self.reranker.predict(np.array(X))
+
+        reranked = list(zip(scores, valid))
+        reranked.sort(key=lambda x: x[0], reverse=True)
+        return reranked
+        
     def search(
         self,
         source: Book,
@@ -34,7 +61,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         step = max(1, self.index.ntotal * self._step_percent // 100)
 
         query = embedding.vec.reshape(1, -1).astype(np.float32)
-        k = min(self._limit * 10 + 200, self.index.ntotal)
+        k = min(self._limit * 20 + 200, self.index.ntotal)
         scores, indices = self.index.search(query, k)
 
         candidates: List[Tuple[float, Book]] = []
@@ -45,28 +72,31 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
             candidate = self.books[idx]
 
-            if self._should_skip(source=source, candidate_name=candidate.file_name, candidate_title=candidate.title):
+            if self._should_skip(
+                source=source,
+                candidate_name=candidate.file_name,
+                candidate_title=candidate.title
+            ):
                 continue
 
-            similarity = float(score_raw)
-            boost = feedbacks.get_boost(source.id, candidate.id)
-            total_score = similarity + boost
-
-            candidates.append((total_score, candidate))
+            candidates.append((score_raw, candidate))
 
             if progress_callback and idx % step == 0:
                 percent = min(99, idx * 100 // self.index.ntotal)
                 progress_callback(percent)
 
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        top = candidates[: self._limit]
+        reranked = self._rerank(
+            source=source,
+            candidates=candidates,
+        )
+        top = reranked[: self._limit]
 
         if not top:
             return []
 
         result: List[Tuple[float, int, int]] = []
         for score, candidate in top:
-            result.append((score, source.id, candidate.id))
+            result.append((float(score), source.id, candidate.id))
 
         return result
 

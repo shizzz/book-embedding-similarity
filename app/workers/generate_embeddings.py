@@ -1,11 +1,13 @@
 import os
+from typing import Any
 import zipfile
 from tqdm import tqdm
 from types import Tuple
 from app.workers import BaseWorker
-from app.utils import FB2Book, HNSW
+from app.utils import FB2Book
+from app.hnsw import HNSW
 from app.models import Book, Task, Embedding
-from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository
+from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.settings.config import BOOK_FOLDER
 
 class GenerateEmbeddingsWorker(BaseWorker):
@@ -40,9 +42,6 @@ class GenerateEmbeddingsWorker(BaseWorker):
                         ))
                 pbar.update(1)
         await self.registry.add(tasks)
-
-        # После обновления\добавления эмбедингов, индекс нужно перестроить
-        self.hnsw.delete_index_file()
 
     def process_book(self, task: Task):
         data = task.book.get_file_bytes_from_zip()
@@ -79,6 +78,12 @@ class GenerateEmbeddingsWorker(BaseWorker):
     async def fin(self):
         with db() as conn:
             embeddings = list[Tuple[int, bytes]](EmbeddingsRepository().get_all(conn))
+            feedbacks = FeedbackRepository().get_all(conn)
+            books = list[Any](BookRepository().get_all(conn))
             
         self.hnsw.load_emb(embeddings)
-        self.hnsw.generate_and_save()
+        self.hnsw.rebuild(
+            embeddings=embeddings,
+            feedbacks=feedbacks,
+            books=books,
+        )

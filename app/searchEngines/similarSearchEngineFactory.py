@@ -1,5 +1,6 @@
 from typing import Literal
-from app.utils import HNSW
+from app.hnsw import HNSW
+from app.hnsw.trainers import LightGBMRerankerTrainer
 from app.db import db, BookRepository
 from app.models import Book
 from .similarSearchEngine import SimilarSearchEngine
@@ -30,6 +31,7 @@ class SimilarSearchEngineFactory:
                 books = [Book(id=r[0], archive_name=r[1], file_name=r[2], title=r[3]) for r in rows]
 
             return IndexSimilarSearchEngine(
+                reranker=LightGBMRerankerTrainer(),
                 index=index,
                 books=books,
                 limit=limit,

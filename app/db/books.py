@@ -12,6 +12,11 @@ class BookRepository:
     FROM books b
     """
     
+    def get_all(self, conn) -> Any:
+        cursor = conn.execute(f"{self.GET_QUERY}")
+        for row in cursor:
+            yield (tuple[Any, ...](row))
+
     def get_all_with_embeddings(self, conn) -> List[Tuple[int, str, str, str, bytes]]:
         cursor = conn.execute("""
         SELECT
