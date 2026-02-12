@@ -85,8 +85,8 @@ class StatsUI:
             self.stats["Done"] += 1
             self.stats["Remaining"] -= 1
 
-        self.progress.update(self.progress_task, advance=1)
-        live.update(self.layout())
+            self.progress.update(self.progress_task, advance=1)
+            live.update(self.layout())
 
     async def update_total(self, total: int):
         async with self.lock:

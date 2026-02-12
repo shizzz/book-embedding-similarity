@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, List, Tuple
+from typing import Any, Generator, Tuple
 
 class BookRepository:
     GET_QUERY = """
@@ -17,7 +17,7 @@ class BookRepository:
         for row in cursor:
             yield (tuple[Any, ...](row))
 
-    def get_all_with_embeddings(self, conn) -> List[Tuple[int, str, str, str, bytes]]:
+    def get_all_with_embeddings(self, conn) -> Generator[Tuple[int, str, str, str, bytes]]:
         cursor = conn.execute("""
         SELECT
             b.id,

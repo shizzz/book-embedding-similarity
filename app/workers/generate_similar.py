@@ -21,58 +21,59 @@ class GenerateSimilarWorker(BaseWorker):
         self._save_thread.start()
         self._queue_batch_size: int = DATABASE_QUEUE_BATCH_SIZE
 
-    def _save_loop(self):
-        buffer: list = []
-        while not self._stop_event.is_set():
-            try:
-                similar_list = self._queue.get(timeout=0.1)
-                buffer.extend(similar_list)
-                self._queue.task_done()
+    def _queue_step(self, buffer, conn, pbar=None, block=True):
+        try:
+            item = (
+                self._queue.get(timeout=0.1)
+                if block
+                else self._queue.get(timeout=0.05)
+            )
 
-                if len(buffer) >= self._queue_batch_size:
-                    with db() as conn:
-                        SimilarRepository().save(conn, buffer)
-                    buffer = []
-            except queue.Empty:
-                if buffer:
-                    with db() as conn:
-                        SimilarRepository().save(conn, buffer)
-                    buffer = []
-                continue
+            buffer.extend(item)
+            self._queue.task_done()
+
+            if len(buffer) >= self._queue_batch_size:
+                SimilarRepository().save(conn, buffer)
+                if pbar:
+                    pbar.update(len(buffer))
+                buffer.clear()
+
+            return True
+        except queue.Empty:
+            if buffer:
+                SimilarRepository().save(conn, buffer)
+                if pbar:
+                    pbar.update(len(buffer))
+                buffer.clear()
+            return False
+        except Exception as e:
+            self.logger.error(
+                f"Критическая ошибка при сбросе очереди: {e}",
+                exc_info=True
+            )
+            return False
+
+    def _save_loop(self):
+        buffer = []
+
+        with db() as conn:
+            while not self._stop_event.is_set():
+                self._queue_step(buffer, conn, block=True)
 
         self.logger.info("Остановка. Сбрасываем остаток очереди...")
-        buffer = []
-        
+
         approx_total = self._queue.unfinished_tasks * self._limit
 
-        with tqdm(total=approx_total, desc="Сброс оставшихся записей", unit=" rows", unit_scale=True) as pbar:
-            with db() as conn:
-                while True:
-                    try:
-                        similar_list = self._queue.get_nowait()
-                        buffer.extend(similar_list)
-                        self._queue.task_done()
+        with tqdm(
+            total=approx_total,
+            desc="Сброс оставшихся записей",
+            unit=" rows",
+            unit_scale=True
+        ) as pbar, db() as conn:
+            while self._queue_step(buffer, conn, pbar=pbar, block=False):
+                pass
 
-                        if len(buffer) >= self._queue_batch_size:
-                            SimilarRepository().save(conn, buffer)
-                            pbar.update(len(buffer))
-                            buffer = []
-                    except queue.Empty:
-                        if buffer:
-                            SimilarRepository().save(conn, buffer)
-                            pbar.update(len(buffer))
-                            buffer = []
-                        break
-                    except Exception as e:
-                        self.logger.error(f"Критическая ошибка при сбросе очереди: {e}", exc_info=True)
-                        break
-
-        while not self._queue.empty():
-            try:
-                self._queue.get_nowait()
-                self._queue.task_done()
-            except queue.Empty:
-                break
+        self.logger.info("Save thread stopped")
 
     async def stat_books(self):
         self.logger.info(f"Очистка таблицы similar")

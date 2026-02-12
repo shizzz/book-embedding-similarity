@@ -74,14 +74,14 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
     async def search_books(self) -> AsyncGenerator[Book, None]:
         await asyncio.to_thread(self._load_completed_books)
+        
+        with zipfile.ZipFile(self.folder) as zipf:
+            for info in zipf.infolist():
+                if info.is_dir():
+                    continue
 
-        with zipfile.ZipFile(self.folder, 'r') as zipf:
-            files = [f for f in zipf.namelist() if not f.endswith('/')]
-
-        for file in tqdm_asyncio(files, desc="Проверка архивов", unit=" с", unit_scale=True):
-            with zipfile.ZipFile(self.folder) as zipf:
                 books = await asyncio.to_thread(
-                    self._parse, zipf, file
+                    self._parse, zipf, info.filename
                 )
 
                 for book in books:
@@ -91,7 +91,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                         continue
 
                     yield Book(
-                        archive_name=f"{os.path.splitext(file)[0]}.zip",
+                        archive_name=f"{os.path.splitext(info.filename)[0]}.zip",
                         file_name=f"{book["file"]}.{book["ext"]}",
                         title=book["title"],
                         author=", ".join(authors),

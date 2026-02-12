@@ -1,8 +1,8 @@
 import numpy as np
 from typing import List, Tuple
 from app.models import Book, Embedding
+from app.hnsw.rerankers import Reranker
 from app.db import db, BookRepository
-from app.models.feedback import Feedback
 from .similarSearchEngine import SimilarSearchEngine
 
 class BruteforceSimilarSearchEngine(SimilarSearchEngine):
@@ -11,8 +11,9 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
         limit: int,
         exclude_same_authors: bool = False,
         step_percent: int = 5,
+        reranker: Reranker = None,
     ):
-        super().__init__(exclude_same_authors)
+        super().__init__(exclude_same_authors, reranker)
         self._limit = limit
         self._step_percent = step_percent
 
@@ -20,7 +21,6 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
         self,
         source: Book,
         embedding: Embedding,
-        feedbacks: List[Feedback],
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         with db() as conn:
@@ -39,10 +39,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
 
                 try:
                     emb_norm = Embedding.from_db(embedding_bytes)
-                    similarity = np.dot(emb_norm.vec, embedding.vec)
-
-                    boost = feedbacks.get_boost(source.id, book_id)
-                    score = similarity + boost
+                    score = np.dot(emb_norm.vec, embedding.vec)
 
                     candidates.append((score, book_id))
 
@@ -53,8 +50,12 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
                     percent = min(99, current * 100 // total)
                     progress_callback(percent)
 
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        top = candidates[:self._limit]
+
+        reranked = self._rerank(
+            source=source,
+            candidates=candidates,
+        )
+        top = reranked[: self._limit]
 
         if not top:
             return []

@@ -20,7 +20,6 @@ class GenerateEmbeddingsWorker(BaseWorker):
         return True
 
     async def pull_queue(self):
-        self._queue_pulled = False
         last_update = 0
         
         async for book in self.engine.search_books():
@@ -78,7 +77,6 @@ class GenerateEmbeddingsWorker(BaseWorker):
             
         self.hnsw.load_emb(embeddings)
         self.hnsw.rebuild(
-            embeddings=embeddings,
             feedbacks=feedbacks,
             books=books,
         )

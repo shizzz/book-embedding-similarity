@@ -1,7 +1,6 @@
 from typing import List, Tuple
 from app.models import Book, Embedding
 from app.searchEngines import SimilarSearchEngine
-from app.db import db, FeedbackRepository
 
 class BulkSimilarSearchService:
     def __init__(
@@ -16,13 +15,9 @@ class BulkSimilarSearchService:
         self.embeddings = embeddings
         self.logger = logger
 
-        with db() as conn:      
-            self._feedbacks = FeedbackRepository().get_all(conn)
-
     def run(self, source_book: Book, source_embedding: bytes) -> List[Tuple[float, int, int]]:
         query_emb = Embedding.from_db(source_embedding)
         return self.engine.search(
             source=source_book, 
-            embedding=query_emb,
-            feedbacks=self._feedbacks
+            embedding=query_emb
         )

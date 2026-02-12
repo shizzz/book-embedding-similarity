@@ -5,7 +5,11 @@ from app.settings.config import MODEL_NAME, DATA_DIR
 class Model:
     MODEL_DIR = "models"
 
-    def get(self) -> SentenceTransformer:    
+    def get_model_dir():
+        model_dir = DATA_DIR / Model.MODEL_DIR
+        return model_dir / MODEL_NAME
+
+    def get(self) -> SentenceTransformer:
         model_dir = DATA_DIR / Model.MODEL_DIR
         model_path = model_dir / MODEL_NAME
 

@@ -1,3 +1,4 @@
+import queue
 import asyncio
 import logging
 from asyncio import create_task, gather
@@ -16,13 +17,12 @@ class BaseWorker:
         show_ui: bool = True,
         sleepy: bool = False,
         title: str = None,
-        async_queue: bool = False,
     ):
         self.registry = registry or TaskRegistry()
         self.max_workers = max_workers
         self.sleepy = sleepy
         self.show_ui = show_ui
-        self._queue_pulled = True
+        self._queue_pulled = False
 
         if self.show_ui:
             self.ui = StatsUI(max_workers=self.max_workers, title=title)
@@ -37,7 +37,7 @@ class BaseWorker:
         raise NotImplementedError("stat_books must be implemented by subclass")
 
     async def pull_queue(self):
-        return false
+        self._queue_pulled = True
 
     def process_book(self, task):
         raise NotImplementedError("process_book must be implemented by subclass")
@@ -55,12 +55,8 @@ class BaseWorker:
             await asyncio.sleep(1)
 
     async def _worker(self, worker_id: int, live: Live):
-        while True:
+        while not self._queue_pulled or not self.registry.queue.empty():
             task = await self.registry.queue.get()
-            
-            if task is None:
-                self.registry.queue.task_done()
-                break
 
             try:
                 if self.show_ui:

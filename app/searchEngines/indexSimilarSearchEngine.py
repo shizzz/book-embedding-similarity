@@ -1,8 +1,7 @@
 import numpy as np
 from typing import List, Sequence, Tuple
 from app.models import Book, Embedding
-from app.models.feedback import Feedback
-from app.hnsw.trainers import RerankerTrainer
+from app.hnsw.rerankers import Reranker
 from .similarSearchEngine import SimilarSearchEngine
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
@@ -11,48 +10,23 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         index,
         books: Sequence[Book],
         limit: int,
-        reranker: RerankerTrainer = None,
+        reranker: Reranker = None,
         exclude_same_authors: bool = False,
         step_percent: int = 5,
         logger = None,
     ):
-        super().__init__(exclude_same_authors)
+        super().__init__(exclude_same_authors, reranker)
         self.index = index
         self.books = list[Book](books)
         self._limit = limit
         self.reranker = reranker
         self._step_percent = step_percent
         self.logger = logger
-
-    def _rerank(
-        self,
-        source: Book,
-        candidates: list[tuple[float, Book]],
-    ):
-        if not self.reranker:
-            return candidates
-
-        X = []
-        valid = []
-
-        for sim, book in candidates:
-            X.append([
-                sim,
-                int(book.author == source.author),
-            ])
-            valid.append(book)
-
-        scores = self.reranker.predict(np.array(X))
-
-        reranked = list(zip(scores, valid))
-        reranked.sort(key=lambda x: x[0], reverse=True)
-        return reranked
         
     def search(
         self,
         source: Book,
         embedding: Embedding,
-        feedbacks: List[Feedback],
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         if self.index is None or self.index.ntotal == 0:

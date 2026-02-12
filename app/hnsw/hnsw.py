@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from typing import List, Tuple
 from app.models import Embedding
-from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, RERANKER_FILE
+from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE
 from .trainers.rerankerTrainer import RerankerTrainer
 
 class HNSW:
@@ -37,7 +37,7 @@ class HNSW:
         # можно и из памяти, но сейчас влом. Важно, чтобы сохранился индекс
         with tqdm(total=len(embeddings), desc="Загружаем ембеддинги", unit=" строк\с", unit_scale=True) as pbar:
             for embedding in embeddings:
-                emb = Embedding.from_db(embedding).vec
+                emb = Embedding.from_db(embedding[1]).vec
                 valid_embeddings.append(emb)
                 pbar.update(1)
 
