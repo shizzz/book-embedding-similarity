@@ -62,10 +62,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
                 percent = min(99, idx * 100 // self.index.ntotal)
                 progress_callback(percent)
 
-        reranked = self._rerank(
-            source=source,
-            candidates=candidates,
-        )
+        reranked = self._rerank(candidates=candidates)
         top = reranked[: self._limit]
 
         if not top:

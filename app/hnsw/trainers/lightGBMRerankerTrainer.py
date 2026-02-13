@@ -2,8 +2,9 @@ import lightgbm as lgb
 import numpy as np
 import joblib
 from app.settings.config import RERANKER_FILE
+from .rerankerTrainer import RerankerTrainer
 
-class LightGBMRerankerTrainer:
+class LightGBMRerankerTrainer(RerankerTrainer):
     def train(self, feedbacks, embeddings, books):
         X, y, w = [], [], []
 
@@ -16,14 +17,9 @@ class LightGBMRerankerTrainer:
                 / (np.linalg.norm(src) * np.linalg.norm(tgt))
             )
 
-            same_author = int(
-                books[fb.source_id].author
-                == books[fb.candidate_id].author
-            )
-
-            X.append([cos, same_author])
+            X.append([cos])
             y.append(1 if fb.label == 1 else 0)
-            w.append(1.0)  # сюда можно trust
+            w.append(1.0)
 
         data = lgb.Dataset(
             np.array(X),

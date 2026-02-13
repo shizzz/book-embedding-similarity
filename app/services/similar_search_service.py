@@ -2,7 +2,7 @@ import time
 from typing import List, Tuple
 from app.models import Book, Embedding
 from app.db import db, BookRepository
-from app.searchEngines import SimilarSearchEngine
+from app.searchEngines.similarSearch import SimilarSearchEngine
 
 class SimilarSearchService:
     def __init__(

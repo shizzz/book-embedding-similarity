@@ -4,7 +4,7 @@ from typing import Optional, List, Tuple
 
 from app.db import db, SimilarRepository
 from app.models import Book, Embedding
-from app.searchEngines import SimilarSearchEngineFactory
+from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 
 class TaskState:

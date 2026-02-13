@@ -36,27 +36,36 @@ class SimilarSearchEngine:
 
     def _rerank(
         self,
-        source: Book,
         candidates: list[tuple[float, Book]],
     ):
-        if not self._reranker or not self._reranker.model:
-            reranked = candidates
-        else:
-            X = []
-            valid = []
+        # Если модели нет или кандидатов нет — возвращаем исходные
+        if not self._reranker or not self._reranker.model or not candidates:
+            return candidates
 
-            for sim, book in candidates:
-                X.append([
-                    sim,
-                    int(book.author == source.author),
-                ])
-                valid.append(book)
+        X = []
+        valid = []
 
-            scores = self._reranker.predict(np.array(X))
-            reranked = list(zip(scores, valid))
-            
+        for sim, book in candidates:
+            # Фича только исходный sim
+            X.append([sim])
+            valid.append(book)
+
+        X = np.array(X, dtype=np.float32)
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+
+        try:
+            scores = self._reranker.model.predict(X, raw_score=False)
+
+            if scores is None or np.all(np.isnan(scores)) or np.all(scores < 1e-6):
+                scores = np.array([sim for sim, _ in candidates], dtype=np.float32)
+        except Exception:
+            scores = np.array([sim for sim, _ in candidates], dtype=np.float32)
+
+        reranked = list(zip(scores, valid))
         reranked.sort(key=lambda x: x[0], reverse=True)
         return reranked
+
     
     def search(
         self,

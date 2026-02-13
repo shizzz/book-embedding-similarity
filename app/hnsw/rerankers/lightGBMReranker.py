@@ -2,8 +2,9 @@ import os
 import joblib
 import numpy as np
 from app.settings.config import RERANKER_FILE
+from .reranker import Reranker
 
-class LightGBMReranker:
+class LightGBMReranker(Reranker):
     def __init__(self,):
         self.model = None
 

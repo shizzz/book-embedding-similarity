@@ -3,7 +3,7 @@ import asyncio
 import time
 from typing import List, Tuple
 from app.models import Similar, Embedding, Book
-from app.searchEngines import SimilarSearchEngineFactory
+from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository
 from app.settings.config import LIB_URL

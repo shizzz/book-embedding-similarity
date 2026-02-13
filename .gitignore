@@ -6,4 +6,5 @@ __pycache__
 *.index
 *.faiss
 .env
+reranker.lgb
 app/data/models

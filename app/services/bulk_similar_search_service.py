@@ -1,6 +1,6 @@
 from typing import List, Tuple
 from app.models import Book, Embedding
-from app.searchEngines import SimilarSearchEngine
+from app.searchEngines.similarSearch import SimilarSearchEngine
 
 class BulkSimilarSearchService:
     def __init__(

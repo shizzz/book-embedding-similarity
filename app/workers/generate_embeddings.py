@@ -1,10 +1,9 @@
 import time
-from typing import Any
-from typing import Tuple
+from typing import Any, Tuple
 from app.workers import BaseWorker
 from app.utils import FB2Book
 from app.hnsw import HNSW
-from app.models import Task, Embedding
+from app.models import Task, Embedding, Book
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.settings.config import INPX_FOLDER
@@ -73,7 +72,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
         with db() as conn:
             embeddings = list[Tuple[int, bytes]](EmbeddingsRepository().get_all(conn))
             feedbacks = FeedbackRepository().get_all(conn)
-            books = list[Any](BookRepository().get_all(conn))
+            books: list[Book] = [
+                Book.map_row(row)
+                for row in BookRepository().get_all(conn)
+            ]
             
         self.hnsw.load_emb(embeddings)
         self.hnsw.rebuild(

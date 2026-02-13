@@ -17,13 +17,14 @@ class BookRepository:
         for row in cursor:
             yield (tuple[Any, ...](row))
 
-    def get_all_with_embeddings(self, conn) -> Generator[Tuple[int, str, str, str, bytes]]:
+    def get_all_with_embeddings(self, conn) -> Generator[Tuple[int, str, str, str, str, bytes]]:
         cursor = conn.execute("""
         SELECT
             b.id,
             b.archive,
             b.book,
             b.title,
+            b.author,
             e.embedding
         FROM books b
         JOIN embeddings e ON e.book_id = b.id

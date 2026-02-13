@@ -137,32 +137,39 @@ class HNSW:
             self._index = None
             return True
 
+    def rebuild_trainer(
+            self,
+            feedbacks=None,
+            books=None,
+    ):
+        if self.logger:
+            self.logger.info("Обучаем reranker по feedback")
+
+        self.reranker_trainer.train(
+            feedbacks=feedbacks,
+            embeddings=self.embeddings,
+            books=books
+        )
+        
     def rebuild(
         self,
         feedbacks=None,
         books=None,
         train_reranker: bool = True,
     ):
-        if self.logger:
-            self.logger.info("Запущен rebuild HNSW")
-
-        self.delete_index_file(force=True)
-        self._index = self.generate_and_save()
-
         if (
             train_reranker
             and self.reranker_trainer
             and feedbacks
             and books
         ):
-            if self.logger:
-                self.logger.info("Обучаем reranker по feedback")
+            self.rebuild_trainer(feedbacks, books)
 
-            self.reranker_trainer.train(
-                feedbacks=feedbacks,
-                embeddings=self.embeddings,
-                books=books
-            )
+        if self.logger:
+            self.logger.info("Запущен rebuild HNSW")
+
+        self.delete_index_file(force=True)
+        self._index = self.generate_and_save()
 
         if self.logger:
             self.logger.info("Rebuild завершён")

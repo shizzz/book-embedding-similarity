@@ -43,6 +43,16 @@ class Book:
             author=row["author"]
         )
 
+    @classmethod
+    def map_row(cls, row) -> "Book":
+        return Book(
+            id=row[0],
+            archive_name=row[1],
+            file_name=row[2],
+            title=row[3],
+            author=row[4]
+        )
+
     def map_by_id(
         rows: Dict[int, Any],
         mapper: Callable[[Any], T],

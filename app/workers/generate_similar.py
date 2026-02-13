@@ -6,7 +6,7 @@ from app.workers import BaseWorker
 from app.services import BulkSimilarSearchService
 from app.models import Task, Book
 from app.db import db, BookRepository, SimilarRepository
-from app.searchEngines import SimilarSearchEngineFactory
+from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK, DATABASE_QUEUE_BATCH_SIZE
 
 class GenerateSimilarWorker(BaseWorker):
@@ -79,14 +79,14 @@ class GenerateSimilarWorker(BaseWorker):
             SimilarRepository().clear(conn)
 
             self.logger.info(f"Получение всех книг из базы данных")
-            books_with_embeddings = list[Tuple[int, str, str, str, bytes]](BookRepository().get_all_with_embeddings(conn))
+            books_with_embeddings = list[Tuple[int, str, str, str, str, bytes]](BookRepository().get_all_with_embeddings(conn))
 
             self.logger.info(f"Фильтрация книг и эмбеддингов по ID")
             valid_books: List[Book] = []
             valid_embeddings: List[bytes] = []
 
-            for book_id, archive, book_name, title, embedding in books_with_embeddings:
-                valid_books.append(Book(id=book_id, archive_name=archive, file_name=book_name, title=title))
+            for book_id, archive, book_name, title, author, embedding in books_with_embeddings:
+                valid_books.append(Book(id=book_id, archive_name=archive, file_name=book_name, title=title, author=author))
                 valid_embeddings.append(embedding)
 
         engine = SimilarSearchEngineFactory.create(SimilarSearchEngineFactory.INDEX, SIMILARS_PER_BOOK, False, 1)

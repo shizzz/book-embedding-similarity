@@ -26,8 +26,10 @@ class SimilarSearchEngineFactory:
             index = hnsw.load_from_file()
 
             with db() as conn:
-                rows = BookRepository().get_all_with_embeddings(conn)
-                books = [Book(id=r[0], archive_name=r[1], file_name=r[2], title=r[3]) for r in rows]
+                books: list[Book] = [
+                    Book.map_row(row)
+                    for row in BookRepository().get_all_with_embeddings(conn)
+                ]
 
             return IndexSimilarSearchEngine(
                 reranker=LightGBMReranker(),
