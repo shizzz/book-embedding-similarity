@@ -10,7 +10,7 @@ services:
     volumes:
       - /mnt/data/librusec/lib/lib.rus.ec:/books
       - ./app/data:/app/data
-      - .:/app
+      - ./app:/app/app
     environment:
       LIB_URL: https://lib.some.com
       SITE_BASE_PATH: ""
