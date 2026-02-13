@@ -4,7 +4,7 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-SITE_BASE_PATH = os.getenv("LIB_URL", "")
+SITE_BASE_PATH = os.getenv("SITE_BASE_PATH", "")
 LIB_URL = os.getenv("LIB_URL", "https://lib.some.ru")
 
 DB_FILE = Path(os.getenv("DB_FILE", str(DATA_DIR / "data.db")))
