@@ -14,7 +14,7 @@
     </thead>
     <tbody>
         {% for item in rows %}
-        <tr data-candidate="{{ item.file_name }}">
+        <tr data-candidate="{{ item.file_name }}" data-source="{{ base_book.file_name }}">
             <td>{{ loop.index }}</td>
             <td>{{ (item.score * 100) | round(2) }}</td>
             <td>{{ item.file_name }}</td>
@@ -33,9 +33,15 @@
                 {% endif %}
             </td>
             <td class="feedback-cell">
-                <div class="feedback-buttons">
-                    <button class="like-btn" data-action="1" title="Нравится">👍</button>
-                    <button class="dislike-btn" data-action="0" title="Не нравится">👎</button>
+                <div class="star-rating" data-current="{{ item.rating if item.rating is defined else 0 }}">
+                    <span class="reset-rating"
+                        data-value="0"
+                        title="Сбросить">✖</span>
+                    {% for i in range(1, 6) %}
+                        <span class="star"
+                            data-value="{{ i }}"
+                            title="Оценка {{ i }}">★</span>
+                    {% endfor %}
                 </div>
             </td>
         </tr>

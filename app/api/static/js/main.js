@@ -39,39 +39,83 @@ es.onerror = function() {
     document.getElementById("progress").innerText = "";
 };
 
+
 document.addEventListener('click', async function(e) {
-    if (e.target.classList.contains('like-btn') || e.target.classList.contains('dislike-btn')) {
+    if (e.target.classList.contains('star')) {
         e.preventDefault();
-        const btn = e.target;
-        const row = btn.closest('tr');
+
+        const star = e.target;
+        const row = star.closest('tr');
         if (!row) return;
 
+        const container = star.closest('.star-rating');
+        const source = row.dataset.source;
         const candidate = row.dataset.candidate;
-        const action = btn.dataset.action;
 
-        try {
-            const resp = await fetch('/feedback', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    source_file_name: '{{ file | e }}',  // из контекста страницы
-                    candidate_file_name: candidate,
-                    label: parseInt(action)
-                })
-            });
+        const stars = parseInt(star.dataset.value);
+        const rating = stars * 0.2;
 
-            if (resp.ok) {
-                row.querySelectorAll('button').forEach(b => {
-                    b.style.opacity = '0.4';
-                    b.disabled = true;
-                });
-                btn.style.opacity = '1';
-                btn.style.fontWeight = 'bold';
-            } else {
-                alert('Ошибка отправки');
-            }
-        } catch (err) {
-            alert('Ошибка сети: ' + err.message);
-        }
+        await sendRating(row, container, source, candidate, rating);
     }
+
+    if (e.target.classList.contains('reset-rating')) {
+        e.preventDefault();
+
+        const reset = e.target;
+        const row = reset.closest('tr');
+        if (!row) return;
+
+        const container = reset.closest('.star-rating');
+        const source = row.dataset.source;
+        const candidate = row.dataset.candidate;
+
+        await sendRating(row, container, source, candidate, 0);
+    }
+});
+
+async function sendRating(row, container, source, candidate, rating) {
+
+    try {
+        const resp = await fetch('/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source_file_name: source,
+                candidate_file_name: candidate,
+                label: rating
+            })
+        });
+
+        if (!resp.ok) {
+            alert('Ошибка отправки');
+            return;
+        }
+
+        container.dataset.current = rating;
+        renderStars(container, rating);
+
+    } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+    }
+}
+
+function renderStars(container, ratingFloat) {
+    const stars = container.querySelectorAll(".star");
+    const activeStars = Math.round(ratingFloat / 0.2);
+
+    stars.forEach(star => {
+        const value = parseInt(star.dataset.value);
+        if (value <= activeStars) {
+            star.classList.add("active");
+        } else {
+            star.classList.remove("active");
+        }
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".star-rating").forEach(container => {
+        const current = parseFloat(container.dataset.current || 0);
+        renderStars(container, current);
+    });
 });

@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository
+from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository, FeedbackRepository
 from app.models import Book
 from app.utils import Html
 from app.services import TaskState, Similarity
@@ -55,8 +55,10 @@ async def similar_events(
 
             if not force and SimilarRepository().has_similar(conn, book.id):
                 similars = SimilarRepository().get(conn, book.id, limit)
+                feedbacks = FeedbackRepository().get(conn, book.id)
+
                 elapsed = time.perf_counter() - start
-                html = html.render_similar_table(request, book, similars, elapsed)
+                html = Html.render_similar_table(request, book, similars, elapsed, feedbacks)
                 yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
                 return
 
@@ -79,7 +81,10 @@ async def similar_events(
 
             if state.result is not None:
                 elapsed = time.perf_counter() - start
-                html = Html.render_similar_table(request, book, state.result, elapsed)
+                with db() as conn:                 
+                    feedbacks = FeedbackRepository().get(conn, book.id)
+
+                html = Html.render_similar_table(request, book, state.result, elapsed, feedbacks)
                 yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
                 break
 

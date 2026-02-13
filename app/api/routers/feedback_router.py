@@ -1,11 +1,10 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse
 from app.models import Book, FeedbackReq
 from app.db import db, BookRepository, FeedbackRepository, SimilarRepository
 
 router = APIRouter()
 
-@router.post("/", response_class=HTMLResponse)
+@router.post("/")
 async def submit_feedback(fb: FeedbackReq):
     try:
         with db() as conn:

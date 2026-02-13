@@ -108,3 +108,31 @@ a:hover {
     transform: scale(1.1);
     background: rgba(0,0,0,0.1);
 }
+
+.star-rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.star {
+    cursor: pointer;
+    font-size: 18px;
+    color: #ccc;
+    transition: 0.15s;
+}
+
+.star.active {
+    color: gold;
+}
+
+.star:hover {
+    transform: scale(1.2);
+}
+
+.reset-rating {
+    cursor: pointer;
+    font-size: 14px;
+    color: #999;
+    margin-left: 6px;
+}

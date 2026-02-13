@@ -34,8 +34,11 @@ class Feedbacks:
             avg = sum(labels) / len(labels)
             self._pair_to_boost[key] = avg
 
-    def get_boost(self, source_fn: id, cand_fn: id, factor: float = FEEDBACK_BOOST_FACTOR) -> float:
+    def get_boost(self, source_fn: int, cand_fn: int, factor: float = FEEDBACK_BOOST_FACTOR) -> float:
             key = (source_fn, cand_fn)
             avg = self._pair_to_boost.get(key, 0.0)
             trust = 1.0
             return avg * factor * trust
+    
+    def get_rating(self, source_id: int, candidate_id: int) -> float:
+        return self._pair_to_boost.get((source_id, candidate_id), 0.0)
