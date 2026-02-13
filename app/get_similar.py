@@ -13,13 +13,11 @@ def make_lib_url(file_name: str) -> str:
     return f"{LIB_URL}/#/extended?page=1&limit=20&ex_file={ex_file}"
 
 def print_similar_books(
-    source_file: str,
     similars: List[Tuple[float, int, int]],
     started_at: float
 ):
     elapsed = time.perf_counter() - started_at
 
-    print(f"\nТоп-50 похожих книг для {source_file}")
     print(f"Время выполнения: {elapsed:.3f} сек\n")
 
     similars_converted = Similar.to_similar_list(similars)
@@ -32,6 +30,7 @@ def print_similar_books(
 
 async def main():
     start = time.perf_counter()
+    limit: int = 100
     parser = argparse.ArgumentParser(description="Показать топ-50 похожих книг")
     parser.add_argument("file_name", type=str, help="Имя файла книги")
     parser.add_argument(
@@ -60,13 +59,15 @@ async def main():
         print(f"У книги {args.file_name} не сгенерирован вектор")
         return
         
+    
+    print(f"Поиск TOP({limit}) книг похожих на \"{book_task.title}\" {book_task.file_name}")
     embedding = Embedding.from_db(embedding_bytes)
 
     mode = getattr(args, "mode", SimilarSearchEngineFactory.BRUTEFORCE)
     compare = getattr(args, "compare", False)
 
     def run_service(selected_mode: str):
-        engine = SimilarSearchEngineFactory.create(selected_mode, 100, False)
+        engine = SimilarSearchEngineFactory.create(selected_mode, limit, False)
         service = SimilarSearchService(
             engine=engine,
             source=book_task,
@@ -95,7 +96,6 @@ async def main():
         SimilarRepository().replace(conn, similars)
 
     print_similar_books(
-        source_file=book_task.file_name,
         similars=similars,
         started_at=start
     )

@@ -29,6 +29,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         embedding: Embedding,
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
+        seen_books: set[tuple[str, tuple[str, ...]]] = set()
         if self.index is None or self.index.ntotal == 0:
             return []
 
@@ -49,7 +50,9 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
             if self._should_skip(
                 source=source,
                 candidate_name=candidate.file_name,
-                candidate_title=candidate.title
+                candidate_title=candidate.title,
+                candidate_authors=candidate.authors,
+                seen=seen_books
             ):
                 continue
 

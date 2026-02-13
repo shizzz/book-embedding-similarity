@@ -1,9 +1,7 @@
-import queue
 import asyncio
 import logging
 from asyncio import create_task, gather
 from rich.live import Live
-from sympy import false
 from app.utils import StatsUI
 from app.db import Migrator
 from app.models import TaskRegistry
@@ -56,7 +54,11 @@ class BaseWorker:
 
     async def _worker(self, worker_id: int, live: Live):
         while not self._queue_pulled or not self.registry.queue.empty():
-            task = await self.registry.queue.get()
+            try:
+                task = self.registry.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                await asyncio.sleep(1)
+                continue
 
             try:
                 if self.show_ui:
@@ -81,20 +83,21 @@ class BaseWorker:
             await self._worker(worker_id, live)
 
     async def _executeWorkers(self):
+        tasks = []
         if self.show_ui:
             with Live(self.ui.layout(), refresh_per_second=5, console=self.ui.console) as live:
-                tasks = [
+                tasks.append(create_task(self.pull_queue()))
+                tasks.extend(
                     create_task(self._createWorker(i, live))
                     for i in range(1, self.max_workers + 1)
-                ]
-                tasks.append(create_task(self.pull_queue()))
+                )
                 await gather(*tasks)
         else:
-            tasks = [
+            tasks.append(create_task(self.pull_queue()))
+            tasks.extend(
                 create_task(self._createWorker(i, None))
                 for i in range(1, self.max_workers + 1)
-            ]
-            tasks.append(create_task(self.pull_queue()))
+            )
             await gather(*tasks)
 
     async def run(self):

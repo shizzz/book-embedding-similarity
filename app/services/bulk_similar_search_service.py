@@ -17,7 +17,9 @@ class BulkSimilarSearchService:
 
     def run(self, source_book: Book, source_embedding: bytes) -> List[Tuple[float, int, int]]:
         query_emb = Embedding.from_db(source_embedding)
-        return self.engine.search(
+        similars = self.engine.search(
             source=source_book, 
             embedding=query_emb
         )
+
+        return similars

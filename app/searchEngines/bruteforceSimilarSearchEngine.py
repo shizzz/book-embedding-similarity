@@ -25,6 +25,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
     ) -> List[Tuple[float, int, int]]:
         with db() as conn:
             candidates = []
+            seen_books: set[tuple[str, tuple[str, ...]]] = set()
             current = 0
             total = BookRepository.count_embeddings(conn)
             step = max(1, total * self._step_percent // 100)
@@ -34,7 +35,12 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
 
                 book_id, _, book, title, embedding_bytes = row
 
-                if self._should_skip(source=source, candidate_name=book, candidate_title=title):
+                if self._should_skip(
+                    source=source,
+                    candidate_name=book,
+                    candidate_title=title,
+                    seen=seen_books
+                ):
                     continue
 
                 try:

@@ -21,13 +21,9 @@ class GenerateSimilarWorker(BaseWorker):
         self._save_thread.start()
         self._queue_batch_size: int = DATABASE_QUEUE_BATCH_SIZE
 
-    def _queue_step(self, buffer, conn, pbar=None, block=True):
+    def _queue_step(self, buffer, conn, pbar=None):
         try:
-            item = (
-                self._queue.get(timeout=0.1)
-                if block
-                else self._queue.get(timeout=0.05)
-            )
+            item = self._queue.get(timeout=0.1)
 
             buffer.extend(item)
             self._queue.task_done()
@@ -58,20 +54,21 @@ class GenerateSimilarWorker(BaseWorker):
 
         with db() as conn:
             while not self._stop_event.is_set():
-                self._queue_step(buffer, conn, block=True)
-
-        self.logger.info("Остановка. Сбрасываем остаток очереди...")
+                self._queue_step(buffer, conn)
 
         approx_total = self._queue.unfinished_tasks * self._limit
 
-        with tqdm(
-            total=approx_total,
-            desc="Сброс оставшихся записей",
-            unit=" rows",
-            unit_scale=True
-        ) as pbar, db() as conn:
-            while self._queue_step(buffer, conn, pbar=pbar, block=False):
-                pass
+        if approx_total > 0:
+            self.logger.info("Остановка. Сбрасываем остаток очереди...")
+
+            with tqdm(
+                total=approx_total,
+                desc="Сброс оставшихся записей",
+                unit=" rows",
+                unit_scale=True
+            ) as pbar, db() as conn:
+                while self._queue_step(buffer, conn, pbar=pbar):
+                    pass
 
         self.logger.info("Save thread stopped")
 
@@ -114,7 +111,7 @@ class GenerateSimilarWorker(BaseWorker):
                 embedding=embedding))
         await self.registry.add(tasks)
         del books_with_embeddings
-
+    
     def process_book(self, task: Task):
         similar = self._service.run(task.book, task.embedding)
         self._queue.put(similar)
