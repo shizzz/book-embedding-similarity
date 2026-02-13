@@ -5,6 +5,9 @@ __pycache__
 *.db-journal
 *.index
 *.faiss
+*.spec
 .env
 reranker.lgb
 app/data/models
+build
+dist

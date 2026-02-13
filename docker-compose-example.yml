@@ -3,7 +3,7 @@ services:
     image: book-sim
     build:
       context: .
-    command: -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
+    command: -m uvicorn сду:app --reload --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     container_name: book-sim
@@ -22,4 +22,4 @@ services:
       MODEL_NAME: all-MiniLM-L6-v2
       MAX_WORKERS: 1
       SIMILARS_PER_BOOK: 100
-      
+      su
