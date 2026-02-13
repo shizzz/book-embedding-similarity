@@ -10,9 +10,11 @@ from app.models import Book
 from app.utils import Html
 from app.services import TaskState, Similarity
 from ..dependencies import executor
+from app.settings.config import SITE_BASE_PATH
 
 router = APIRouter()
 similarity = Similarity()
+path_for_static = f"{SITE_BASE_PATH}/static" if SITE_BASE_PATH else "/static"
 
 @router.get("/", response_class=HTMLResponse)
 async def similar_page(
@@ -22,7 +24,7 @@ async def similar_page(
     exclude_same_author: bool = False,
     force: bool = False,
 ):
-    return Html.templates.TemplateResponse(   # или импортировать из utils
+    return Html.templates.TemplateResponse(
         "similar.html",
         {
             "request": request,
@@ -30,6 +32,7 @@ async def similar_page(
             "limit": limit,
             "exclude_same_author": exclude_same_author,
             "force": force,
+            "base_path": path_for_static
         }
     )
 
