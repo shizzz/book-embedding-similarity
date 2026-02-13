@@ -7,18 +7,14 @@ from app.settings.config import FEEDBACK_BOOST_FACTOR
 class FeedbackReq(BaseModel):
     source_file_name: str
     candidate_file_name: str
-    label: int
+    label: float
 
 @dataclass(frozen=True, slots=True)
 class Feedback:
     source_id: str
     candidate_id: str
-    label: int
+    label: float
     created_at: datetime = field(default_factory=datetime.now)
-
-    def __post_init__(self):
-        if self.label not in (1, -1):
-            raise ValueError("label должен быть 1 или -1")
         
 @dataclass(slots=True)
 class Feedbacks:

@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS feedback (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_book_id INTEGER NOT NULL,
     candidate_book_id INTEGER NOT NULL,
-    label INTEGER NOT NULL,
+    label FLOAT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_book_id, candidate_book_id),
     FOREIGN KEY (source_book_id) REFERENCES books(id),

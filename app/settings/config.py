@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 SITE_BASE_PATH = os.getenv("LIB_URL", "")
-LIB_URL = os.getenv("LIB_URL", "https://lib.ooosh.ru")
+LIB_URL = os.getenv("LIB_URL", "https://lib.some.ru")
 
 DB_FILE = Path(os.getenv("DB_FILE", str(DATA_DIR / "data.db")))
 INDEX_FILE = Path(os.getenv("INDEX_FILE", str(DATA_DIR / "index.faiss")))
@@ -25,3 +25,7 @@ HNSW_M: int = 32
 HNSW_EF_CONSTRUCTION: int = 200
 HNSW_EF_SEARCH: int = 64
 FEEDBACK_BOOST_FACTOR: float = 0.4
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY","")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY","")
+LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL","")

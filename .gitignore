@@ -5,4 +5,5 @@ __pycache__
 *.db-journal
 *.index
 *.faiss
+.env
 app/data/models

@@ -9,4 +9,5 @@ aiohttp
 fastapi
 faiss-cpu
 lightgbm
+openai
 uvicorn[standard]

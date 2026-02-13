@@ -36,6 +36,10 @@ class BookRepository:
         row = conn.execute(f"{self.GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
         return row if row else None
     
+    def get_by_id(self, conn, book_id: int) -> Any:
+        row = conn.execute(f"{self.GET_QUERY} WHERE b.id = ?",(book_id,)).fetchone()
+        return row if row else None
+    
     def get_many(self, conn, book_ids: list[int]) -> dict[int, Any]:
         if not book_ids:
             return {}
@@ -71,28 +75,6 @@ class BookRepository:
         book_id = row[0]
 
         return book_id
-
-    def save_authors(conn, book: str, authors: list[str]):
-        if not authors:
-            return
-        
-        cur = conn.cursor()
-        cur.execute("DELETE FROM book_authors WHERE book = ?", (book,))
-
-        author_ids = []
-        for name in authors:
-            cur.execute("SELECT id FROM authors WHERE name = ?", (name,))
-            row = cur.fetchone()
-            if row:
-                author_ids.append(row["id"])
-            else:
-                cur.execute("INSERT INTO authors (name) VALUES (?)", (name,))
-                author_ids.append(cur.lastrowid)
-
-        cur.executemany(
-            "INSERT INTO book_authors (book, author_id) VALUES (?, ?)",
-            [(book, aid) for aid in author_ids]
-        )
 
     def count_embeddings(conn) -> int:
         return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
