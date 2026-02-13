@@ -1,0 +1,24 @@
+services:
+  api:
+    image: book-sim
+    build:
+      context: .
+    command: -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
+    ports:
+      - "8100:8000"
+    container_name: book-sim
+    volumes:
+      - /mnt/data/librusec/lib/lib.rus.ec:/books
+      - ./app/data:/app/data
+      - ./app:/app/app
+    environment:
+      LIB_URL: https://lib.some.com
+      SITE_BASE_PATH: ""
+      BOOK_FOLDER: /books
+      INPX_FOLDER: /books/librusec_local_fb2.inpx
+      DB_FILE: /app/data/data.db
+      INDEX_FILE: /app/data/index.faiss
+      RERANKER_FILE: /app/data/reranker.lgb
+      MODEL_NAME: all-MiniLM-L6-v2
+      MAX_WORKERS: 1
+      SIMILARS_PER_BOOK: 100
