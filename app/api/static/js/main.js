@@ -89,6 +89,7 @@ document.addEventListener('click', async function(e) {
         const candidate = row.dataset.candidate;
 
         await sendRating(row, container, source, candidate, -1);
+        row.remove();
     }
 });
 
