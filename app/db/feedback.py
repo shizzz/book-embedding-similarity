@@ -35,6 +35,9 @@ class FeedbackRepository:
 
         return Feedbacks([self._map(r) for r in rows if r])
 
+    def delete(self, conn, book_id: int, similar_book_id: int):
+        conn.execute(f"DELETE FROM feedback WHERE source_book_id = ? AND candidate_book_id = ?", (book_id, similar_book_id, ))
+
     def get_all(self, conn) -> Feedbacks:
         rows = conn.execute(self.GET_QUERY).fetchall()
 

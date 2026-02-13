@@ -32,7 +32,7 @@ async def similar_page(
             "limit": limit,
             "exclude_same_author": exclude_same_author,
             "force": force,
-            "base_path": path_for_static
+            "path_for_static": path_for_static
         }
     )
 

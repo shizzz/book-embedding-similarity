@@ -24,6 +24,11 @@ es.onmessage = function(e) {
             document.getElementById("result").innerHTML = 
                 `<p class="error">Не удалось обработать запрос: ${data.message || 'неизвестная ошибка'}</p>`;
         }
+        
+        document.querySelectorAll(".star-rating").forEach(container => {
+            const current = parseFloat(container.dataset.current || 0);
+            renderStars(container, current);
+        });
     } catch (err) {
         console.error("Ошибка парсинга SSE:", err);
         document.getElementById("status").innerText = "Ошибка соединения";
@@ -71,10 +76,23 @@ document.addEventListener('click', async function(e) {
 
         await sendRating(row, container, source, candidate, 0);
     }
+
+    if (e.target.classList.contains('negative-rating')) {
+        e.preventDefault();
+
+        const reset = e.target;
+        const row = reset.closest('tr');
+        if (!row) return;
+
+        const container = reset.closest('.star-rating');
+        const source = row.dataset.source;
+        const candidate = row.dataset.candidate;
+
+        await sendRating(row, container, source, candidate, -1);
+    }
 });
 
 async function sendRating(row, container, source, candidate, rating) {
-
     try {
         const resp = await fetch('/feedback', {
             method: 'POST',

@@ -136,3 +136,10 @@ a:hover {
     color: #999;
     margin-left: 6px;
 }
+
+.negative-rating {
+    cursor: pointer;
+    font-size: 14px;
+    color: #999;
+    margin-left: 6px;
+}

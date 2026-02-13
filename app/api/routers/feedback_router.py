@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.models import Book, FeedbackReq
-from app.db import db, BookRepository, FeedbackRepository
+from app.db import db, BookRepository, FeedbackRepository, SimilarRepository
 
 router = APIRouter()
 
@@ -11,8 +11,14 @@ async def submit_feedback(fb: FeedbackReq):
             source = Book.map(BookRepository().get_by_file(conn, fb.source_file_name))
             candidate = Book.map(BookRepository().get_by_file(conn, fb.candidate_file_name))
 
-            FeedbackRepository().submit(conn, source.id, candidate.id, fb.label)
-            
+            if fb.label > 0:
+                FeedbackRepository().submit(conn, source.id, candidate.id, fb.label)
+            elif fb.label == 0:
+                FeedbackRepository().delete(conn, source.id, candidate.id)
+            elif fb.label < 0:
+                FeedbackRepository().submit(conn, source.id, candidate.id, fb.label)
+                SimilarRepository().delete(conn, source.id, candidate.id)
+
         return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
