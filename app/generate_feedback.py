@@ -113,7 +113,7 @@ def call_lm_studio(prompt: str) -> int | None:
 
 def save_feedback(source_book_id: int, candidate_book_id: int, label: float):
     with db() as conn:
-        FeedbackRepository().submit(conn, source_book_id, candidate_book_id, label)
+        FeedbackRepository.submit(conn, source_book_id, candidate_book_id, label)
 
 def main(book_file: str):
     source_book = get_book_info(book_file)

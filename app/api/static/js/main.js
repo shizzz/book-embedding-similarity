@@ -95,7 +95,7 @@ document.addEventListener('click', async function(e) {
 
 async function sendRating(row, container, source, candidate, rating) {
     try {
-        const resp = await fetch('/feedback', {
+        const resp = await fetch('/similar/feedback', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

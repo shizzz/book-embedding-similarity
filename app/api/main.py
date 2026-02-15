@@ -25,4 +25,4 @@ app = FastAPI(title="Book Similarity HTML API", lifespan=lifespan)
 app.mount(path_for_static, StaticFiles(directory=f"{str(BASE_DIR)}/api/static"), name="static")
 
 app.include_router(similar_router, prefix="/similar")
-app.include_router(feedback_router, prefix="/feedback")
+app.include_router(feedback_router, prefix="/similar/feedback")
