@@ -1,6 +1,6 @@
 import asyncio
 from app.workers import GenerateEmbeddingsWorker
-from app.utils.model import Model
+from app.model.model import Model
 
 if __name__ == "__main__":
     model = Model().get()

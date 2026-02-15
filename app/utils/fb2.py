@@ -15,12 +15,53 @@ class FB2Book:
     # =====================
     # TEXT
     # =====================
-    def extract_text(self) -> str:
+    def extract_text(self, paragraphs_per_part: int = 5) -> str:
+        """
+        Возвращает текст книги для embedding:
+        - Берёт несколько абзацев из начала, середины и конца
+        - Пропускает сноски и оглавление
+        """
+        # 1. Берём все параграфы <p>
         paragraphs = self.root.xpath(
-            ".//fb2:body//fb2:p/text()",
+            ".//fb2:body//fb2:p[not(ancestor::fb2:annotation) and not(ancestor::fb2:note)]/text()",
             namespaces=self.NS
         )
-        return "\n".join(p.strip() for p in paragraphs if p.strip())
+        # очищаем пустые строки
+        paragraphs = [p.strip() for p in paragraphs if p.strip()]
+
+        if not paragraphs:
+            return ""
+
+        total = len(paragraphs)
+
+        # 2. Выбираем части: начало, середина, конец
+        parts = []
+
+        title = self.get_title()
+        if title:
+            parts.append(title)
+
+        authors = self.get_authors()
+        if authors:
+            parts.append(", ".join(authors))
+
+        description = self.get_description()
+        if description:
+            parts.append(description)
+
+        # Начало
+        parts.extend(paragraphs[:paragraphs_per_part])
+
+        # Середина
+        if total > paragraphs_per_part * 2:
+            mid_start = max(paragraphs_per_part, total // 2 - paragraphs_per_part // 2)
+            parts.extend(paragraphs[mid_start:mid_start + paragraphs_per_part])
+
+        # Конец (эпилог)
+        parts.extend(paragraphs[-paragraphs_per_part:])
+
+        # 3. Собираем текст
+        return "\n\n".join(parts)
 
     # =====================
     # METADATA
@@ -52,6 +93,24 @@ class FB2Book:
 
         return authors
 
+    def get_description(self) -> Optional[str]:
+        """
+        Возвращает описание/аннотацию книги (если есть)
+        """
+        desc_nodes = self.root.xpath(
+            ".//fb2:title-info/fb2:annotation",
+            namespaces=self.NS
+        )
+        if not desc_nodes:
+            return None
+
+        # берём текст внутри <annotation>, объединяя параграфы
+        paragraphs = []
+        for node in desc_nodes:
+            ps = node.xpath(".//fb2:p/text()", namespaces=self.NS)
+            paragraphs.extend([p.strip() for p in ps if p.strip()])
+        return "\n".join(paragraphs) if paragraphs else None
+    
     def get_id(self) -> Optional[str]:
         book_id = self.root.xpath(
             "string(.//fb2:document-info/fb2:id)",

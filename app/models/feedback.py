@@ -2,7 +2,8 @@ from sqlite3 import Row
 from pydantic import BaseModel
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
+from app.db import db, FeedbackRepository
 from app.settings.config import FEEDBACK_BOOST_FACTOR
 
 class FeedbackReq(BaseModel):
@@ -12,6 +13,7 @@ class FeedbackReq(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class Feedback:
+    id: Optional[int]
     source_id: str
     candidate_id: str
     label: float
@@ -20,10 +22,31 @@ class Feedback:
     @staticmethod
     def map(row: Row) -> "Feedback":
         return Feedback(
-            source_id=row[0],
-            candidate_id=row[1],
-            label=row[2],
-            created_at=row[3] if len(row) > 3 else datetime.now()
+            id=row[0],
+            source_id=row[1],
+            candidate_id=row[2],
+            label=row[3],
+            created_at=row[4] if len(row) > 3 else datetime.now()
+        )
+
+    @staticmethod
+    def map_from_dict(data: dict) -> "Feedback":
+        return Feedback(
+            id=None,
+            source_id=data["source_id"],
+            candidate_id=data["candidate_id"],
+            label=float(data["label"]),
+            created_at=datetime.fromisoformat(data["created_at"])
+            if "created_at" in data and data["created_at"]
+            else datetime.now(),
+        )
+    
+    def to_db_tuple(self) -> tuple:
+        return (
+            self.source_id,
+            self.candidate_id,
+            self.label,
+            self.created_at,
         )
 
     def to_dict(self):
@@ -47,6 +70,28 @@ class Feedbacks:
         self._pair_to_boost = {}
         self._build_index()
 
+    @classmethod
+    def from_dicts(cls, data: list[dict]) -> "Feedbacks":
+        obj = cls(None)
+
+        obj.items = [
+            Feedback(
+                id=None,
+                source_id=row["source_id"],
+                candidate_id=row["candidate_id"],
+                label=float(row["label"]),
+                created_at=datetime.fromisoformat(row["created_at"])
+                if "created_at" in row and row["created_at"]
+                else datetime.now(),
+            )
+            for row in data
+        ]
+
+        obj._pair_to_boost = {}
+        obj._build_index()
+
+        return obj
+    
     def _build_index(self):
         for fb in self.items:
             self._pair_to_boost[(fb.source_id, fb.candidate_id)] = fb.label
@@ -72,3 +117,9 @@ class Feedbacks:
     
     def get_rating(self, source_id: int, candidate_id: int) -> float:
         return self._pair_to_boost.get((source_id, candidate_id), 0.0)
+    
+    def insert_feedbacks(self, conn):
+        FeedbackRepository.insert_many(
+            conn,
+            [fb.to_db_tuple() for fb in self.items]
+        )

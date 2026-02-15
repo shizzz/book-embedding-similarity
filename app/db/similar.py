@@ -1,6 +1,13 @@
 from typing import Any, List, Tuple
 
 class SimilarRepository:
+    GET_QUERY: str = """
+            SELECT
+                score, 
+                book_id as source_id,
+                similar_book_id as similar_book_id
+            FROM similar
+    """
     DELETE_QUERY: str = "DELETE FROM similar"
 
     def save(self, conn, similars: List[Tuple[float, int, int]]):
@@ -21,24 +28,23 @@ class SimilarRepository:
         self.save(conn, similars)
 
     def get(self, conn, book_id: int, limit: int) -> List[Tuple[float, int, int]]:
-        cursor = conn.execute(
-            """
-            SELECT
-                score, 
-                book_id as source_id,
-                similar_book_id as similar_book_id
-            FROM similar
-            WHERE book_id = ?
-            ORDER BY score DESC
-            LIMIT ?
-            """,
-            (book_id, limit)
-        )
+        cursor = conn.execute(f"{self.GET_QUERY} WHERE book_id = ? ORDER BY score DESC LIMIT ?",(book_id, limit))
 
         return [
             (row["score"], row["source_id"], row["similar_book_id"])
             for row in cursor
         ]
+    
+    def get_score(self, conn, book_id: int, candidate_id: int) -> float:
+        row = conn.execute(
+            f"{self.GET_QUERY} WHERE book_id = ? AND similar_book_id = ?",
+            (book_id, candidate_id)
+        ).fetchone()
+
+        if row is None:
+            return 0.0
+
+        return float(row["score"])
     
     def clear(self, conn):
         conn.execute(f"{self.DELETE_QUERY}")
