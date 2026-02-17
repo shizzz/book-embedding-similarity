@@ -83,7 +83,7 @@ class StatsUI:
                 self.stats["Done"] += count
                 self.stats["Remaining"] -= count
 
-            self._bars[idx].update(self._tasks[idx], advance=count)
+            self._bars[idx].update(task_id=self._tasks[idx], advance=count)
             self.live.update(self.layout())
 
     async def update_total(self, total: int, idx: int = 0):

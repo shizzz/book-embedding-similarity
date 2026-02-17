@@ -2,7 +2,6 @@ import os
 import asyncio
 import zipfile
 from typing import AsyncGenerator
-from tqdm.asyncio import tqdm_asyncio
 from app.db import db, BookRepository
 from app.models import Book
 from app.utils import get_file_bytes_from_zip
@@ -73,7 +72,7 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
         await self._completed_books_loaded.wait()
         archives = await asyncio.to_thread(self._list_archives)
 
-        for archive in tqdm_asyncio(archives, desc="Проверка архивов", unit=" с", unit_scale=True):
+        for archive in archives:
             books = await asyncio.to_thread(
                 self._scan_archive,
                 archive,

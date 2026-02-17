@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.http
+    image: book-sim-api
+    command: -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    container_name: book-sim-api
+    volumes:
+      - /mnt/books:/books
+      - ./data:/book-sim/data
+      - ./app:/book-sim/app
+    environment:
+      LIB_URL: https://lib.some.com
+      SITE_BASE_PATH: "/similar"
+      DATA_DIR: /book-sim/data

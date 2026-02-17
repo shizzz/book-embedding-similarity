@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Generic, Tuple
 from asyncio import create_task, gather
 from rich.live import Live
-from app.utils import StatsUI
+from app.workers.parts import StatsUI
 from app.db import Migrator
 from app.common.types import TEntity, TResult
 from app.models import Task
@@ -110,15 +110,15 @@ class BaseWorker(ABC, Generic[TEntity]):
     async def _fin(self):
         self.ui.console.log("Finalise")
 
-        self._stop_event.set()
+        self._db_queue_stop_event.set()
         
         if self._db_save_enabled:
             db_queue_size = self._db_queue.qsize()
             if db_queue_size > 0:
                 self.ui.console.log(f"Still have {db_queue_size} records to save into database")
 
-            if self._save_task:
-                await self._save_task
+            if self._db_queue_task:
+                await self._db_queue_task
 
         await self.fin()
 
@@ -152,7 +152,7 @@ class BaseWorker(ABC, Generic[TEntity]):
                 done_count, result = await self.process(task)
                 
                 if self._db_save_enabled:
-                    self._db_queue_total += done_count
+                    self._db_queue_total += len(result)
                     await self._db_queue.put(result)
                     await self.ui.update_total(
                         idx=self._db_queue_progress_idx,

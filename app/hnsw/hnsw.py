@@ -1,12 +1,16 @@
 import os
 import faiss
 import numpy as np
-from tqdm import tqdm
 from typing import List, Tuple
 from app.models import Embedding
 from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE
 from .trainers.rerankerTrainer import RerankerTrainer
-
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, *args, **kwargs):
+        return iterable
+    
 class HNSW:
     def __init__(
         self,

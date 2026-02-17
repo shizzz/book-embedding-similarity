@@ -2,7 +2,9 @@ from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
+
+data_dir_env = os.environ.get("DATA_DIR")
+DATA_DIR = Path(data_dir_env) if data_dir_env else BASE_DIR.parent / "data"
 
 SITE_BASE_PATH = os.getenv("SITE_BASE_PATH", "")
 LIB_URL = os.getenv("LIB_URL", "https://lib.some.ru")
@@ -20,7 +22,7 @@ MAX_WORKERS = int(os.getenv("MAX_WORKERS","7"))
 
 SIMILARS_PER_BOOK = int(os.getenv("SIMILARS_PER_BOOK","100"))
 
-DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE","20000"))
+DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE","10000"))
 
 HNSW_M: int = 32
 HNSW_EF_CONSTRUCTION: int = 200

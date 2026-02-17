@@ -1,0 +1,22 @@
+FROM python:3.13-slim
+
+WORKDIR /book-sim
+
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements.http.txt ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir -r requirements.http.txt
+
+COPY app/ ./app
+
+# ---------- env defaults ----------
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    LIB_URL=https://lib.ooosh.ru
+
+VOLUME ["/books", "/book-sim/data", "/book-sim/app"]
+
+ENTRYPOINT ["python"]

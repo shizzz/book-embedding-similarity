@@ -1,23 +1,35 @@
 services:
   api:
-    image: book-sim
     build:
       context: .
+      dockerfile: Dockerfile.http
+    image: book-sim-api
     command: -m uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
-    container_name: book-sim
+    container_name: book-sim-api
     volumes:
       - /mnt/books:/books
-      - ./data:/data
-      - ./app:/app
+      - ./data:/book-sim/data
+      - ./app:/book-sim/app
     environment:
       LIB_URL: https://lib.some.com
       SITE_BASE_PATH: "/similar"
+      DATA_DIR: /book-sim/data
+
+  background:
+    build:
+      context: .
+      dockerfile: Dockerfile.background
+    image: book-sim-background
+    container_name: book-sim-background
+    volumes:
+      - /mnt/books:/books
+      - ./data:/book-sim/data
+      - ./app:/book-sim/app
+    environment:
       BOOK_FOLDER: /books/lib.rus.ec
       INPX_FOLDER: /books/librusec_local_fb2.inpx
-      DB_FILE: /data/data.db
-      INDEX_FILE: /data/index.faiss
-      RERANKER_FILE: /data/reranker.lgb
+      DATA_DIR: /book-sim/data
       MODEL_NAME: all-MiniLM-L6-v2
       MAX_WORKERS: 1

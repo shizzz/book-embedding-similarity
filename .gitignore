@@ -8,6 +8,6 @@ __pycache__
 *.spec
 .env
 reranker.lgb
-app/data/models
+data/models
 build
 dist

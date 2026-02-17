@@ -47,14 +47,17 @@ class Book:
 
     @classmethod
     def map(cls, row) -> "Book":
-        return Book(
-            id=row["id"],
-            file_name=row["book"],
-            title=row["title"],
-            author=row["author"],
-            source_type=row["source_type"],
-            source_link=row["source_link"],
-        )
+        if row:
+            return Book(
+                id=row["id"],
+                file_name=row["book"],
+                title=row["title"],
+                author=row["author"],
+                source_type=row["source_type"],
+                source_link=row["source_link"],
+            )
+        else:
+            return None
 
     @property
     def embedding_bytes(self) -> Optional[bytes]:

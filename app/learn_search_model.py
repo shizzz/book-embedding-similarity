@@ -77,21 +77,21 @@ def update_embeddings(model: Model, embeddings: list[Tuple[int, bytes]]):
                 pbar.update(1)
 
 def add_args(parser: argparse.ArgumentParser):
-    parser.add_argument("--skip-learn_hnsw", action="store_true", help="Пропустить learn_hnsw")
-    parser.add_argument("--skip-learn_model", action="store_true", help="Пропустить learn_model")
-    parser.add_argument("--skip-train_transformer", action="store_true", help="Пропустить train_transformer")
-    parser.add_argument("--skip-update_embeddings", action="store_true", help="Пропустить update_embeddings")
+    parser.add_argument("--learn_hnsw", action="store_true", help="Выполнить learn_hnsw")
+    parser.add_argument("--learn_model", action="store_true", help="Выполнить learn_model")
+    parser.add_argument("--train_transformer", action="store_true", help="Выполнить train_transformer")
+    parser.add_argument("--update_embeddings", action="store_true", help="Выполнить update_embeddings")
 
 def main(args):
     embeddings, feedbacks, books = get_data()
 
-    if not args.skip_learn_hnsw:
+    if args.learn_hnsw:
         print("Запуск learn_hnsw...")
         learn_hnsw(embeddings, feedbacks, books)
     else:
         print("Пропуск learn_hnsw")
 
-    if not args.skip_learn_model:
+    if args.learn_model:
         print("Запуск learn_model...")
         learn_model()
     else:
@@ -99,13 +99,13 @@ def main(args):
 
     model = Model()
 
-    if not args.skip_train_transformer:
+    if args.train_transformer:
         print("Запуск train_transformer...")
         train_trasformator(model)
     else:
         print("Пропуск train_transformer")
 
-    if not args.skip_update_embeddings:
+    if args.update_embeddings:
         print("Запуск update_embeddings...")
         update_embeddings(model, embeddings)
     else:
