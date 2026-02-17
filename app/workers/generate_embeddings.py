@@ -9,7 +9,7 @@ from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, F
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
 class GenerateEmbeddingsWorker(BaseWorker):
-    BOOK_BATCH_SIZE: int = 10
+    MAX_BOOK_BATCH_SIZE: int = 1000
 
     def __init__(self, model, **kwargs):
         super().__init__(**kwargs)
@@ -18,7 +18,6 @@ class GenerateEmbeddingsWorker(BaseWorker):
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX)
         self._get_book_idx: int = None
         self._book_id: int = 1
-        self._db_queue = asyncio.Queue()
 
     async def stat_books(self):
         with db() as conn:
@@ -41,8 +40,9 @@ class GenerateEmbeddingsWorker(BaseWorker):
             buffer.append(book)
             await self.ui.done(self._get_book_idx)
 
-            if len(buffer) >= self.BOOK_BATCH_SIZE:                
-                await self.queue.put(Task(book.source_link, buffer.copy()))
+            batch_size = self._adaptive_batch_size(self.queue.qsize() + len(buffer))
+            if len(buffer) >= batch_size:                
+                await self.queue.put(Task(f"{book.source_link} ({batch_size})", buffer.copy()))
                 buffer.clear()
             
         if len(buffer) > 0:                
@@ -93,3 +93,20 @@ class GenerateEmbeddingsWorker(BaseWorker):
             BookRepository.save_bulk(conn, books)
             EmbeddingsRepository.save_bulk(conn, books, embeddings_db)
             AuthorRepository.save_bulk(conn, books)
+
+    def _adaptive_batch_size(self, queue_size: int,) -> int:
+        """
+        Вычисляет адаптивный размер пакета для очереди.
+        - queue_size: текущее количество элементов в очереди
+        - max_batch: максимальный размер пакета
+        """
+        if queue_size < 10:
+            # Если мало элементов, возвращаем число меньше 10
+            return max(1, queue_size)
+        
+        # Для больших чисел: округляем до ближайшего "красивого" числа
+        # Красивое число — кратное 10, не больше max_batch
+        batch = min(queue_size, self.MAX_BOOK_BATCH_SIZE)
+        # Округление вниз до ближайшего кратного 10
+        batch = (batch // 10) * 10
+        return max(10, batch)

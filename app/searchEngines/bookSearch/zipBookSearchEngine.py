@@ -69,7 +69,7 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
 
         return result
         
-    async def search_books(self) -> AsyncGenerator[BookResult, None]:
+    async def search_books(self) -> AsyncGenerator[Book, None]:
         await self._completed_books_loaded.wait()
         archives = await asyncio.to_thread(self._list_archives)
 
