@@ -15,7 +15,7 @@ class BaseWorker:
         sleepy: bool = False,
         title: str = None,
     ):
-        self.queue = asyncio.Queue(maxsize=MAX_WORKERS*3)
+        self.queue = asyncio.Queue()
         self.max_workers = max_workers
         self.sleepy = sleepy
         self.show_ui = show_ui

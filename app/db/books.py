@@ -13,12 +13,14 @@ class BookRepository:
     FROM books b
     """
     
-    def get_all(self, conn) -> Any:
+    @staticmethod
+    def get_all(conn) -> Any:
         cursor = conn.execute(f"{BookRepository.GET_QUERY}")
         for row in cursor:
             yield (tuple[Any, ...](row))
 
-    def get_all_with_embeddings(self, conn) -> Generator[Tuple[int, str, str, str, str, str, bytes]]:
+    @staticmethod
+    def get_all_with_embeddings(conn) -> Generator[Tuple[int, str, str, str, str, str, bytes]]:
         cursor = conn.execute("""
         SELECT
             b.id,
@@ -35,15 +37,18 @@ class BookRepository:
         for row in cursor:
             yield (tuple[Any, ...](row))
 
-    def get_by_file(self, conn, book: str) -> Any:
+    @staticmethod
+    def get_by_file(conn, book: str) -> Any:
         row = conn.execute(f"{BookRepository.GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
         return row if row else None
     
-    def get_by_id(self, conn, book_id: int) -> Any:
+    @staticmethod
+    def get_by_id(conn, book_id: int) -> Any:
         row = conn.execute(f"{BookRepository.GET_QUERY} WHERE b.id = ?",(book_id,)).fetchone()
         return row if row else None
     
-    def get_many(self, conn, book_ids: list[int]) -> dict[int, Any]:
+    @staticmethod
+    def get_many(conn, book_ids: list[int]) -> dict[int, Any]:
         if not book_ids:
             return {}
 
@@ -130,5 +135,6 @@ class BookRepository:
             start_id = row["seq"] + 1
         return start_id
 
+    @staticmethod
     def count_embeddings(conn) -> int:
         return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]

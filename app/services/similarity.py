@@ -63,7 +63,7 @@ class Similarity:
             )
 
             with db() as conn:
-                SimilarRepository().replace(conn, similars)
+                SimilarRepository.replace(conn, similars)
 
             state.set_done(similars)
 

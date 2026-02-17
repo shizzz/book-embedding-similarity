@@ -30,7 +30,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
             total = BookRepository.count_embeddings(conn)
             step = max(1, total * self._step_percent // 100)
 
-            for row in BookRepository().get_all_with_embeddings(conn):
+            for row in BookRepository.get_all_with_embeddings(conn):
                 current += 1
 
                 book_id, _, book, title, _, embedding_bytes = row

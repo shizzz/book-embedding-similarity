@@ -28,7 +28,7 @@ class SimilarSearchEngineFactory:
             with db() as conn:
                 books: list[Book] = [
                     Book.map_row(row)
-                    for row in BookRepository().get_all_with_embeddings(conn)
+                    for row in BookRepository.get_all_with_embeddings(conn)
                 ]
 
             return IndexSimilarSearchEngine(

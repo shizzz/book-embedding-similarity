@@ -48,7 +48,7 @@ async def similar_events(
         start = time.perf_counter()
 
         with db() as conn:
-            book = Book.map(BookRepository().get_by_file(conn, file))
+            book = Book.map(BookRepository.get_by_file(conn, file))
             if not book:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
                 return
@@ -56,8 +56,8 @@ async def similar_events(
             if force:
                 similarity.remove_task(book.file_name)
 
-            if not force and SimilarRepository().has_similar(conn, book.id):
-                similars = SimilarRepository().get(conn, book.id, limit)
+            if not force and SimilarRepository.has_similar(conn, book.id):
+                similars = SimilarRepository.get(conn, book.id, limit)
                 feedbacks = Feedbacks(FeedbackRepository.get(conn, book.id))
 
                 elapsed = time.perf_counter() - start
@@ -65,7 +65,7 @@ async def similar_events(
                 yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
                 return
 
-            embedding_raw = EmbeddingsRepository().get(conn, book.id)
+            embedding_raw = EmbeddingsRepository.get(conn, book.id)
 
         if book.file_name not in similarity.tasks:
             similarity.tasks[book.file_name] = TaskState()

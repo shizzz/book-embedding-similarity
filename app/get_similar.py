@@ -47,13 +47,13 @@ async def main():
     args = parser.parse_args()
 
     with db() as conn:
-        book_task = Book.map(BookRepository().get_by_file(conn, args.file_name))
+        book_task = Book.map(BookRepository.get_by_file(conn, args.file_name))
 
         if not book_task:
             print(f"Книга {args.file_name} не найдена в реестре")
             return
         
-        embedding_bytes = EmbeddingsRepository().get(conn, book_task.id)
+        embedding_bytes = EmbeddingsRepository.get(conn, book_task.id)
 
     if embedding_bytes is None:
         print(f"У книги {args.file_name} не сгенерирован вектор")
@@ -93,7 +93,7 @@ async def main():
             print(f"Режим '{other_mode}' не выполнен: {e}")
     
     with db() as conn:
-        SimilarRepository().replace(conn, similars)
+        SimilarRepository.replace(conn, similars)
 
     print_similar_books(
         similars=similars,

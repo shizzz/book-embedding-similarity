@@ -10,11 +10,11 @@ from app.settings.config import LIB_URL, MODEL_NAME
 def main():
     with db() as conn:
         sync_feedbacks(conn)
-        embeddings = list[Tuple[int, bytes]](EmbeddingsRepository().get_all(conn))
+        embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
         feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
         books: list[Book] = [
             Book.map_row(row)
-            for row in BookRepository().get_all(conn)
+            for row in BookRepository.get_all(conn)
         ]
         
     hnsw = HNSW(

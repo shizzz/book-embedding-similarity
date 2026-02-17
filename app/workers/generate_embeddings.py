@@ -55,11 +55,11 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
     async def fin(self):
         with db() as conn:
-            embeddings = list[Tuple[int, bytes]](EmbeddingsRepository().get_all(conn))
+            embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
             feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
             books: list[Book] = [
                 Book.map_row(row)
-                for row in BookRepository().get_all(conn)
+                for row in BookRepository.get_all(conn)
             ]
             
         self.hnsw.load_emb(embeddings)

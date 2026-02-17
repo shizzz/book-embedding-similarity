@@ -53,7 +53,7 @@ class Similar:
             book_ids.add(candidate_id)
 
         with db() as conn:
-            raw_books = BookRepository().get_many(conn, list[int](book_ids))
+            raw_books = BookRepository.get_many(conn, list[int](book_ids))
             books_by_id = Book.map_by_id(raw_books, Book.map)
 
         result: List[Similar] = []

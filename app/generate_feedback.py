@@ -9,14 +9,14 @@ client = None
 
 def get_book_info(book_file: str) -> Optional[Book]:
     with db() as conn:
-        book_row = BookRepository().get_by_file(conn, book_file)
+        book_row = BookRepository.get_by_file(conn, book_file)
         if not book_row:
             return None
         return Book.map(book_row)
 
 def get_similar_books(source_book_id: int) -> List[tuple]:
     with db() as conn:
-        similars = SimilarRepository().get(conn, source_book_id, limit=100)
+        similars = SimilarRepository.get(conn, source_book_id, limit=100)
         return similars
 
 def generate_feedback_prompt(source_book: Book, candidate_book: Book) -> str:
@@ -152,7 +152,7 @@ def main(book_file: str):
 
 def get_book_info_by_id(book_id: int) -> Optional[Book]:
     with db() as conn:
-        book_row = BookRepository().get_by_id(conn, book_id)
+        book_row = BookRepository.get_by_id(conn, book_id)
         if not book_row:
             return None
         return Book.map(book_row)

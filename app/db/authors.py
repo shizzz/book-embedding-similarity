@@ -1,4 +1,5 @@
 class AuthorRepository:
+    @staticmethod
     def save(conn, book_id: int, authors: list[str]):
         if not authors:
             return
@@ -20,7 +21,6 @@ class AuthorRepository:
             "INSERT INTO book_authors (book_id, author_id) VALUES (?, ?)",
             [(book_id, aid) for aid in author_ids]
         )
-    
     
     @staticmethod
     def save_bulk(conn, books: list):

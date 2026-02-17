@@ -24,7 +24,7 @@ class GenerateSimilarWorker(BaseWorker):
 
     def _save_similar(self, buffer):
         with db() as conn:
-            SimilarRepository().save(conn, buffer)
+            SimilarRepository.save(conn, buffer)
 
     async def _queue_step(self, buffer, bar_idx: int=None):
         try:
@@ -78,11 +78,11 @@ class GenerateSimilarWorker(BaseWorker):
         self.logger.info(f"Очистка таблицы similar")
 
         with db() as conn:
-            SimilarRepository().clear(conn)
+            SimilarRepository.clear(conn)
 
             self.logger.info(f"Получение всех книг из базы данных")
             books_with_embeddings = list(
-                await asyncio.to_thread(BookRepository().get_all_with_embeddings, conn)
+                await asyncio.to_thread(BookRepository.get_all_with_embeddings, conn)
             )
 
             self.logger.info(f"Фильтрация книг и эмбеддингов по ID")

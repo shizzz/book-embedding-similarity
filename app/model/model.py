@@ -51,7 +51,7 @@ class Model:
             for fb in feedbacks.items:
                 book_ids.add(fb.source_id)
                 book_ids.add(fb.candidate_id)
-            raw_books = BookRepository().get_many(conn, list(book_ids))
+            raw_books = BookRepository.get_many(conn, list(book_ids))
             books_by_id = Book.map_by_id(raw_books, Book.map)
 
         for fb in feedbacks.items:
@@ -118,6 +118,6 @@ class Model:
             score = np.dot(emb_src, emb_tgt)
 
             with db() as conn:
-                weight = SimilarRepository().get_score(conn, src_book.id, tgt_book.id)
+                weight = SimilarRepository.get_score(conn, src_book.id, tgt_book.id)
 
             print(f"Прогнозированная похожесть \"{src_book.title}\" --> \"{tgt_book.title}\": ранее: {weight} теперь: {score}")
