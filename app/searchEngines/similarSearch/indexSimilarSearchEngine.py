@@ -36,7 +36,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         step = max(1, self.index.ntotal * self._step_percent // 100)
 
         query = embedding.vec.reshape(1, -1).astype(np.float32)
-        k = min(self._limit * 20 + 200, self.index.ntotal)
+        k = min(self._limit * 10 + 200, self.index.ntotal)
         scores, indices = self.index.search(query, k)
 
         candidates: List[Tuple[float, Book]] = []

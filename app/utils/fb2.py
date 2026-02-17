@@ -1,5 +1,6 @@
 from lxml import etree
 from typing import List, Optional
+from app.models import Book
 
 class FB2Book:
     NS = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
@@ -12,10 +13,22 @@ class FB2Book:
         )
         self.root = etree.fromstring(fb2_bytes, parser)
 
+    def enrich_book(self, book: Book):
+        enrichers = (
+            ("uid", self.get_id),
+            ("title", self.get_title),
+            ("authors", self.get_authors),
+            ("author", lambda: ", ".join(book.authors)),
+        )
+
+        for attr, getter in enrichers:
+            if not getattr(book, attr):
+                setattr(book, attr, getter())
+
     # =====================
     # TEXT
     # =====================
-    def extract_text(self, paragraphs_per_part: int = 5) -> str:
+    def extract_text(self, paragraphs_per_part: int = 10) -> str:
         """
         Возвращает текст книги для embedding:
         - Берёт несколько абзацев из начала, середины и конца

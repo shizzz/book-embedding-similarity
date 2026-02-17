@@ -1,11 +1,12 @@
 CREATE TABLE IF NOT EXISTS books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book TEXT,
-    archive TEXT,
     uid TEXT,
     title TEXT,
     author TEXT,
-    added_at TEXT
+    added_at TEXT,
+    source_type TEXT,
+    source_link TEXT
 );
 
 CREATE TABLE IF NOT EXISTS embeddings (
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS feedback (
     FOREIGN KEY (candidate_book_id) REFERENCES books(id)
 );
                     
-CREATE INDEX IF NOT EXISTS idx_books_book_archive ON books(book, archive);
+CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
 CREATE INDEX IF NOT EXISTS idx_embeddings_book_id ON embeddings(book_id);
 CREATE INDEX IF NOT EXISTS idx_similar_book_id ON similar(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id);

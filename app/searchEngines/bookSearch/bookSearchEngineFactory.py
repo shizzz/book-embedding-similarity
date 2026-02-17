@@ -4,8 +4,8 @@ from .zipBookSearchEngine import ZipBookSearchEngine
 from .inpSearchEngine import InpBookSearchEngine
 
 class BookSearchEngineFactory:
-    ZIP = "zip" 
-    INPIX = "inpix"
+    ZIP = ZipBookSearchEngine.TYPE
+    INPIX = InpBookSearchEngine.TYPE
     
     EngineType = Literal[ZIP, INPIX]
 

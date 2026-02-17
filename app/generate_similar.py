@@ -3,5 +3,5 @@ from app.workers import GenerateSimilarWorker
 from app.settings.config import MAX_WORKERS
 
 if __name__ == "__main__":
-    worker = GenerateSimilarWorker(max_workers = MAX_WORKERS)
+    worker = GenerateSimilarWorker(max_workers = MAX_WORKERS, title="Generate similar")
     asyncio.run(worker.run())

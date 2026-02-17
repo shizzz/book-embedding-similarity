@@ -39,7 +39,11 @@ class SimilarSearchEngine:
         candidates: list[tuple[float, Book]],
     ):
         # Если модели нет или кандидатов нет — возвращаем исходные
-        if not self._reranker or not self._reranker.model or not candidates:
+        if not candidates:
+            return candidates
+        
+        if not self._reranker or not self._reranker.model:
+            candidates.sort(key=lambda x: x[0], reverse=True)
             return candidates
 
         X = []
@@ -66,7 +70,6 @@ class SimilarSearchEngine:
         reranked.sort(key=lambda x: x[0], reverse=True)
         return reranked
 
-    
     def search(
         self,
         source: Book,

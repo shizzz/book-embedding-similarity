@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 from app.db import db, FeedbackRepository, BookRepository, SimilarRepository
 from app.models import Feedbacks, Book
-from app.utils import FB2Book
+from app.utils import FB2Book, get_file_bytes_from_zip
 from app.settings.config import MODEL_NAME, DATA_DIR
 
 class Model:
@@ -15,7 +15,7 @@ class Model:
     
     @staticmethod
     def get_book_text(book: Book) -> str:
-        data = book.get_file_bytes_from_zip()
+        data = get_file_bytes_from_zip(book.source_link)
         fb2Book = FB2Book(data)
         return fb2Book.extract_text()
 

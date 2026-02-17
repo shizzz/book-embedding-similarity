@@ -1,32 +1,37 @@
 from dataclasses import dataclass
-import zipfile
 from typing import List, Dict, Any, Optional, Callable, TypeVar
-from app.settings.config import BOOK_FOLDER
 
 @dataclass
 class Book:
     id: Optional[int]
-    archive_name: str
     file_name: str
     title: Optional[str]
     author: Optional[str]
     authors: Optional[List[str]]
+    data: Optional[bytes]
+    source_type: Optional[str]
+    source_link: Optional[str]
+    uid: str = None
 
     T = TypeVar("T")
 
     def __init__(
             self,
-            archive_name: str,
             file_name: str,
             id: int = None,
             title: str = None,
             author: str = None,
-            authors: List[str] = None):
+            authors: List[str] = None,
+            data: bytes = None,
+            source_type: str = None,
+            source_link: str = None):
         self.id = id
-        self.archive_name = archive_name
         self.file_name = file_name
         self.title = title
         self.author = author
+        self.data = data
+        self.source_type = source_type
+        self.source_link = source_link
 
         if authors == None and author != None:
             self.authors = self._parse_authors(author)
@@ -37,20 +42,22 @@ class Book:
     def map(cls, row) -> "Book":
         return Book(
             id=row["id"],
-            archive_name=row["archive"],
             file_name=row["book"],
             title=row["title"],
-            author=row["author"]
+            author=row["author"],
+            source_type=row["source_type"],
+            source_link=row["source_link"],
         )
 
     @classmethod
     def map_row(cls, row) -> "Book":
         return Book(
             id=row[0],
-            archive_name=row[1],
-            file_name=row[2],
-            title=row[3],
-            author=row[4]
+            file_name=row[1],
+            title=row[2],
+            author=row[3],
+            source_type=row[4],
+            source_link=row[5],
         )
 
     def map_by_id(
@@ -72,13 +79,6 @@ class Book:
             for a in author.split(",")
             if a.strip()
         ]
-
-    def get_file_bytes_from_zip(self) -> bytes:
-        zip_path = f"{BOOK_FOLDER}/{self.archive_name}"
-
-        with zipfile.ZipFile(zip_path, "r") as archive:
-            with archive.open(self.file_name) as f:
-                return f.read()
 
 @dataclass
 class BookRegistry:

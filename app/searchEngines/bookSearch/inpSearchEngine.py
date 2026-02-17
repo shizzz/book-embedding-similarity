@@ -2,18 +2,27 @@ import os
 import zipfile
 import asyncio
 from typing import AsyncGenerator
-from tqdm.asyncio import tqdm_asyncio
 from app.db import db, BookRepository
-from app.models import Book
+from app.models import Book, BookResult
+from app.utils import get_file_bytes_from_zip
 from .bookSearchEngine import BaseBookSearchEngine
 
 class InpBookSearchEngine(BaseBookSearchEngine):
+    TYPE: str = "inpix"
+
     def __init__(self, folder: str):
         self.folder = folder
+        self._completed_books: set[str] = set()
+        self._completed_books_loaded = asyncio.Event()
 
     def _load_completed_books(self) -> set[str]:
-        with db() as conn:
-            self._completed_books = set[str](BookRepository.get_names(conn))
+        try:
+            with db() as conn:
+                self._completed_books = set[str](BookRepository.get_names(conn))
+        finally:
+            # сигнализируем async-коду, что загрузка завершена
+            loop = asyncio.get_running_loop()
+            loop.call_soon_threadsafe(self._completed_books_loaded.set)
 
     def _parse(self, zipf, filename):
         data = zipf.read(filename)
@@ -72,9 +81,9 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
         return False
 
-    async def search_books(self) -> AsyncGenerator[Book, None]:
-        await asyncio.to_thread(self._load_completed_books)
-        
+    async def search_books(self) -> AsyncGenerator[BookResult, None]:
+        await self._completed_books_loaded.wait()
+
         with zipfile.ZipFile(self.folder) as zipf:
             for info in zipf.infolist():
                 if info.is_dir():
@@ -89,11 +98,46 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
                     if self._should_skip(book):
                         continue
+                    
+                    archive_name=f"{os.path.splitext(info.filename)[0]}.zip",
+                    file_name=f"{book["file"]}.{book["ext"]}"
+                    link = f"{archive_name[0]}/{file_name}"
 
-                    yield Book(
-                        archive_name=f"{os.path.splitext(info.filename)[0]}.zip",
-                        file_name=f"{book["file"]}.{book["ext"]}",
-                        title=book["title"],
-                        author=", ".join(authors),
-                        authors=authors,
+                    yield BookResult(
+                        source=self.TYPE,
+                        link=link,
+                        book=Book(
+                            file_name=file_name,
+                            title=book["title"],
+                            author=", ".join(authors),
+                            authors=authors,
+                            source_type=self.TYPE,
+                            source_link=link
+                        )
                     )
+                    
+    async def get_book(self, bookResult: BookResult) -> Book:
+        await self._completed_books_loaded.wait()
+        bookResult.book.data = await asyncio.to_thread(get_file_bytes_from_zip, bookResult.link)
+        return bookResult.book
+
+    async def get_total(self) -> int:
+        self._load_completed_books()
+
+        total = 0
+        with zipfile.ZipFile(self.folder) as zipf:
+            for info in zipf.infolist():
+                if info.is_dir():
+                    continue
+
+                books = await asyncio.to_thread(
+                    self._parse, zipf, info.filename
+                )
+
+                for book in books:
+                    if self._should_skip(book):
+                        continue
+
+                    total += 1
+            
+        return total

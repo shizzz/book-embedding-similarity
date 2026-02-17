@@ -18,5 +18,20 @@ class EmbeddingsRepository:
             (book_id, embedding)
         )
 
+    @staticmethod
+    def save_bulk(conn, books: list, embeddings_db: list[bytes]):
+
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO embeddings
+            (book_id, embedding)
+            VALUES (?, ?)
+            """,
+            [
+                (book.id, emb)
+                for book, emb in zip(books, embeddings_db)
+            ]
+        )
+
     def count(self, conn) -> int:
         return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]

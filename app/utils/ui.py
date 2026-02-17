@@ -1,4 +1,5 @@
 import asyncio
+from typing import Dict
 from rich.live import Live
 from rich.console import Console
 from rich.table import Table
@@ -8,6 +9,7 @@ from rich.progress import (
     BarColumn,
     TextColumn,
     TimeRemainingColumn,
+    TaskID
 )
 
 from app.settings.config import MAX_WORKERS
@@ -15,7 +17,11 @@ from app.settings.config import MAX_WORKERS
 class StatsUI:
     def __init__(self, max_workers: int = MAX_WORKERS, title: str = "Library scanner"):
         self.max_workers = max_workers
+        self.live: Live = None
+        
         self._label = title
+        self._bars: Dict[int, Progress] = {}
+        self._tasks: Dict[int, TaskID] = {}
 
         self.stats = {
             "Total": 0,
@@ -29,7 +35,7 @@ class StatsUI:
         self.lock = asyncio.Lock()
         self.console = Console()
 
-        self.progress = Progress(
+        self._bars[0] = Progress(
             TextColumn("[bold cyan]Book analysis progress"),
             BarColumn(),
             TextColumn("{task.completed}/{task.total} books"),
@@ -37,7 +43,7 @@ class StatsUI:
             TimeRemainingColumn(),
         )
 
-        self.progress_task = self.progress.add_task(
+        self._tasks[0] = self._bars[0].add_task(
             "[bold green]Books processed",
             total=0,
         )
@@ -63,45 +69,67 @@ class StatsUI:
         grid = Table.grid(expand=True)
         grid.add_row(self._make_table())
         grid.add_row(self._make_info())
-        grid.add_row(self.progress)
+
+        for idx in self._bars:
+            grid.add_row(self._bars[idx])
         return grid
     
-    async def init(self, total: int, remaining: int):
+    async def init(self):
         async with self.lock:
-            self.stats["Total"] = total
-            self.stats["Remaining"] = remaining
+            self.stats["Total"] = 0
+            self.stats["Remaining"] = 0
             self.stats["Done"] = 0
             self.stats["Errors"] = 0
 
-        self.progress.update(self.progress_task, total=remaining)
+        self._bars[0].update(self._tasks[0], total=0)
 
-    async def set_thread(self, worker_id: int, live: Live, name: str):
+    async def set_thread(self, worker_id: int, name: str):
         async with self.lock:
             self.stats[f"Thread {worker_id}"] = name
-        live.update(self.layout())
+        self.live.update(self.layout())
 
-    async def done(self, live: Live):
+    async def done(self, idx: int = 0, count: int = 1):
         async with self.lock:
-            self.stats["Done"] += 1
-            self.stats["Remaining"] -= 1
+            if idx == 0:
+                self.stats["Done"] += count
+                self.stats["Remaining"] -= count
 
-            self.progress.update(self.progress_task, advance=1)
-            live.update(self.layout())
+            self._bars[idx].update(self._tasks[idx], advance=count)
+            self.live.update(self.layout())
 
-    async def update_total(self, total: int):
+    async def update_total(self, total: int, idx: int = 0):
         async with self.lock:
-            old_total = self.stats["Total"]
-            delta = total - old_total
+            if idx == 0:
+                old_total = self.stats["Total"]
+                delta = total - old_total
 
-            self.stats["Total"] = total
-            self.stats["Remaining"] += delta
+                self.stats["Total"] = total
+                self.stats["Remaining"] += delta
 
-            self.progress.update(self.progress_task, total=total)
+            self._bars[idx].update(self._tasks[idx], total=total)
 
 
-    async def error(self, live: Live):
+    async def error(self, idx: int = 0):
         async with self.lock:
             self.stats["Errors"] += 1
 
-        self.progress.update(self.progress_task, advance=1)
-        live.update(self.layout())
+        self._bars[idx].update(self._tasks[idx], advance=1)
+        self.live.update(self.layout())
+
+    def add_progress(self, title: str, descr: str) -> int:
+        idx = max(self._bars.keys(), default=-1) + 1
+
+        self._bars[idx] = Progress(
+            TextColumn(f"[bold cyan]{title}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total} "),
+            TextColumn("{task.speed} /s"),
+            TimeRemainingColumn(),
+        )
+
+        self._tasks[idx] = self._bars[idx].add_task(
+            f"[bold green]{descr}",
+            total=0,
+        )
+
+        return idx
