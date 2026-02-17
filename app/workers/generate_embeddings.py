@@ -7,7 +7,6 @@ from app.hnsw import HNSW
 from app.models import Embedding, Book, Feedbacks, Task
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.searchEngines.bookSearch import BookSearchEngineFactory
-from app.settings.config import INPX_FOLDER
 
 class GenerateEmbeddingsWorker(BaseWorker):
     BOOK_BATCH_SIZE: int = 10
@@ -16,7 +15,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         super().__init__(**kwargs)
         self.model = model
         self.hnsw = HNSW(batch_size=10000)
-        self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, INPX_FOLDER)
+        self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX)
         self._get_book_idx: int = None
         self._book_id: int = 1
         self._db_queue = asyncio.Queue()
@@ -34,8 +33,8 @@ class GenerateEmbeddingsWorker(BaseWorker):
     async def pull_queue(self):
         buffer = []
         self._get_book_idx = self.ui.add_progress("Парсинг книг ", "обработано")
-        async for book_task in self.engine.search_books():    
-            book = await self.engine.get_book(book_task)
+        async for book in self.engine.search_books():    
+            await self.engine.enrich_book_data(book)
             book.id = self._book_id
             self._book_id += 1
 
@@ -43,11 +42,11 @@ class GenerateEmbeddingsWorker(BaseWorker):
             await self.ui.done(self._get_book_idx)
 
             if len(buffer) >= self.BOOK_BATCH_SIZE:                
-                await self.queue.put(Task(book_task.link, buffer.copy()))
+                await self.queue.put(Task(book.source_link, buffer.copy()))
                 buffer.clear()
             
         if len(buffer) > 0:                
-            await self.queue.put(Task(book_task.link, buffer))
+            await self.queue.put(Task(book.source_link, buffer))
         self._queue_pulled = True
 
     async def process_book(self, task: Task) -> int:

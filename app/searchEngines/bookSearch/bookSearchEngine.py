@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
-from app.models import Book, BookResult
+from app.models import Book
 
 class BaseBookSearchEngine(ABC):
     @abstractmethod
-    async def search_books(self) -> AsyncGenerator[BookResult, None]:
+    async def search_books(self) -> AsyncGenerator[Book, None]:
         pass
 
     @abstractmethod
-    async def get_book(self, bookResult: BookResult) -> Book:
+    async def enrich_book_data(self, book: Book) -> Book:
         pass
 
     @abstractmethod

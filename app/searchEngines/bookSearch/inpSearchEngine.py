@@ -3,7 +3,7 @@ import zipfile
 import asyncio
 from typing import AsyncGenerator
 from app.db import db, BookRepository
-from app.models import Book, BookResult
+from app.models import Book
 from app.utils import get_file_bytes_from_zip
 from .bookSearchEngine import BaseBookSearchEngine
 
@@ -81,7 +81,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
         return False
 
-    async def search_books(self) -> AsyncGenerator[BookResult, None]:
+    async def search_books(self) -> AsyncGenerator[Book, None]:
         await self._completed_books_loaded.wait()
 
         with zipfile.ZipFile(self.folder) as zipf:
@@ -103,10 +103,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                     file_name=f"{book["file"]}.{book["ext"]}"
                     link = f"{archive_name[0]}/{file_name}"
 
-                    yield BookResult(
-                        source=self.TYPE,
-                        link=link,
-                        book=Book(
+                    yield Book(
                             file_name=file_name,
                             title=book["title"],
                             author=", ".join(authors),
@@ -114,12 +111,10 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                             source_type=self.TYPE,
                             source_link=link
                         )
-                    )
                     
-    async def get_book(self, bookResult: BookResult) -> Book:
+    async def enrich_book_data(self, book: Book):
         await self._completed_books_loaded.wait()
-        bookResult.book.data = await asyncio.to_thread(get_file_bytes_from_zip, bookResult.link)
-        return bookResult.book
+        book.data = await asyncio.to_thread(get_file_bytes_from_zip, book.source_link)
 
     async def get_total(self) -> int:
         self._load_completed_books()

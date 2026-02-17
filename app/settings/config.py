@@ -10,6 +10,7 @@ LIB_URL = os.getenv("LIB_URL", "https://lib.some.ru")
 DB_FILE = Path(os.getenv("DB_FILE", str(DATA_DIR / "data.db")))
 INDEX_FILE = Path(os.getenv("INDEX_FILE", str(DATA_DIR / "index.faiss")))
 RERANKER_FILE = Path(os.getenv("RERANKER_FILE", str(DATA_DIR / "reranker.lgb")))
+TRANSFORM_FILE = Path(os.getenv("TRANSFORM_FILE", str(DATA_DIR / "embedding_transform.npy")))
 MODEL_NAME = os.getenv("MODEL_NAME","all-MiniLM-L6-v2")
 
 BOOK_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/lib.rus.ec/")

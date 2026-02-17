@@ -4,7 +4,7 @@ import zipfile
 from typing import AsyncGenerator
 from tqdm.asyncio import tqdm_asyncio
 from app.db import db, BookRepository
-from app.models import Book, BookResult
+from app.models import Book
 from app.utils import get_file_bytes_from_zip
 from .bookSearchEngine import BaseBookSearchEngine
 
@@ -46,7 +46,7 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
 
         return result
 
-    def _scan_archive(self, archive: str, completed_books: set[str]) -> list[BookResult]:
+    def _scan_archive(self, archive: str, completed_books: set[str]) -> list[Book]:
         archive_path = os.path.join(self.folder, archive)
         result = []
 
@@ -60,15 +60,11 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
                 link = f"{archive}/{info.filename}"
 
                 result.append(
-                    BookResult(
-                        source=self.TYPE,
-                        link=link,
-                        book=Book(
+                        Book(
                             file_name=info.filename,
                             source_type=self.TYPE,
                             source_link=link
                         )
-                    )
                 )
 
         return result
@@ -101,8 +97,6 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
             
         return total
     
-    async def get_book(self, bookResult: BookResult) -> Book:
+    async def enrich_book_data(self, book: Book):
         await self._completed_books_loaded.wait()
-        bookResult.book = await asyncio.to_thread(get_file_bytes_from_zip, bookResult.link)
-
-        return bookResult.book
+        book.data = await asyncio.to_thread(get_file_bytes_from_zip, book.link)

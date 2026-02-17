@@ -1,33 +1,15 @@
 import requests
+import tqdm
+import argparse
+import numpy as np
 from typing import Tuple
 from app.hnsw import HNSW
 from app.model import Model
-from app.models import Book, Feedbacks
+from app.models import Book, Feedbacks, Embedding
 from app.hnsw.trainers import LightGBMRerankerTrainer
 from app.db import db, FeedbackRepository, EmbeddingsRepository, BookRepository
 from app.settings.config import LIB_URL, MODEL_NAME
-
-def main():
-    with db() as conn:
-        sync_feedbacks(conn)
-        embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
-        feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
-        books: list[Book] = [
-            Book.map_row(row)
-            for row in BookRepository.get_all(conn)
-        ]
-        
-    hnsw = HNSW(
-        batch_size=10000,
-        reranker_trainer=LightGBMRerankerTrainer()
-    )
-    hnsw.load_emb(embeddings)
-    hnsw.rebuild_trainer(feedbacks=feedbacks, books=books)
-    print(f"Поисковая модель обновлена")
-    print(f"Обучение модели {MODEL_NAME}")
-
-    Model().learn_by_feedback()
-
+  
 def sync_feedbacks(conn):
     url = f"{LIB_URL}/similar/feedback/"
 
@@ -46,7 +28,95 @@ def sync_feedbacks(conn):
     FeedbackRepository.delete_all(conn)
     feedbacks.insert_feedbacks(conn)
 
+def get_data() -> Tuple[list[Tuple[int, bytes]], Feedbacks, list[Book]]:
+    with db() as conn:
+        sync_feedbacks(conn)
+        embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
+        feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
+        books: list[Book] = [
+            Book.map_row(row)
+            for row in BookRepository.get_all(conn)
+        ]
+
+    return (embeddings, feedbacks, books)
+
+def learn_hnsw(embeddings, feedbacks, books):
+    print(f"Обновление поисковой модели")
+    hnsw = HNSW(
+        batch_size=10000,
+        reranker_trainer=LightGBMRerankerTrainer()
+    )
+    hnsw.load_emb(embeddings)
+    hnsw.rebuild_trainer(feedbacks=feedbacks, books=books)
+    print(f"Поисковая модель обновлена")
+
+def learn_model():
+    print(f"Обучение модели {MODEL_NAME}")
+    Model().learn_by_feedback()
+
+def train_trasformator(model):
+    model.train_embedding_transform()
+
+def update_embeddings(model: Model, embeddings: list[Tuple[int, bytes]]):
+    print(f"Загружаем трансформатор")
+    W = model.get_embedding_transformator()
+
+    print(f"Преобразование ембеддингов")
+    ids = [book_id for book_id, _ in embeddings]
+    emb_array = np.stack([np.frombuffer(b, dtype=np.float32) for _, b in embeddings])
+    new_emb_array = emb_array @ W
+
+    with tqdm(
+        total=len(ids),
+        desc="Сохранение обновленных ембеддингов в базу",
+        unit="vec",
+        unit_scale=True
+    ) as pbar, db() as conn:
+            for book_id, new_emb in zip(ids, new_emb_array):
+                EmbeddingsRepository.update(conn, book_id, Embedding(new_emb).to_db())
+                pbar.update(1)
+
+def add_args(parser: argparse.ArgumentParser):
+    parser.add_argument("--skip-learn_hnsw", action="store_true", help="Пропустить learn_hnsw")
+    parser.add_argument("--skip-learn_model", action="store_true", help="Пропустить learn_model")
+    parser.add_argument("--skip-train_transformer", action="store_true", help="Пропустить train_transformer")
+    parser.add_argument("--skip-update_embeddings", action="store_true", help="Пропустить update_embeddings")
+
+def main(args):
+    embeddings, feedbacks, books = get_data()
+
+    if not args.skip_learn_hnsw:
+        print("Запуск learn_hnsw...")
+        learn_hnsw(embeddings, feedbacks, books)
+    else:
+        print("Пропуск learn_hnsw")
+
+    if not args.skip_learn_model:
+        print("Запуск learn_model...")
+        learn_model()
+    else:
+        print("Пропуск learn_model")
+
+    model = Model()
+
+    if not args.skip_train_transformer:
+        print("Запуск train_transformer...")
+        train_trasformator(model)
+    else:
+        print("Пропуск train_transformer")
+
+    if not args.skip_update_embeddings:
+        print("Запуск update_embeddings...")
+        update_embeddings(model, embeddings)
+    else:
+        print("Пропуск update_embeddings")
+
+    print("Процесс завершен")
+
 if __name__ == "__main__":
-    print(f"Генерация модели поисковой базы на основе фидбеков")
-    
-    main()
+    parser = argparse.ArgumentParser(
+        description="Генерация модели поисковой базы на основе фидбеков"
+    )
+    add_args(parser)
+    args = parser.parse_args()
+    main(args)

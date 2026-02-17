@@ -1,12 +1,14 @@
 import os
+import asyncio
 import numpy as np
 from typing import Dict, Tuple
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
-from app.db import db, FeedbackRepository, BookRepository, SimilarRepository
-from app.models import Feedbacks, Book
-from app.utils import FB2Book, get_file_bytes_from_zip
-from app.settings.config import MODEL_NAME, DATA_DIR
+from app.db import db, FeedbackRepository, BookRepository, SimilarRepository, EmbeddingsRepository
+from app.models import Feedbacks, Book, Embedding
+from app.searchEngines.bookSearch import BookSearchEngineFactory
+from app.utils import FB2Book
+from app.settings.config import MODEL_NAME, DATA_DIR, TRANSFORM_FILE
 
 class Model:
     MODEL_DIR = "models"
@@ -15,8 +17,9 @@ class Model:
     
     @staticmethod
     def get_book_text(book: Book) -> str:
-        data = get_file_bytes_from_zip(book.source_link)
-        fb2Book = FB2Book(data)
+        engine = BookSearchEngineFactory.create(book.source_type)
+        asyncio.run(engine.enrich_book_data(book))
+        fb2Book = FB2Book(book.data)
         return fb2Book.extract_text()
 
     @staticmethod
@@ -36,6 +39,9 @@ class Model:
             model.save(str(model_path))
         
         return model
+
+    def get_embedding_transformator():    
+        return np.load(str(TRANSFORM_FILE))
 
     def learn_by_feedback(self):
         examples = []
@@ -102,6 +108,40 @@ class Model:
         print(f"Модель сохранена в {model_dir}")
 
         self._print_update_model_result(results)
+    
+    def train_embedding_transform():
+        model = Model().get()
+
+        X = []  # old embeddings
+        Y = []  # new embeddings
+
+        with db() as conn:
+            books = BookRepository.get_all(conn)
+
+            for row in books[:5000]:  # достаточно 1-5k примеров
+                book = Book.map_row(row)
+
+                old_emb = EmbeddingsRepository.get(conn, book.id)
+                if old_emb is None:
+                    continue
+
+                old_norm_emb = Embedding.from_db(old_emb)
+
+                text = Model.get_book_text(book)
+                new_emb = model.encode(text)
+
+                X.append(old_norm_emb)
+                Y.append(new_emb)
+
+        X = np.stack(X)
+        Y = np.stack(Y)
+
+        W, _, _, _ = np.linalg.lstsq(X, Y, rcond=None)
+
+        np.save(str(TRANSFORM_FILE), W)
+
+    def transform_embedding(old_emb, W):
+        return old_emb @ W
 
     def _print_update_model_result(
             self,

@@ -28,10 +28,7 @@ def print_similar_books(
 
         print(f"{percent:6.2f},{similar.candidate.file_name},{similar.candidate.title},{url}")
 
-async def main():
-    start = time.perf_counter()
-    limit: int = 100
-    parser = argparse.ArgumentParser(description="Показать топ-50 похожих книг")
+def add_args(parser: argparse.ArgumentParser):
     parser.add_argument("file_name", type=str, help="Имя файла книги")
     parser.add_argument(
         "--mode",
@@ -44,7 +41,15 @@ async def main():
         action="store_true",
         help="Запустить оба режима последовательно и вывести их время выполнения",
     )
-    args = parser.parse_args()
+
+def parse_args(args=None):
+    parser = argparse.ArgumentParser(description="Показать топ-50 похожих книг")
+    add_args(parser)
+    return parser.parse_args(args)
+
+async def main(args=None):
+    start = time.perf_counter()
+    limit: int = 100
 
     with db() as conn:
         book_task = Book.map(BookRepository.get_by_file(conn, args.file_name))
@@ -101,4 +106,4 @@ async def main():
     )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(parse_args()))

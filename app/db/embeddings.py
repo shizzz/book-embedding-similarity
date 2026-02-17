@@ -37,5 +37,12 @@ class EmbeddingsRepository:
         )
 
     @staticmethod
+    def update(conn, book_id: int, embedding: bytes):
+        conn.execute(
+            "UPDATE embeddings SET embedding = ? WHERE book_id = ?",
+            (embedding, book_id)
+        )
+
+    @staticmethod
     def count(conn) -> int:
         return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
