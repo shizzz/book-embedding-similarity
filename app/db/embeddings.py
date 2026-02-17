@@ -27,11 +27,11 @@ class EmbeddingsRepository:
         conn.executemany(
             """
             INSERT OR REPLACE INTO embeddings
-            (book_id, embedding)
-            VALUES (?, ?)
+            (book_id, embedding, model)
+            VALUES (?, ?, ?)
             """,
             [
-                (book.id, book.embedding_bytes)
+                (book.id, book.embedding_bytes, book.model_id)
                 for book in books
             ]
         )

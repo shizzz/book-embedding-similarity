@@ -3,21 +3,25 @@ from typing import Tuple, List
 from app.workers import BaseWorker
 from app.utils import FB2Book
 from app.hnsw import HNSW
+from app.model import Model
 from app.models import Embedding, Book, Feedbacks, Task
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
 class GenerateEmbeddingsWorker(BaseWorker):
-    MAX_BOOK_BATCH_SIZE: int = 1000
+    MAX_BOOK_BATCH_SIZE: int = 10000
 
-    def __init__(self, model, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.model = model
         self.hnsw = HNSW(batch_size=10000)
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX)
         self._get_book_idx: int = None
         self._book_id: int = 1
         self._db_queue_batch_size = 100
+
+        self._model = Model()
+        self._model_id = self._model.get_model_uid()
+        self._transformer = self._model.get()
 
     async def process(self, task: Task) -> Tuple[int, Tuple[List[Book], List[bytes]]]:
         return (len(task.entity), await to_thread(self._process_book, task.entity))
@@ -81,7 +85,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
             fb2.enrich_book(book)
             texts.append(fb2.extract_text())
 
-        embeddings_np = self.model.encode(
+        embeddings_np = self._transformer.encode(
             texts,
             batch_size=128,
             convert_to_numpy=True,
@@ -90,6 +94,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
         for book, vec in zip(books, embeddings_np):
             book.embedding = Embedding(vec)
+            book.model_id = self._model_id
 
         return books
 

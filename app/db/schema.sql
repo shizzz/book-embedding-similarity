@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE TABLE IF NOT EXISTS embeddings (
     book_id INTEGER PRIMARY KEY,
     embedding BLOB,
+    model CHAR(32) NOT NULL,
     FOREIGN KEY(book_id) REFERENCES books(id)
 );
 
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS feedback (
                     
 CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
 CREATE INDEX IF NOT EXISTS idx_embeddings_book_id ON embeddings(book_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings(model);
 CREATE INDEX IF NOT EXISTS idx_similar_book_id ON similar(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id);

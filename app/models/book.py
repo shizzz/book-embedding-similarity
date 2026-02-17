@@ -14,6 +14,7 @@ class Book:
     source_link: Optional[str]
     uid: str = None
     embedding: Embedding = None
+    model_id: str = None
 
     T = TypeVar("T")
 
@@ -27,7 +28,8 @@ class Book:
             data: bytes = None,
             source_type: str = None,
             source_link: str = None,
-            embedding: Embedding = None):
+            embedding: Embedding = None,
+            model_id: str = None):
         self.id = id
         self.file_name = file_name
         self.title = title
@@ -36,6 +38,7 @@ class Book:
         self.source_type = source_type
         self.source_link = source_link
         self.embedding = embedding
+        self.model_id = model_id
 
         if authors == None and author != None:
             self.authors = self._parse_authors(author)
