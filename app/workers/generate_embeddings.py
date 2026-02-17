@@ -29,7 +29,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
     async def get_total(self) -> int:
         total = await self.engine.get_total()
         await self.ui.update_total(total, self._get_book_idx)
-        return total / self.BOOK_BATCH_SIZE
+        return total
 
     async def pull_queue(self):
         buffer = []
@@ -50,8 +50,9 @@ class GenerateEmbeddingsWorker(BaseWorker):
             await self.queue.put(Task(book_task.link, buffer))
         self._queue_pulled = True
 
-    async def process_book(self, task: Task):
+    async def process_book(self, task: Task) -> int:
         await to_thread(self._process_book, task.entity)
+        return len(task.entity)
 
     async def fin(self):
         with db() as conn:

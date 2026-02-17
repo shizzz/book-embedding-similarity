@@ -99,10 +99,10 @@ class BaseWorker:
                 if self.show_ui:
                     await self.ui.set_thread(worker_id, task.name)
 
-                await self.process_book(task)
+                done_count = await self.process_book(task)
 
                 if self.show_ui:
-                    await self.ui.done()
+                    await self.ui.done(count=done_count or 1)
             except Exception as error:
                 if self.show_ui:
                     await self.ui.error()
