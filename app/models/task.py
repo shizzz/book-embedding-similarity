@@ -1,11 +1,8 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Generic
+from app.common.types import TEntity
 
 @dataclass
-class Task:
+class Task(Generic[TEntity]):
     name: str
-    entity: Any
-
-    def __init__(self, name: str, entity: Any):
-        self.name = name
-        self.entity = entity
+    entity: TEntity

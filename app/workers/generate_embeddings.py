@@ -1,6 +1,5 @@
-import asyncio
 from asyncio import to_thread
-from typing import Tuple
+from typing import Tuple, List
 from app.workers import BaseWorker
 from app.utils import FB2Book
 from app.hnsw import HNSW
@@ -18,20 +17,38 @@ class GenerateEmbeddingsWorker(BaseWorker):
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX)
         self._get_book_idx: int = None
         self._book_id: int = 1
+        self._db_queue_batch_size = 100
 
-    async def stat_books(self):
+    async def process(self, task: Task) -> Tuple[int, Tuple[List[Book], List[bytes]]]:
+        return (len(task.entity), await to_thread(self._process_book, task.entity))
+    
+    async def prepare(self) -> None:
+        self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
         with db() as conn:
             self._book_id = BookRepository.get_max_id(conn)
-        return True
     
     async def get_total(self) -> int:
         total = await self.engine.get_total()
         await self.ui.update_total(total, self._get_book_idx)
         return total
 
-    async def pull_queue(self):
+    async def fin(self) -> None:
+        with db() as conn:
+            embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
+            feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
+            books: list[Book] = [
+                Book.map_row(row)
+                for row in BookRepository.get_all(conn)
+            ]
+            
+        self.hnsw.load_emb(embeddings)
+        self.hnsw.rebuild(
+            feedbacks=feedbacks,
+            books=books,
+        )
+
+    async def pull_queue(self) -> None:
         buffer = []
-        self._get_book_idx = self.ui.add_progress("Парсинг книг ", "обработано")
         async for book in self.engine.search_books():    
             await self.engine.enrich_book_data(book)
             book.id = self._book_id
@@ -49,29 +66,16 @@ class GenerateEmbeddingsWorker(BaseWorker):
             await self.queue.put(Task(book.source_link, buffer))
         self._queue_pulled = True
 
-    async def process_book(self, task: Task) -> int:
-        await to_thread(self._process_book, task.entity)
-        return len(task.entity)
-
-    async def fin(self):
+    def save_to_db(self, buffer: List[Book]) -> int:
         with db() as conn:
-            embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
-            feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
-            books: list[Book] = [
-                Book.map_row(row)
-                for row in BookRepository.get_all(conn)
-            ]
-            
-        self.hnsw.load_emb(embeddings)
-        self.hnsw.rebuild(
-            feedbacks=feedbacks,
-            books=books,
-        )
+            BookRepository.save_bulk(conn, buffer)
+            EmbeddingsRepository.save_bulk(conn, buffer)
+            AuthorRepository.save_bulk(conn, buffer)
+        return len(buffer)
 
-    def _process_book(self, books: list[Book]):
+    def _process_book(self, books: list[Book]) -> List[Book]:
         texts = []
 
-        # parse
         for book in books:
             fb2 = FB2Book(book.data)
             fb2.enrich_book(book)
@@ -84,15 +88,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
             normalize_embeddings=True
         )
 
-        embeddings_db = [
-            Embedding(vec).to_db()
-            for vec in embeddings_np
-        ]
+        for book, vec in zip(books, embeddings_np):
+            book.embedding = Embedding(vec)
 
-        with db() as conn:
-            BookRepository.save_bulk(conn, books)
-            EmbeddingsRepository.save_bulk(conn, books, embeddings_db)
-            AuthorRepository.save_bulk(conn, books)
+        return books
 
     def _adaptive_batch_size(self, queue_size: int,) -> int:
         """

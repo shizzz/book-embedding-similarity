@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar
+from .embedding import Embedding
 
 @dataclass
 class Book:
@@ -12,6 +13,7 @@ class Book:
     source_type: Optional[str]
     source_link: Optional[str]
     uid: str = None
+    embedding: Embedding = None
 
     T = TypeVar("T")
 
@@ -24,7 +26,8 @@ class Book:
             authors: List[str] = None,
             data: bytes = None,
             source_type: str = None,
-            source_link: str = None):
+            source_link: str = None,
+            embedding: Embedding = None):
         self.id = id
         self.file_name = file_name
         self.title = title
@@ -32,6 +35,7 @@ class Book:
         self.data = data
         self.source_type = source_type
         self.source_link = source_link
+        self.embedding = embedding
 
         if authors == None and author != None:
             self.authors = self._parse_authors(author)
@@ -49,6 +53,13 @@ class Book:
             source_link=row["source_link"],
         )
 
+    @property
+    def embedding_bytes(self) -> Optional[bytes]:
+        if self.embedding is None:
+            return None
+        
+        return self.embedding.to_db()
+    
     @classmethod
     def map_row(cls, row) -> "Book":
         return Book(

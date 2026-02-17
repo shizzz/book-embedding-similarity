@@ -27,10 +27,10 @@ class SimilarSearchWorker(BaseWorker):
         self.__candidates.sort(key=lambda x: x[1], reverse=True)
         return self.__candidates[:self.__top_k]
    
-    async def stat_books(self):
+    async def prepare(self):
         return
 
-    def process_book(self, task: Task):
+    def process(self, task: Task):
         self.__current += 1
         if task.book.embedding is None:
             return

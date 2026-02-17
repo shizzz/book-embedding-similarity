@@ -22,7 +22,7 @@ class EmbeddingsRepository:
         )
 
     @staticmethod
-    def save_bulk(conn, books: list, embeddings_db: list[bytes]):
+    def save_bulk(conn, books: list):
 
         conn.executemany(
             """
@@ -31,8 +31,8 @@ class EmbeddingsRepository:
             VALUES (?, ?)
             """,
             [
-                (book.id, emb)
-                for book, emb in zip(books, embeddings_db)
+                (book.id, book.embedding_bytes)
+                for book in books
             ]
         )
 

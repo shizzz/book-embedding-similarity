@@ -9,6 +9,7 @@ from rich.progress import (
     BarColumn,
     TextColumn,
     TimeRemainingColumn,
+    TimeElapsedColumn,
     TaskID
 )
 
@@ -34,19 +35,7 @@ class StatsUI:
 
         self.lock = asyncio.Lock()
         self.console = Console()
-
-        self._bars[0] = Progress(
-            TextColumn("[bold cyan]Book analysis progress"),
-            BarColumn(),
-            TextColumn("{task.completed}/{task.total} books"),
-            TextColumn("{task.speed} books/s"),
-            TimeRemainingColumn(),
-        )
-
-        self._tasks[0] = self._bars[0].add_task(
-            "[bold green]Books processed",
-            total=0,
-        )
+        self.add_progress("Прогресс анализа книг", "Книг")
 
     def _make_table(self) -> Table:
         table = Table(title=self._label, expand=True)
@@ -108,7 +97,6 @@ class StatsUI:
 
             self._bars[idx].update(self._tasks[idx], total=total)
 
-
     async def error(self, idx: int = 0):
         async with self.lock:
             self.stats["Errors"] += 1
@@ -116,20 +104,31 @@ class StatsUI:
         self._bars[idx].update(self._tasks[idx], advance=1)
         self.live.update(self.layout())
 
-    def add_progress(self, title: str, descr: str) -> int:
+    def add_progress(self, descr: str, unit: str) -> int:
         idx = max(self._bars.keys(), default=-1) + 1
 
-        self._bars[idx] = Progress(
-            TextColumn(f"[bold cyan]{title}"),
-            BarColumn(),
-            TextColumn("{task.completed}/{task.total} "),
-            TextColumn("{task.speed} /s"),
+        self._bars[idx] = Progress(  
+            TextColumn(
+                "[bold cyan]{task.description:>20}",
+                justify="left",
+            ),
+            BarColumn(bar_width=40),
+            TextColumn(
+                "{task.completed:>6}/{task.total:<6}",
+                justify="right"
+            ),    
+            TextColumn(
+                "{task.speed} {task.fields[unit]}/с",
+                justify="right",
+            ),
             TimeRemainingColumn(),
+            TimeElapsedColumn(),
         )
 
         self._tasks[idx] = self._bars[idx].add_task(
-            f"[bold green]{descr}",
+            description=f"[bold green]{descr}",
             total=0,
+            unit=unit,
         )
 
         return idx
