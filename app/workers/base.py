@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import traceback
+import signal
 from abc import ABC, abstractmethod
 from typing import Generic, Tuple
 from asyncio import create_task, gather
@@ -19,6 +20,9 @@ class BaseWorker(ABC, Generic[TEntity]):
         sleepy: bool = False,
         title: str = None,
     ):
+        self._cancellation_token = asyncio.Event()
+        signal.signal(signal.SIGINT, self._signal_handler)
+
         self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue()
         self.max_workers: int = max_workers
         self.sleepy: bool = sleepy
@@ -64,7 +68,7 @@ class BaseWorker(ABC, Generic[TEntity]):
     
     def save_to_db(self, buffer: TEntity) -> int:
         pass
-    
+
     async def run(self):
         self.logger.info("Prepare...")
         self._db_save_enabled = self._is_overridden("save_to_db")
@@ -103,6 +107,10 @@ class BaseWorker(ABC, Generic[TEntity]):
             self.ui.console.log("DB save disabled")
 
         await self._executeWorkers()
+        
+        if self._cancellation_token.is_set():
+            return
+        
         await self._fin()
 
         self.ui.console.log("All books processed!")
@@ -139,6 +147,9 @@ class BaseWorker(ABC, Generic[TEntity]):
 
     async def _worker(self, worker_id: int):
         while not self._queue_pulled or not self.queue.empty():
+            if self._cancellation_token.is_set():
+                return
+            
             try:
                 task = self.queue.get_nowait()
             except asyncio.QueueEmpty:
@@ -212,6 +223,9 @@ class BaseWorker(ABC, Generic[TEntity]):
     async def _save_loop(self):
         buffer = []
 
+        if self._cancellation_token.is_set():
+            return
+
         while not self._db_queue_stop_event.is_set():
             await self._db_queue_step(buffer, False)
 
@@ -219,3 +233,7 @@ class BaseWorker(ABC, Generic[TEntity]):
             pass
 
         self.ui.console.log("Save thread stopped")
+        
+    def _signal_handler(self, sig, frame):
+        self.ui.console.log("Получен Ctrl+C, отменяем задачи...")
+        self._cancellation_token.set()

@@ -9,7 +9,7 @@ from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, F
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
 class GenerateEmbeddingsWorker(BaseWorker):
-    MAX_BOOK_BATCH_SIZE: int = 10000
+    MAX_BOOK_BATCH_SIZE: int = 500
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -53,7 +53,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
     async def pull_queue(self) -> None:
         buffer = []
-        async for book in self.engine.search_books():    
+        async for book in self.engine.search_books():         
+            if self._cancellation_token.is_set():
+                return
+        
             await self.engine.enrich_book_data(book)
             book.id = self._book_id
             self._book_id += 1
@@ -106,7 +109,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         """
         if queue_size < 10:
             # Если мало элементов, возвращаем число меньше 10
-            return max(1, queue_size)
+            return 10
         
         # Для больших чисел: округляем до ближайшего "красивого" числа
         # Красивое число — кратное 10, не больше max_batch

@@ -1,7 +1,7 @@
 import lightgbm as lgb
 import numpy as np
 import joblib
-from app.models import Feedbacks, Embedding, Book
+from app.models import Feedbacks
 from .rerankerTrainer import RerankerTrainer
 from app.settings.config import RERANKER_FILE
 
@@ -32,7 +32,7 @@ class LightGBMRerankerTrainer(RerankerTrainer):
 
             # отрицательные примеры можно немного усилить
             if fb.label < 0:
-                w.append(1.2)
+                w.append(1.4)
             else:
                 w.append(1.0)
 
