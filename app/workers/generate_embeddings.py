@@ -62,7 +62,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
             self._book_id += 1
 
             buffer.append(book)
-            await self.ui.done(self._get_book_idx)
+            await self.ui.done_async(self._get_book_idx)
 
             batch_size = self._adaptive_batch_size(self.queue.qsize() + len(buffer))
             if len(buffer) >= batch_size:                
@@ -73,11 +73,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
             await self.queue.put(Task(book.source_link, buffer))
         self._queue_pulled = True
 
-    def save_to_db(self, buffer: List[Book]) -> int:
-        with db() as conn:
-            BookRepository.save_bulk(conn, buffer)
-            EmbeddingsRepository.save_bulk(conn, buffer)
-            AuthorRepository.save_bulk(conn, buffer)
+    def save_to_db(self, conn, buffer: List[Book]) -> int:
+        BookRepository.save_bulk(conn, buffer)
+        EmbeddingsRepository.save_bulk(conn, buffer)
+        AuthorRepository.save_bulk(conn, buffer)
         return len(buffer)
 
     def _process_book(self, books: list[Book]) -> List[Book]:

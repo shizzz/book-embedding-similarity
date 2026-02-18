@@ -77,7 +77,7 @@ class StatsUI:
             self.stats[f"Thread {worker_id}"] = name
         self.live.update(self.layout())
 
-    async def done(self, idx: int = 0, count: int = 1):
+    async def done_async(self, idx: int = 0, count: int = 1):
         async with self.lock:
             if idx == 0:
                 self.stats["Done"] += count
@@ -85,6 +85,10 @@ class StatsUI:
 
             self._bars[idx].update(task_id=self._tasks[idx], advance=count)
             self.live.update(self.layout())
+
+    def done(self, idx: int = 0, count: int = 1):
+        self._bars[idx].update(task_id=self._tasks[idx], advance=count)
+        self.live.update(self.layout())
 
     async def update_total(self, total: int, idx: int = 0):
         async with self.lock:

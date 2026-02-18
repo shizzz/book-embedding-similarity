@@ -74,7 +74,6 @@ class GenerateSimilarWorker(BaseWorker):
     async def fin(self) -> None:
         return
 
-    def save_to_db(self, buffer: List[Tuple[float, int, int]]) -> None:
-        with db() as conn:
-            SimilarRepository.save(conn, buffer)
+    def save_to_db(self, conn, buffer: List[Tuple[float, int, int]]) -> None:
+        SimilarRepository.save(conn, buffer)
         return len(buffer)

@@ -7,7 +7,7 @@ from typing import Generic, Tuple
 from asyncio import create_task, gather
 from rich.live import Live
 from app.workers.parts import StatsUI
-from app.db import Migrator
+from app.db import Migrator, db
 from app.common.types import TEntity, TResult
 from app.models import Task
 from app.settings.config import MAX_WORKERS, DATABASE_QUEUE_BATCH_SIZE
@@ -84,9 +84,9 @@ class BaseWorker(ABC, Generic[TEntity]):
             await self.ui.init()
             with Live(self.ui.layout(), refresh_per_second=1, console=self.ui.console) as live:
                 self.ui.live = live
-                await self._bottom()
+                await self._run_internal()
         else:
-            await self._bottom()
+            await self._run_internal()
     
     def _is_overridden(self, method_name: str) -> bool:
         """
@@ -96,26 +96,23 @@ class BaseWorker(ABC, Generic[TEntity]):
         sub_method = getattr(self.__class__, method_name)
         return sub_method is not base_method
     
-    async def _bottom(self):
-        self._get_total_task = asyncio.create_task(self._get_total())
+    async def _run_internal(self):
+        self._get_total_task = create_task(self._get_total())
 
         if self._db_save_enabled:
             self.ui.console.log("DB save enabled")
             self._db_queue_progress_idx = self.ui.add_progress("Сохранение в БД", "пакетов")
-            self._db_queue_task = asyncio.create_task(self._save_loop())
+            self._db_queue_task = create_task(self._save_loop())
         else:
             self.ui.console.log("DB save disabled")
 
         await self._executeWorkers()
         
-        if self._cancellation_token.is_set():
-            return
-        
-        await self._fin()
+        if not self._cancellation_token.is_set():
+            await self._finalise()
+            self.ui.console.log("All books processed!")
 
-        self.ui.console.log("All books processed!")
-
-    async def _fin(self):
+    async def _finalise(self):
         self.ui.console.log("Finalise")
 
         self._db_queue_stop_event.set()
@@ -124,6 +121,7 @@ class BaseWorker(ABC, Generic[TEntity]):
             db_queue_size = self._db_queue.qsize()
             if db_queue_size > 0:
                 self.ui.console.log(f"Still have {db_queue_size} records to save into database")
+                self._db_queue.put_nowait(None)
 
             if self._db_queue_task:
                 await self._db_queue_task
@@ -171,7 +169,7 @@ class BaseWorker(ABC, Generic[TEntity]):
                     )
 
                 if self.show_ui:
-                    await self.ui.done(count=done_count or 1)
+                    await self.ui.done_async(count=done_count or 1)
             except Exception as error:
                 if self.show_ui:
                     await self.ui.error()
@@ -180,57 +178,68 @@ class BaseWorker(ABC, Generic[TEntity]):
             finally:
                 self.queue.task_done()
 
-    async def _createWorker(self, worker_id: int):
+    async def _run_worker(self, worker_id: int):
         if self.sleepy:
             await self._sleepyWorker()
         else:
             await self._worker(worker_id)
 
     async def _executeWorkers(self):
-        tasks = []
-        tasks.append(create_task(self.pull_queue()))
+        tasks = [
+            create_task(self.pull_queue())
+        ]
         tasks.extend(
-            create_task(self._createWorker(i))
+            create_task(self._run_worker(i))
             for i in range(1, self.max_workers + 1)
         )
         await gather(*tasks)
 
-    async def _db_queue_step(self, buffer: TEntity, save_if_empty: bool = False):
-        try:
-            item = self._db_queue.get_nowait()
+    def _db_save(self, buffer: TEntity) -> int:
+        with db() as conn:
+            return self.save_to_db(conn, buffer.copy())
 
-            buffer.extend(item)
+    async def _db_queue_step_async(self, buffer: TEntity):
+        try:
+            item = await self._db_queue.get()
+        
+            if item:
+                buffer.extend(item)
+
+            if len(buffer) >= self._db_queue_batch_size or item is None:
+                done = await asyncio.to_thread(self._db_save, buffer.copy())
+                await self.ui.done_async(self._db_queue_progress_idx, done)
+                buffer.clear()
             self._db_queue.task_done()
 
-            if len(buffer) >= self._db_queue_batch_size:
-                done = await asyncio.to_thread(self.save_to_db, buffer)
-                await self.ui.done(self._db_queue_progress_idx, done)
-                buffer.clear()
-
-            return True
-        except asyncio.QueueEmpty:
-            if buffer and save_if_empty:
-                done = await asyncio.to_thread(self.save_to_db, buffer)
-                await self.ui.done(self._db_queue_progress_idx, done)
-                buffer.clear()
-            await asyncio.sleep(1)
-            return False
+            return item is not None
         except Exception as e:
             traceback.print_exc()
             self.ui.console.log(f"Критическая ошибка при сохранение в базу данных: {e}")
             return False
+    
+    def _db_queue_step(self, conn, buffer: TEntity):
+        item = self._db_queue.get_nowait()
+        
+        if item:
+            buffer.extend(item)
+
+        if len(buffer) >= self._db_queue_batch_size or item is None:
+            done = self.save_to_db(conn, buffer.copy())
+            buffer.clear()
+            self.ui.done(self._db_queue_progress_idx, done)
+        self._db_queue.task_done()
+
+        return item is not None
 
     async def _save_loop(self):
         buffer = []
 
-        if self._cancellation_token.is_set():
-            return
+        while not self._db_queue_stop_event.is_set() and not self._cancellation_token.is_set():
+            await self._db_queue_step_async(buffer)
 
-        while not self._db_queue_stop_event.is_set():
-            await self._db_queue_step(buffer, False)
-
-        while await self._db_queue_step(buffer, True):
-            pass
+        with db() as conn:
+            while self._db_queue_step(conn, buffer) and not self._cancellation_token.is_set():
+                pass
 
         self.ui.console.log("Save thread stopped")
         
