@@ -24,10 +24,14 @@ SIMILARS_PER_BOOK = int(os.getenv("SIMILARS_PER_BOOK","100"))
 DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE","20000"))
 
 
-MODEL_NAME: str = os.getenv("MODEL_NAME","intfloat/multilingual-e5-large")
-ST_CHUNK_SIZE: int = 2500  # максимально безопасный размер для multilingual-e5-large
-ST_OVERLAP: int = 300      # overlap для сохранения контекста между chunk
-ST_BATCH_SIZE: int = 64
+MODEL_NAME: str = os.getenv(
+    "MODEL_NAME",
+    "sentence-transformers/all-MiniLM-L6-v2"
+)
+ST_CHUNK_SIZE: int = 1000  # безопасный размер для MiniLM-L6
+ST_OVERLAP: int = 200      # overlap между чанками
+ST_BATCH_SIZE: int = 128    # MiniLM позволяет большие batch
+
 ST_MIN_CHARS: int = 3000
 ST_TARGET_CHARS: int = 16000
 ST_MAX_TITLE_CHARS: int = 300

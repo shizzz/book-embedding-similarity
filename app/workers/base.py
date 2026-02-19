@@ -19,11 +19,12 @@ class BaseWorker(ABC, Generic[TEntity]):
         show_ui: bool = True,
         sleepy: bool = False,
         title: str = None,
+        queue_size: int = 0
     ):
         self._cancellation_token = asyncio.Event()
         signal.signal(signal.SIGINT, self._signal_handler)
 
-        self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue()
+        self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue(maxsize=queue_size)
         self.max_workers: int = max_workers
         self.sleepy: bool = sleepy
         self.show_ui: bool = show_ui

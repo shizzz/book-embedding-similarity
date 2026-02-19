@@ -21,7 +21,6 @@ class GenerateEmbeddingsWorker(BaseWorker):
         self._db_queue_batch_size = 100
 
         self._model = Model()
-        self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue(maxsize=1000)
 
     async def process(self, task: Task) -> TaskResult:
         result = await to_thread(self._process_book, task.entity)
