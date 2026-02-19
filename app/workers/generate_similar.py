@@ -3,7 +3,7 @@ from asyncio import to_thread
 from typing import List, Tuple
 from app.workers import BaseWorker
 from app.services import BulkSimilarSearchService
-from app.models import Task, Book, Task
+from app.models import Task, Book, Task, TaskResult, Action
 from app.db import db, BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK
@@ -17,8 +17,12 @@ class GenerateSimilarWorker(BaseWorker):
 
         self._task_total: int = 0
 
-    async def process(self, task: Task) -> Tuple[int, List[Tuple[float, int, int]]]:
-        return (1, await to_thread(self._service.run, task.entity[0], task.entity[1]))
+    async def process(self, task: Task) -> TaskResult:
+        result = await to_thread(self._service.run, task.entity[0], task.entity[1])
+        return task.to_result(
+            len(task.entity),
+            result
+        )
 
     async def prepare(self) -> None:
         self.logger.info(f"Очистка таблицы similar")
@@ -62,7 +66,8 @@ class GenerateSimilarWorker(BaseWorker):
                             title=title
                         ),
                         embedding,
-                    )
+                    ),
+                    action=Action.INSERT
                 )
             )
 
@@ -74,6 +79,7 @@ class GenerateSimilarWorker(BaseWorker):
     async def fin(self) -> None:
         return
 
-    def save_to_db(self, conn, buffer: List[Tuple[float, int, int]]) -> None:
-        SimilarRepository.save(conn, buffer)
-        return len(buffer)
+    def save_to_db(self, conn, task: Task) -> int:
+        SimilarRepository.save(conn, task.entity)
+        done += len(task.entity)
+        return len(task.entity)

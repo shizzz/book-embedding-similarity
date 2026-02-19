@@ -3,13 +3,13 @@ import logging
 import traceback
 import signal
 from abc import ABC, abstractmethod
-from typing import Generic, Tuple
+from typing import Generic, List
 from asyncio import create_task, gather
 from rich.live import Live
 from app.workers.parts import StatsUI
 from app.db import Migrator, db
-from app.common.types import TEntity, TResult
-from app.models import Task
+from app.common.types import TEntity
+from app.models import Task, TaskResult
 from app.settings.config import MAX_WORKERS, DATABASE_QUEUE_BATCH_SIZE
 
 class BaseWorker(ABC, Generic[TEntity]):
@@ -48,7 +48,7 @@ class BaseWorker(ABC, Generic[TEntity]):
         self.logger.addHandler(handler)
 
     @abstractmethod
-    async def process(self, task: Task) -> Tuple[int, TResult]:
+    async def process(self, task: Task) -> TaskResult:
         raise NotImplementedError("process_book must be implemented by subclass")
         
     @abstractmethod
@@ -66,7 +66,7 @@ class BaseWorker(ABC, Generic[TEntity]):
     async def pull_queue(self) -> None:
         self._queue_pulled = True
     
-    def save_to_db(self, buffer: TEntity) -> int:
+    def save_to_db(self, task: Task) -> int:
         pass
 
     async def run(self):
@@ -158,18 +158,18 @@ class BaseWorker(ABC, Generic[TEntity]):
                 if self.show_ui:
                     await self.ui.set_thread(worker_id, task.name)
 
-                done_count, result = await self.process(task)
+                result = await self.process(task)
                 
                 if self._db_save_enabled:
-                    self._db_queue_total += len(result)
-                    await self._db_queue.put(result)
+                    self._db_queue_total += result.done
+                    await self._db_queue.put(result.to_task())
                     await self.ui.update_total(
                         idx=self._db_queue_progress_idx,
                         total=self._db_queue_total
                     )
 
                 if self.show_ui:
-                    await self.ui.done_async(count=done_count or 1)
+                    await self.ui.done_async(count=result.done or 1)
             except Exception as error:
                 if self.show_ui:
                     await self.ui.error()
@@ -194,42 +194,53 @@ class BaseWorker(ABC, Generic[TEntity]):
         )
         await gather(*tasks)
 
-    def _db_save(self, buffer: TEntity) -> int:
+    def _db_save(self, tasks: List[Task]) -> int:
+        total = 0
         with db() as conn:
-            return self.save_to_db(conn, buffer.copy())
+            for task in tasks:
+                total += self.save_to_db(conn, task)
+        return total
 
-    async def _db_queue_step_async(self, buffer: TEntity):
+    async def _db_queue_step_async(self, buffer: List[Task]):
         try:
-            item = await self._db_queue.get()
+            task = await self._db_queue.get()
         
-            if item:
-                buffer.extend(item)
+            if task:
+                buffer.append(task)
 
-            if len(buffer) >= self._db_queue_batch_size or item is None:
+            total = sum(len(task.entity) for task in buffer)
+
+            if total >= self._db_queue_batch_size or task is None:
                 done = await asyncio.to_thread(self._db_save, buffer.copy())
                 await self.ui.done_async(self._db_queue_progress_idx, done)
                 buffer.clear()
             self._db_queue.task_done()
 
-            return item is not None
+            return task is not None
         except Exception as e:
             traceback.print_exc()
             self.ui.console.log(f"Критическая ошибка при сохранение в базу данных: {e}")
             return False
     
-    def _db_queue_step(self, conn, buffer: TEntity):
-        item = self._db_queue.get_nowait()
-        
-        if item:
-            buffer.extend(item)
-
-        if len(buffer) >= self._db_queue_batch_size or item is None:
-            done = self.save_to_db(conn, buffer.copy())
+    def _db_queue_step(self, conn, buffer: list[Task]) -> bool:
+        if buffer:
+            for task in buffer:
+                done = self.save_to_db(conn, task)
+                self.ui.done(self._db_queue_progress_idx, done)
             buffer.clear()
+
+        try:
+            task = self._db_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return
+
+        if task is not None:
+            done = self.save_to_db(conn, task)
             self.ui.done(self._db_queue_progress_idx, done)
+
         self._db_queue.task_done()
 
-        return item is not None
+        return task is not None
 
     async def _save_loop(self):
         buffer = []

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Callable, TypeVar
+from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterable, Iterator
 from .embedding import Embedding
 
 @dataclass
@@ -15,6 +15,9 @@ class Book:
     uid: str = None
     embedding: Embedding = None
     model_id: str = None
+    text: str = None
+    source_length: int = 0
+    token_length: int = 0
 
     T = TypeVar("T")
 
@@ -107,5 +110,30 @@ class BookRegistry:
         else:
             self.books: List[Book] = []
 
-    def add_books(self, books: list[Book]):
-        self.books = books
+    # --- container API ---
+    def append(self, book: Book) -> None:
+        self.books.append(book)
+
+    def clear(self) -> None:
+        self.books.clear()
+
+    def copy(self) -> "BookRegistry":
+        return BookRegistry(self.books.copy())
+    
+    # --- standard container methods ---
+    def __len__(self) -> int:
+        return len(self.books)
+
+    def __iter__(self) -> Iterator[Book]:
+        return iter(self.books)
+
+    def __bool__(self) -> bool:
+        return bool(self.books)
+    
+    @property
+    def texts(self):
+        yield from (book.text for book in self.books)
+    
+    @property
+    def embeddings(self):
+        yield from (book.embedding for book in self.books)

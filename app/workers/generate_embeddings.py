@@ -1,11 +1,12 @@
+import asyncio
 from asyncio import to_thread
-from typing import Tuple, List
+from typing import Tuple
 from app.workers import BaseWorker
-from app.utils import FB2Book
 from app.hnsw import HNSW
-from app.model import Model
-from app.models import Embedding, Book, Feedbacks, Task
+from app.model import Model, generate_embeddings
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
+from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action
+from app.common.types import TEntity
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
 class GenerateEmbeddingsWorker(BaseWorker):
@@ -20,11 +21,14 @@ class GenerateEmbeddingsWorker(BaseWorker):
         self._db_queue_batch_size = 100
 
         self._model = Model()
-        self._model_id = self._model.get_model_uid()
-        self._transformer = self._model.get()
+        self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue(maxsize=1000)
 
-    async def process(self, task: Task) -> Tuple[int, Tuple[List[Book], List[bytes]]]:
-        return (len(task.entity), await to_thread(self._process_book, task.entity))
+    async def process(self, task: Task) -> TaskResult:
+        result = await to_thread(self._process_book, task.entity)
+        return task.to_result(
+            len(task.entity),
+            result
+        )
     
     async def prepare(self) -> None:
         self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
@@ -52,7 +56,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         )
 
     async def pull_queue(self) -> None:
-        buffer = []
+        registry = BookRegistry()
         async for book in self.engine.search_books():         
             if self._cancellation_token.is_set():
                 return
@@ -61,44 +65,38 @@ class GenerateEmbeddingsWorker(BaseWorker):
             book.id = self._book_id
             self._book_id += 1
 
-            buffer.append(book)
+            registry.append(book)
             await self.ui.done_async(self._get_book_idx)
 
-            batch_size = self._adaptive_batch_size(self.queue.qsize() + len(buffer))
-            if len(buffer) >= batch_size:                
-                await self.queue.put(Task(f"{book.source_link} ({batch_size})", buffer.copy()))
-                buffer.clear()
+            batch_size = self._adaptive_batch_size(self.queue.qsize() + len(registry))
+            if len(registry) >= batch_size:                
+                await self.queue.put(
+                    Task(
+                            name=f"{book.source_link} ({batch_size})", 
+                            entity=registry.copy(),
+                            action=Action.INSERT
+                        )
+                    )
+                registry.clear()
             
-        if len(buffer) > 0:                
-            await self.queue.put(Task(book.source_link, buffer))
+        if len(registry) > 0:                
+            await self.queue.put(
+                Task(
+                        name=book.source_link, 
+                        entity=registry,
+                        action=Action.INSERT
+                    )
+                )
         self._queue_pulled = True
 
-    def save_to_db(self, conn, buffer: List[Book]) -> int:
-        BookRepository.save_bulk(conn, buffer)
-        EmbeddingsRepository.save_bulk(conn, buffer)
-        AuthorRepository.save_bulk(conn, buffer)
-        return len(buffer)
+    def save_to_db(self, conn, task: Task) -> int:
+        BookRepository.save_bulk(conn, task.entity)
+        EmbeddingsRepository.save_bulk(conn, task.entity)
+        AuthorRepository.save_bulk(conn, task.entity)
+        return len(task.entity)
 
-    def _process_book(self, books: list[Book]) -> List[Book]:
-        texts = []
-
-        for book in books:
-            fb2 = FB2Book(book.data)
-            fb2.enrich_book(book)
-            texts.append(fb2.extract_text())
-
-        embeddings_np = self._transformer.encode(
-            texts,
-            batch_size=128,
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
-
-        for book, vec in zip(books, embeddings_np):
-            book.embedding = Embedding(vec)
-            book.model_id = self._model_id
-
-        return books
+    def _process_book(self, registry: BookRegistry) -> BookRegistry:
+        return generate_embeddings(self._model, registry)
 
     def _adaptive_batch_size(self, queue_size: int,) -> int:
         """
@@ -108,7 +106,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         """
         if queue_size < 10:
             # Если мало элементов, возвращаем число меньше 10
-            return 10
+            return 5
         
         # Для больших чисел: округляем до ближайшего "красивого" числа
         # Красивое число — кратное 10, не больше max_batch

@@ -4,7 +4,7 @@ import asyncio
 from typing import AsyncGenerator
 from app.db import db, BookRepository
 from app.models import Book
-from app.utils import get_file_bytes_from_zip
+from app.utils import get_file_bytes_from_zip, FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
 
 class InpBookSearchEngine(BaseBookSearchEngine):
@@ -113,8 +113,9 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                         )
                     
     async def enrich_book_data(self, book: Book):
-        await self._completed_books_loaded.wait()
         book.data = await asyncio.to_thread(get_file_bytes_from_zip, book.source_link)
+        fb2 = FB2Book(book.data)
+        fb2.enrich_book(book)
 
     async def get_total(self) -> int:
         self._load_completed_books()

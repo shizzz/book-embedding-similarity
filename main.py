@@ -36,8 +36,6 @@ if __name__ == "__main__":
     parser.add_argument("--run-similar", action="store_true", help="Генерация similar")
     parser.add_argument("--run-learn-model", action="store_true", help="Обучение поисковой модели")
     parser.add_argument("--run-get-similar", action="store_true", help="Получения похожих книг")
-    get_similar_args(parser)
-    learn_search_model_args(parser)
 
     args = parser.parse_args()
     main(args)

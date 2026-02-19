@@ -15,7 +15,8 @@ class Model:
     MODEL_DIR = "models"
     BATCH_SIZE = 16
     EPOCHS = 3
-    _model: SentenceTransformer
+    transformer: SentenceTransformer
+    uid: str
 
     def __init__(self):
         model_dir = DATA_DIR / Model.MODEL_DIR
@@ -23,10 +24,18 @@ class Model:
 
         model_dir.mkdir(parents=True, exist_ok=True)
         if os.path.exists(model_path):
-            self._model = SentenceTransformer(str(model_path))
+            self.transformer = SentenceTransformer(
+                model_name_or_path=str(model_path),
+                tokenizer_kwargs={"fix_mistral_regex": True}
+            )
         else:
-            self._model = SentenceTransformer(MODEL_NAME)
-            self._model.save(str(model_path))
+            self.transformer = SentenceTransformer(
+                MODEL_NAME,
+                tokenizer_kwargs={"fix_mistral_regex": True}
+            )
+            self.transformer.save(str(model_path))
+            
+        self.uid = self.get_model_uid()
     
     @staticmethod
     def get_book_text(book: Book) -> str:
@@ -40,12 +49,9 @@ class Model:
         model_dir = DATA_DIR / Model.MODEL_DIR
         return model_dir / MODEL_NAME
 
-    def get(self) -> SentenceTransformer:
-        return self._model
-    
     def get_model_uid(self) -> str:
         """Возвращает хеш модели (будет меняться при дообучении)"""
-        state_dict = self._model.state_dict()
+        state_dict = self.transformer.state_dict()
         
         data = b"".join([v.cpu().numpy().tobytes() for v in state_dict.values()])
         return hashlib.md5(data).hexdigest()
@@ -97,12 +103,12 @@ class Model:
             pin_memory=False)
 
         # --- Loss с учётом весов ---
-        train_loss = losses.CosineSimilarityLoss(model=self._model)
+        train_loss = losses.CosineSimilarityLoss(model=self.transformer)
 
         # --- Fine-tuning ---
         warmup_steps = max(100, len(train_dataloader) * self.EPOCHS // 10)
 
-        self._model.fit(
+        self.transformer.fit(
             train_objectives=[(train_dataloader, train_loss)],
             epochs=self.EPOCHS,
             warmup_steps=warmup_steps,
@@ -111,7 +117,7 @@ class Model:
 
         # --- Сохраняем модель ---
         model_dir = str(Model.get_model_dir())
-        self._model.save(model_dir)
+        self.transformer.save(model_dir)
         print(f"Модель сохранена в {model_dir}")
 
         self._print_update_model_result(results)
@@ -132,8 +138,8 @@ class Model:
 
                 old_norm_emb = Embedding.from_db(old_emb)
 
-                text = self._model.get_book_text(book)
-                new_emb = self._model.encode(text)
+                text = self.transformer.get_book_text(book)
+                new_emb = self.transformer.encode(text)
 
                 X.append(old_norm_emb)
                 Y.append(new_emb)
@@ -154,8 +160,8 @@ class Model:
 
             src_text = self.get_book_text(src_book)
             tgt_text = self.get_book_text(tgt_book)
-            emb_src = self._model.encode(src_text)
-            emb_tgt = self._model.encode(tgt_text)
+            emb_src = self.transformer.encode(src_text)
+            emb_tgt = self.transformer.encode(tgt_text)
             score = np.dot(emb_src, emb_tgt)
 
             with db() as conn:
