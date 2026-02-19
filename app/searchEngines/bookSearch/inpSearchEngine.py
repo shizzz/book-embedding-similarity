@@ -1,11 +1,10 @@
-import os
-import zipfile
 import asyncio
 from typing import AsyncGenerator
 from app.db import db, BookRepository
 from app.models import Book
-from app.utils import get_file_bytes_from_zip, FB2Book
+from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
+from sources.remote import RemoteBookScanner
 
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
@@ -15,125 +14,133 @@ class InpBookSearchEngine(BaseBookSearchEngine):
         self._completed_books: set[str] = set()
         self._completed_books_loaded = asyncio.Event()
 
-    def _load_completed_books(self) -> set[str]:
+    # -----------------------------
+    # Загрузка уже обработанных книг
+    # -----------------------------
+    def _load_completed_books(self):
         try:
             with db() as conn:
-                self._completed_books = set[str](BookRepository.get_names(conn))
+                self._completed_books = set(BookRepository.get_names(conn))
         finally:
-            # сигнализируем async-коду, что загрузка завершена
             loop = asyncio.get_running_loop()
             loop.call_soon_threadsafe(self._completed_books_loaded.set)
 
-    def _parse(self, zipf, filename):
-        data = zipf.read(filename)
+    # -----------------------------
+    # Парсинг одного файла внутри ZIP
+    # -----------------------------
+    def _parse(self, zip_bytes, filename) -> list[dict]:
+        import zipfile
         books = []
-        
-        content = data.decode("utf-8")
-        for line in content.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            fields = line.split('\x04')
-            
-            while len(fields) <= 13:
-                fields.append("")
+        with zipfile.ZipFile(zip_bytes) as zipf:
+            data = zipf.read(filename)
+            content = data.decode("utf-8")
+            for line in content.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                fields = line.split('\x04')
+                while len(fields) <= 13:
+                    fields.append("")
 
-            book = {
-                "author": fields[0],
-                "genere": fields[1],
-                "title": fields[2],
-                "series": fields[3],
-                "serno": fields[4],
-                "file": fields[5],
-                "size": fields[6],
-                "libid": fields[7],
-                "deleted": fields[8] == "1",
-                "ext": fields[9],
-                "date": fields[10],
-                "lang": fields[11],
-                "librate": fields[12],
-                "keywords": fields[13]
-            }
-            books.append(book)
+                books.append({
+                    "author": fields[0],
+                    "genere": fields[1],
+                    "title": fields[2],
+                    "series": fields[3],
+                    "serno": fields[4],
+                    "file": fields[5],
+                    "size": fields[6],
+                    "libid": fields[7],
+                    "deleted": fields[8] == "1",
+                    "ext": fields[9],
+                    "date": fields[10],
+                    "lang": fields[11],
+                    "librate": fields[12],
+                    "keywords": fields[13]
+                })
         return books
 
-    def _parse_authors(_, authors_str: str) -> str:
-        """
-        Преобразует строку авторов 'Фамилия,Имя,Отчество:Фамилия,Имя,Отчество:...'
-        в строку 'Фамилия Имя Отчество, Фамилия Имя Отчество'
-        """
+    # -----------------------------
+    # Преобразование авторов
+    # -----------------------------
+    def _parse_authors(self, authors_str: str) -> list[str]:
         authors = []
         for author in authors_str.split(":"):
             author = author.strip()
             if not author:
                 continue
-            # Разбиваем на части и соединяем через пробел
             parts = [part.strip() for part in author.split(",") if part.strip()]
             authors.append(" ".join(parts))
         return authors
 
-    def _should_skip(self, book) -> bool:
-        if book["lang"] != "ru" or book["deleted"] or book["file"] == "":
+    # -----------------------------
+    # Пропуск ненужных книг
+    # -----------------------------
+    def _should_skip(self, book: dict) -> bool:
+        if book["lang"] != "ru" or book["deleted"] or not book["file"]:
             return True
-            
-        if f"{book["file"]}.{book["ext"]}" in self._completed_books:
+        if f'{book["file"]}.{book["ext"]}' in self._completed_books:
             return True
-
         return False
 
+    # -----------------------------
+    # Поиск книг (async)
+    # -----------------------------
     async def search_books(self) -> AsyncGenerator[Book, None]:
+        await asyncio.to_thread(self._load_completed_books)
         await self._completed_books_loaded.wait()
 
-        with zipfile.ZipFile(self.folder) as zipf:
-            for info in zipf.infolist():
-                if info.is_dir():
-                    continue
+        # Используем RemoteBookScanner как контекстный менеджер
+        with RemoteBookScanner(self.folder, self._completed_books) as scanner:
+            archives = await asyncio.to_thread(scanner.list_archives)
 
-                books = await asyncio.to_thread(
-                    self._parse, zipf, info.filename
-                )
+            for archive in archives:
+                archive_bytes = await asyncio.to_thread(scanner._read_archive, archive)
+                # Получаем список файлов внутри архива
+                books_info = await asyncio.to_thread(self._parse, archive_bytes, archive)
 
-                for book in books:
-                    authors = self._parse_authors(book["author"])
-
+                for book in books_info:
                     if self._should_skip(book):
                         continue
-                    
-                    archive_name=f"{os.path.splitext(info.filename)[0]}.zip",
-                    file_name=f"{book["file"]}.{book["ext"]}"
-                    link = f"{archive_name[0]}/{file_name}"
+
+                    authors_list = self._parse_authors(book["author"])
+                    authors_str = ", ".join(authors_list)
+
+                    file_name = f'{book["file"]}.{book["ext"]}'
+                    link = f"{archive}/{file_name}"
 
                     yield Book(
-                            file_name=file_name,
-                            title=book["title"],
-                            author=", ".join(authors),
-                            authors=authors,
-                            source_type=self.TYPE,
-                            source_link=link
-                        )
-                    
+                        file_name=file_name,
+                        title=book["title"],
+                        author=authors_str,
+                        authors=authors_list,
+                        source_type=self.TYPE,
+                        source_link=link
+                    )
+
+    # -----------------------------
+    # Подсчет общего количества книг
+    # -----------------------------
+    async def get_total(self) -> int:
+        await asyncio.to_thread(self._load_completed_books)
+        total = 0
+
+        with RemoteBookScanner(self.folder, self._completed_books) as scanner:
+            archives = await asyncio.to_thread(scanner.list_archives)
+
+            for archive in archives:
+                archive_bytes = await asyncio.to_thread(scanner._read_archive, archive)
+                books_info = await asyncio.to_thread(self._parse, archive_bytes, archive)
+                total += sum(1 for book in books_info if not self._should_skip(book))
+
+        return total
+
+    # -----------------------------
+    # Получение данных книги
+    # -----------------------------
     async def enrich_book_data(self, book: Book):
-        book.data = await asyncio.to_thread(get_file_bytes_from_zip, book.source_link)
+        archive_name, file_name = book.source_link.split("/", 1)
+        with RemoteBookScanner(self.folder, self._completed_books) as scanner:
+            book.data = await asyncio.to_thread(scanner.get_book_data, archive_name, file_name)
         fb2 = FB2Book(book.data)
         fb2.enrich_book(book)
-
-    async def get_total(self) -> int:
-        self._load_completed_books()
-
-        total = 0
-        with zipfile.ZipFile(self.folder) as zipf:
-            for info in zipf.infolist():
-                if info.is_dir():
-                    continue
-
-                books = await asyncio.to_thread(
-                    self._parse, zipf, info.filename
-                )
-
-                for book in books:
-                    if self._should_skip(book):
-                        continue
-
-                    total += 1
-            
-        return total
