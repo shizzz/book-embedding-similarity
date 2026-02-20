@@ -98,11 +98,8 @@ class BookRegistry:
     books: list[Book]
     
     def __init__(self, books: list[Book] = None):
-        if books:
-            self.books = books
-            self._book_map = {book.id: book for book in books if book.id is not None}
-        else:
-            self.books: List[Book] = []
+        self.books = books if books else []
+        self._book_map = {book.id: book for book in self.books if book.id is not None}
 
     # --- container API ---
     def append(self, book: Book) -> None:

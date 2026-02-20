@@ -1,4 +1,3 @@
-import asyncio
 from asyncio import to_thread
 from typing import Tuple
 from app.workers import BaseWorker
@@ -6,7 +5,6 @@ from app.hnsw import IndexManager
 from app.model import Model, generate_embeddings
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action
-from app.common.types import TEntity
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
 class GenerateEmbeddingsWorker(BaseWorker):
