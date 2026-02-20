@@ -2,7 +2,7 @@ from typing import Literal
 from .bookSearchEngine import BaseBookSearchEngine
 from .zipBookSearchEngine import ZipBookSearchEngine
 from .inpSearchEngine import InpBookSearchEngine
-from app.settings.config import INPX_FOLDER, BOOK_FOLDER
+from app.settings.config import BOOK_FOLDER
 
 class BookSearchEngineFactory:
     ZIP = ZipBookSearchEngine.TYPE
@@ -15,6 +15,6 @@ class BookSearchEngineFactory:
         if engine_type == BookSearchEngineFactory.ZIP:
             return ZipBookSearchEngine(BOOK_FOLDER)
         if engine_type == BookSearchEngineFactory.INPIX:
-            return InpBookSearchEngine(INPX_FOLDER)
+            return InpBookSearchEngine(BOOK_FOLDER)
             
         raise ValueError(f"Unknown engine_type: {engine_type}")

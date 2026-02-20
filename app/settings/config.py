@@ -5,6 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 data_dir_env = os.environ.get("DATA_DIR")
 DATA_DIR = Path(data_dir_env) if data_dir_env else BASE_DIR.parent / "data"
+CACHE_DIR = DATA_DIR / "cache"
 
 SITE_BASE_PATH = os.getenv("SITE_BASE_PATH", "")
 LIB_URL = os.getenv("LIB_URL", "https://lib.some.ru")
@@ -15,7 +16,7 @@ RERANKER_FILE = Path(os.getenv("RERANKER_FILE", str(DATA_DIR / "reranker.lgb")))
 TRANSFORM_FILE = Path(os.getenv("TRANSFORM_FILE", str(DATA_DIR / "embedding_transform.npy")))
 
 BOOK_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/lib.rus.ec/")
-INPX_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/librusec_local_fb2.inpx")
+INPX_FOLDER = os.getenv("INPX_FOLDER","/mnt/data/librusec/lib/librusec_local_fb2.inpx")
 
 MAX_WORKERS = int(os.getenv("MAX_WORKERS","7"))
 
@@ -24,13 +25,10 @@ SIMILARS_PER_BOOK = int(os.getenv("SIMILARS_PER_BOOK","100"))
 DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE","20000"))
 
 
-MODEL_NAME: str = os.getenv(
-    "MODEL_NAME",
-    "sentence-transformers/all-MiniLM-L6-v2"
-)
-ST_CHUNK_SIZE: int = 1000  # безопасный размер для MiniLM-L6
-ST_OVERLAP: int = 200      # overlap между чанками
-ST_BATCH_SIZE: int = 128    # MiniLM позволяет большие batch
+MODEL_NAME: str = os.getenv("MODEL_NAME","intfloat/multilingual-e5-large")
+ST_CHUNK_SIZE: int = 2500  # максимально безопасный размер для multilingual-e5-large
+ST_OVERLAP: int = 300      # overlap для сохранения контекста между chunk
+ST_BATCH_SIZE: int = 8
 
 ST_MIN_CHARS: int = 3000
 ST_TARGET_CHARS: int = 16000

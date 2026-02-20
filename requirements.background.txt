@@ -1,7 +1,14 @@
+# PyTorch с поддержкой GTX 1060 (CUDA 11.8)
+torch==2.2.2+cu118
+torchvision==0.17.2+cu118
+torchaudio==2.2.2+cu118
+--extra-index-url https://download.pytorch.org/whl/cu118
+
 #model
 sentence-transformers>=5.2.0
 datasets>=4.5.0
 accelerate>=1.12.0
+protobuf>=6.33.5
 
 #workers
 openai>=2.20.0
@@ -9,8 +16,8 @@ requests>=2.32.5
 websockets>=16.0
 
 #search
-paramiko
-smbprotocol
+paramiko>=4.0.0
+smbprotocol>=1.16.0
 
 #ui
 rich>=14.2.0

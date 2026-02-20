@@ -1,3 +1,4 @@
+import torch
 from collections import defaultdict
 from app.models import Embedding, BookRegistry
 from .model import Model
@@ -31,6 +32,7 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
             convert_to_numpy=True,
             normalize_embeddings=True
         )
+        torch.cuda.empty_cache()
 
         # усредняем embeddings по каждой книге
         for idx, book in enumerate(registry):

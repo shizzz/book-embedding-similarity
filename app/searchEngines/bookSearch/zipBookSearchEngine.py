@@ -4,7 +4,7 @@ from app.db import db, BookRepository
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
-from sources.remote import RemoteBookScanner
+from app.searchEngines.sources import RemoteBookScanner
 
 
 class ZipBookSearchEngine(BaseBookSearchEngine):
@@ -32,12 +32,11 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
     async def search_books(self) -> AsyncGenerator[Book, None]:
         await self._completed_books_loaded.wait()
 
-        # используем RemoteBookScanner как контекстный менеджер
         with RemoteBookScanner(self.folder, self._completed_books) as scanner:
             archives = await asyncio.to_thread(scanner.list_archives)
 
             for archive in archives:
-                books = await asyncio.to_thread(scanner.scan_archive, archive)
+                books = await scanner.scan_archive(archive)
                 for file_name, archive_name in books:
                     yield Book(
                         file_name=file_name,
@@ -49,14 +48,15 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
     # Подсчет общего количества книг
     # -----------------------------
     async def get_total(self) -> int:
-        await asyncio.to_thread(self._load_completed_books)
+        await self._load_completed_books()
+        await self._completed_books_loaded.wait()
         total = 0
 
         with RemoteBookScanner(self.folder, self._completed_books) as scanner:
             archives = await asyncio.to_thread(scanner.list_archives)
 
             for archive in archives:
-                total += await asyncio.to_thread(scanner.archive_book_total, archive)
+                total += await scanner.archive_book_total(archive)
 
         return total
 
@@ -68,6 +68,6 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
         archive_name, file_name = book.source_link.split("/", 1)
 
         with RemoteBookScanner(self.folder, self._completed_books) as scanner:
-            book.data = await asyncio.to_thread(scanner.get_book_data, archive_name, file_name)
+            book.data = await scanner.get_book_data(archive_name, file_name)
             fb2 = FB2Book(book.data)
             fb2.enrich_book(book)

@@ -1,10 +1,13 @@
 import asyncio
+import os
+import zipfile
 from typing import AsyncGenerator
 from app.db import db, BookRepository
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
-from sources.remote import RemoteBookScanner
+from app.searchEngines.sources import RemoteBookScanner
+from app.settings.config import INPX_FOLDER
 
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
@@ -17,47 +20,49 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # -----------------------------
     # Загрузка уже обработанных книг
     # -----------------------------
-    def _load_completed_books(self):
+    async def _load_completed_books(self):
         try:
             with db() as conn:
                 self._completed_books = set(BookRepository.get_names(conn))
         finally:
-            loop = asyncio.get_running_loop()
-            loop.call_soon_threadsafe(self._completed_books_loaded.set)
+            self._completed_books_loaded.set()
 
     # -----------------------------
     # Парсинг одного файла внутри ZIP
     # -----------------------------
-    def _parse(self, zip_bytes, filename) -> list[dict]:
-        import zipfile
-        books = []
-        with zipfile.ZipFile(zip_bytes) as zipf:
-            data = zipf.read(filename)
-            content = data.decode("utf-8")
-            for line in content.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                fields = line.split('\x04')
-                while len(fields) <= 13:
-                    fields.append("")
+    def _parse(self, zipf: zipfile.ZipFile, filename: str):
+        data = zipf.read(filename)
 
-                books.append({
-                    "author": fields[0],
-                    "genere": fields[1],
-                    "title": fields[2],
-                    "series": fields[3],
-                    "serno": fields[4],
-                    "file": fields[5],
-                    "size": fields[6],
-                    "libid": fields[7],
-                    "deleted": fields[8] == "1",
-                    "ext": fields[9],
-                    "date": fields[10],
-                    "lang": fields[11],
-                    "librate": fields[12],
-                    "keywords": fields[13]
-                })
+        books = []
+        content = data.decode("utf-8", errors="ignore")
+        for line in content.splitlines():
+            line = line.strip()
+
+            if not line:
+                continue
+
+            fields = line.split('\x04')
+
+            while len(fields) <= 13:
+                fields.append("")
+
+            books.append({
+                "author": fields[0],
+                "genere": fields[1],
+                "title": fields[2],
+                "series": fields[3],
+                "serno": fields[4],
+                "file": fields[5],
+                "size": fields[6],
+                "libid": fields[7],
+                "deleted": fields[8] == "1",
+                "ext": fields[9],
+                "date": fields[10],
+                "lang": fields[11],
+                "librate": fields[12],
+                "keywords": fields[13],
+            })
+
         return books
 
     # -----------------------------
@@ -87,33 +92,36 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # Поиск книг (async)
     # -----------------------------
     async def search_books(self) -> AsyncGenerator[Book, None]:
-        await asyncio.to_thread(self._load_completed_books)
         await self._completed_books_loaded.wait()
 
-        # Используем RemoteBookScanner как контекстный менеджер
         with RemoteBookScanner(self.folder, self._completed_books) as scanner:
-            archives = await asyncio.to_thread(scanner.list_archives)
+            zipf = await scanner.open_zip(INPX_FOLDER)
+            
+            for info in zipf.infolist():
+                if info.is_dir():
+                    continue
 
-            for archive in archives:
-                archive_bytes = await asyncio.to_thread(scanner._read_archive, archive)
-                # Получаем список файлов внутри архива
-                books_info = await asyncio.to_thread(self._parse, archive_bytes, archive)
+                books = await asyncio.to_thread(
+                    self._parse, 
+                    zipf, 
+                    info.filename
+                )
 
-                for book in books_info:
+                archive_name = os.path.splitext(info.filename)[0] + ".zip"
+
+                for book in books:
                     if self._should_skip(book):
                         continue
 
-                    authors_list = self._parse_authors(book["author"])
-                    authors_str = ", ".join(authors_list)
-
-                    file_name = f'{book["file"]}.{book["ext"]}'
-                    link = f"{archive}/{file_name}"
+                    authors = self._parse_authors(book["author"])
+                    file_name = f"{book['file']}.{book['ext']}"
+                    link = f"{archive_name}/{file_name}"
 
                     yield Book(
                         file_name=file_name,
                         title=book["title"],
-                        author=authors_str,
-                        authors=authors_list,
+                        author=", ".join(authors),
+                        authors=authors,
                         source_type=self.TYPE,
                         source_link=link
                     )
@@ -122,18 +130,30 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # Подсчет общего количества книг
     # -----------------------------
     async def get_total(self) -> int:
-        await asyncio.to_thread(self._load_completed_books)
-        total = 0
-
+        await self._load_completed_books()
+        await self._completed_books_loaded.wait()
+        
         with RemoteBookScanner(self.folder, self._completed_books) as scanner:
-            archives = await asyncio.to_thread(scanner.list_archives)
+            zipf = await scanner.open_zip(INPX_FOLDER)
 
-            for archive in archives:
-                archive_bytes = await asyncio.to_thread(scanner._read_archive, archive)
-                books_info = await asyncio.to_thread(self._parse, archive_bytes, archive)
-                total += sum(1 for book in books_info if not self._should_skip(book))
+            total = 0
 
-        return total
+            for info in zipf.infolist():
+                if info.is_dir():
+                    continue
+
+                books = await asyncio.to_thread(
+                    self._parse,
+                    zipf,
+                    info.filename
+                )
+
+                for book in books:
+                    if self._should_skip(book):
+                        continue
+
+                    total += 1
+            return total
 
     # -----------------------------
     # Получение данных книги
@@ -141,6 +161,6 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     async def enrich_book_data(self, book: Book):
         archive_name, file_name = book.source_link.split("/", 1)
         with RemoteBookScanner(self.folder, self._completed_books) as scanner:
-            book.data = await asyncio.to_thread(scanner.get_book_data, archive_name, file_name)
+            book.data = await scanner.get_book_data(archive_name, file_name)
         fb2 = FB2Book(book.data)
         fb2.enrich_book(book)

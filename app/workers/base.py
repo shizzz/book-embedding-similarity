@@ -70,6 +70,14 @@ class BaseWorker(ABC, Generic[TEntity]):
     def save_to_db(self, task: Task) -> int:
         pass
 
+    async def enqueue_shutdown_signals_async(self):
+        for _ in range(self.max_workers):
+            await self.queue.put(None)
+
+    async def enqueue_shutdown_signals(self):
+        for _ in range(self.max_workers):
+            await self.queue.put_nowait(None)
+
     async def run(self):
         self.logger.info("Prepare...")
         self._db_save_enabled = self._is_overridden("save_to_db")
@@ -149,11 +157,11 @@ class BaseWorker(ABC, Generic[TEntity]):
             if self._cancellation_token.is_set():
                 return
             
-            try:
-                task = self.queue.get_nowait()
-            except asyncio.QueueEmpty:
-                await asyncio.sleep(1)
-                continue
+            task = await self.queue.get()
+
+            if task is None:
+                self.queue.task_done()
+                return
 
             try:
                 if self.show_ui:

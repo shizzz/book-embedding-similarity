@@ -86,6 +86,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
                         action=Action.INSERT
                     )
                 )
+        await self.enqueue_shutdown_signals_async()
         self._queue_pulled = True
 
     def save_to_db(self, conn, task: Task) -> int:

@@ -24,19 +24,21 @@ class Model:
 
         model_dir.mkdir(parents=True, exist_ok=True)
         if os.path.exists(model_path):
-            self.transformer = SentenceTransformer(
-                model_name_or_path=str(model_path),
-                tokenizer_kwargs={"fix_mistral_regex": True}
-            )
+            self.load_local_model(model_path)
         else:
-            self.transformer = SentenceTransformer(
-                MODEL_NAME,
-                tokenizer_kwargs={"fix_mistral_regex": True}
-            )
-            self.transformer.save(str(model_path))
+            transformer = SentenceTransformer(MODEL_NAME)
+            transformer.save(str(model_path))
+            del transformer
+            self.load_local_model(model_path)
             
         self.uid = self.get_model_uid()
     
+    def load_local_model(self, model_path: str):
+        self.transformer = SentenceTransformer(
+            model_name_or_path=str(model_path),
+            #tokenizer_kwargs={"fix_mistral_regex": True}
+        )
+
     @staticmethod
     def get_book_text(book: Book) -> str:
         engine = BookSearchEngineFactory.create(book.source_type)

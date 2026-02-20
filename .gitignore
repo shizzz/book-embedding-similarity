@@ -10,5 +10,6 @@ __pycache__
 .docker-compose.yml
 reranker.lgb
 data/models
+data/cache
 build
 dist
