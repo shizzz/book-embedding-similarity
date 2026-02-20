@@ -1,6 +1,6 @@
+import numpy as np
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterable, Iterator
-from .embedding import Embedding
+from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
 
 @dataclass
 class Book:
@@ -13,7 +13,7 @@ class Book:
     source_type: Optional[str]
     source_link: Optional[str]
     uid: str = None
-    embedding: Embedding = None
+    embedding: np.ndarray = None
     model_id: str = None
     text: str = None
     source_length: int = 0
@@ -31,7 +31,7 @@ class Book:
             data: bytes = None,
             source_type: str = None,
             source_link: str = None,
-            embedding: Embedding = None,
+            embedding: np.ndarray = None,
             model_id: str = None):
         self.id = id
         self.file_name = file_name
@@ -61,13 +61,6 @@ class Book:
             )
         else:
             return None
-
-    @property
-    def embedding_bytes(self) -> Optional[bytes]:
-        if self.embedding is None:
-            return None
-        
-        return self.embedding.to_db()
     
     @classmethod
     def map_row(cls, row) -> "Book":
@@ -107,12 +100,15 @@ class BookRegistry:
     def __init__(self, books: list[Book] = None):
         if books:
             self.books = books
+            self._book_map = {book.id: book for book in books if book.id is not None}
         else:
             self.books: List[Book] = []
 
     # --- container API ---
     def append(self, book: Book) -> None:
         self.books.append(book)
+        if book.id is not None:
+            self._book_map[book.id] = book
 
     def clear(self) -> None:
         self.books.clear()
@@ -137,3 +133,6 @@ class BookRegistry:
     @property
     def embeddings(self):
         yield from (book.embedding for book in self.books)
+
+    def get(self, book_id: int) -> Optional["Book"]:
+        return self._book_map.get(book_id)

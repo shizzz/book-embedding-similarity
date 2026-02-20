@@ -1,8 +1,8 @@
 from typing import Literal
-from app.hnsw import HNSW
+from app.hnsw import IndexManager
 from app.hnsw.rerankers import LightGBMReranker
 from app.db import db, BookRepository
-from app.models import Book
+from app.models import Book, BookRegistry
 from .similarSearchEngine import SimilarSearchEngine
 from .indexSimilarSearchEngine import IndexSimilarSearchEngine
 from .bruteforceSimilarSearchEngine import BruteforceSimilarSearchEngine
@@ -22,7 +22,7 @@ class SimilarSearchEngineFactory:
         step_percent: int = 5,
     ) -> SimilarSearchEngine:
         if mode == SimilarSearchEngineFactory.INDEX:
-            hnsw = HNSW()
+            hnsw = IndexManager()
             index = hnsw.load_from_file()
 
             with db() as conn:
@@ -34,7 +34,7 @@ class SimilarSearchEngineFactory:
             return IndexSimilarSearchEngine(
                 reranker=LightGBMReranker(),
                 index=index,
-                books=books,
+                books=BookRegistry(books),
                 limit=limit,
                 exclude_same_authors=exclude_same_authors,
                 step_percent=step_percent,

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Tuple
-from app.models import Book, Embedding
+from app.models import Book
 from app.hnsw.rerankers import Reranker
 from app.db import db, BookRepository
 from .similarSearchEngine import SimilarSearchEngine
@@ -20,7 +20,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
     def search(
         self,
         source: Book,
-        embedding: Embedding,
+        embedding: np.ndarray,
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         with db() as conn:
@@ -33,7 +33,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
             for row in BookRepository.get_all_with_embeddings(conn):
                 current += 1
 
-                book_id, book, title, _, _, _, embedding_bytes = row
+                book_id, book, title, _, _, _, emb_norm = row
 
                 if self._should_skip(
                     source=source,
@@ -44,8 +44,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
                     continue
 
                 try:
-                    emb_norm = Embedding.from_db(embedding_bytes)
-                    score = np.dot(emb_norm.vec, embedding.vec)
+                    score = np.dot(emb_norm, embedding)
 
                     candidates.append((score, book_id))
 

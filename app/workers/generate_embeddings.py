@@ -2,7 +2,7 @@ import asyncio
 from asyncio import to_thread
 from typing import Tuple
 from app.workers import BaseWorker
-from app.hnsw import HNSW
+from app.hnsw import IndexManager
 from app.model import Model, generate_embeddings
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action
@@ -14,7 +14,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.hnsw = HNSW(batch_size=10000)
+        self.hnsw = IndexManager(batch_size=10000)
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX)
         self._get_book_idx: int = None
         self._book_id: int = 1

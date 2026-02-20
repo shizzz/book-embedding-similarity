@@ -6,7 +6,7 @@ from typing import Dict, Tuple
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
 from app.db import db, FeedbackRepository, BookRepository, SimilarRepository, EmbeddingsRepository
-from app.models import Feedbacks, Book, Embedding
+from app.models import Feedbacks, Book
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.utils import FB2Book
 from app.settings.config import MODEL_NAME, DATA_DIR, TRANSFORM_FILE
@@ -138,7 +138,7 @@ class Model:
                 if old_emb is None:
                     continue
 
-                old_norm_emb = Embedding.from_db(old_emb)
+                old_norm_emb = old_emb
 
                 text = self.transformer.get_book_text(book)
                 new_emb = self.transformer.encode(text)

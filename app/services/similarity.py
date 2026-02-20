@@ -1,9 +1,10 @@
 import time
 import asyncio
+import numpy as np
 from typing import Optional, List, Tuple
 
 from app.db import db, SimilarRepository
-from app.models import Book, Embedding
+from app.models import Book
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 
@@ -40,7 +41,7 @@ class Similarity:
     def compute_similar(
         self, 
         book: Book,
-        embedding_bytes: bytes,
+        embedding: np.ndarray,
         limit: int,
         exclude_same_author: bool
     ):
@@ -55,7 +56,7 @@ class Similarity:
             service = SimilarSearchService(
                 engine=engine,
                 source=book,
-                embedding=Embedding.from_db(embedding_bytes)
+                embedding=embedding
             )
 
             similars = service.run(

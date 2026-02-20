@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import time
 from typing import List, Tuple
-from app.models import Similar, Embedding, Book
+from app.models import Similar, Book
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository
@@ -58,15 +58,14 @@ async def main(args=None):
             print(f"Книга {args.file_name} не найдена в реестре")
             return
         
-        embedding_bytes = EmbeddingsRepository.get(conn, book_task.id)
+        embedding = EmbeddingsRepository.get(conn, book_task.id)
 
-    if embedding_bytes is None:
+    if embedding is None:
         print(f"У книги {args.file_name} не сгенерирован вектор")
         return
         
     
     print(f"Поиск TOP({limit}) книг похожих на \"{book_task.title}\" {book_task.file_name}")
-    embedding = Embedding.from_db(embedding_bytes)
 
     mode = getattr(args, "mode", SimilarSearchEngineFactory.BRUTEFORCE)
     compare = getattr(args, "compare", False)

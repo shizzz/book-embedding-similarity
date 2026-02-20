@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Tuple
 from app.hnsw.rerankers import Reranker
-from app.models import Book, Embedding
+from app.models import Book
 
 class SimilarSearchEngine:
     def __init__(self, exclude_same_authors: bool, reranker: Reranker = None):
@@ -73,7 +73,7 @@ class SimilarSearchEngine:
     def search(
         self,
         source: Book,
-        embedding: Embedding,
+        embedding: np.ndarray,
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         raise NotImplementedError()

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS books (
 
 CREATE TABLE IF NOT EXISTS embeddings (
     book_id INTEGER PRIMARY KEY,
-    embedding BLOB,
+    embedding NUMPY,
     model CHAR(32) NOT NULL,
     source_length INTEGER NULL,
     token_length INTEGER NULL,

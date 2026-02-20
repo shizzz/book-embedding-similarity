@@ -1,3 +1,3 @@
-from .hnsw import HNSW
+from .hnsw import IndexManager
 
-__all__ = ["HNSW"]
+__all__ = ["IndexManager"]

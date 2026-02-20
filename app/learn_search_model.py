@@ -3,9 +3,9 @@ import tqdm
 import argparse
 import numpy as np
 from typing import Tuple
-from app.hnsw import HNSW
+from app.hnsw import IndexManager
 from app.model import Model
-from app.models import Book, Feedbacks, Embedding
+from app.models import Book, Feedbacks
 from app.hnsw.trainers import LightGBMRerankerTrainer
 from app.db import db, FeedbackRepository, EmbeddingsRepository, BookRepository
 from app.settings.config import LIB_URL, MODEL_NAME
@@ -42,7 +42,7 @@ def get_data() -> Tuple[list[Tuple[int, bytes]], Feedbacks, list[Book]]:
 
 def learn_hnsw(embeddings, feedbacks, books):
     print(f"Обновление поисковой модели")
-    hnsw = HNSW(
+    hnsw = IndexManager(
         batch_size=10000,
         reranker_trainer=LightGBMRerankerTrainer()
     )
@@ -73,7 +73,7 @@ def update_embeddings(model: Model, embeddings: list[Tuple[int, bytes]]):
         unit_scale=True
     ) as pbar, db() as conn:
             for book_id, new_emb in zip(ids, new_emb_array):
-                EmbeddingsRepository.update(conn, book_id, Embedding(new_emb).to_db())
+                EmbeddingsRepository.update(conn, book_id, new_emb)
                 pbar.update(1)
 
 def add_args(parser: argparse.ArgumentParser):

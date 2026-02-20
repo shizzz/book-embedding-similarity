@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Sequence, Tuple
-from app.models import Book, Embedding
+from app.models import Book, BookRegistry
 from app.hnsw.rerankers import Reranker
 from .similarSearchEngine import SimilarSearchEngine
 
@@ -17,7 +17,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
     ):
         super().__init__(exclude_same_authors, reranker)
         self.index = index
-        self.books = list[Book](books)
+        self.books = BookRegistry(books)
         self._limit = limit
         self.reranker = reranker
         self._step_percent = step_percent
@@ -26,7 +26,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
     def search(
         self,
         source: Book,
-        embedding: Embedding,
+        embedding: np.ndarray,
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         seen_books: set[tuple[str, tuple[str, ...]]] = set()
@@ -35,17 +35,20 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
         step = max(1, self.index.ntotal * self._step_percent // 100)
 
-        query = embedding.vec.reshape(1, -1).astype(np.float32)
+        query = embedding.reshape(1, -1).astype(np.float32)
         k = min(self._limit * 10 + 200, self.index.ntotal)
         scores, indices = self.index.search(query, k)
 
         candidates: List[Tuple[float, Book]] = []
 
-        for score_raw, idx in zip(scores[0], indices[0]):
-            if idx == -1 or idx < 0 or idx >= len(self.books):
+        for score_raw, book_id in zip(scores[0], indices[0]):
+            if book_id == -1:
                 continue
 
-            candidate = self.books[idx]
+            candidate = self.books.get(book_id)
+
+            if candidate is None:
+                continue
 
             if self._should_skip(
                 source=source,
@@ -58,8 +61,8 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
             candidates.append((score_raw, candidate))
 
-            if progress_callback and idx % step == 0:
-                percent = min(99, idx * 100 // self.index.ntotal)
+            if progress_callback and book_id % step == 0:
+                percent = min(99, book_id * 100 // self.index.ntotal)
                 progress_callback(percent)
 
         reranked = self._rerank(candidates=candidates)

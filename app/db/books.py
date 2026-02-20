@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Generator, Tuple
+import numpy as np
 
 class BookRepository:
     GET_QUERY = """
@@ -20,7 +21,7 @@ class BookRepository:
             yield (tuple[Any, ...](row))
 
     @staticmethod
-    def get_all_with_embeddings(conn) -> Generator[Tuple[int, str, str, str, str, str, bytes]]:
+    def get_all_with_embeddings(conn) -> Generator[Tuple[int, str, str, str, str, str, np.ndarray]]:
         cursor = conn.execute("""
         SELECT
             b.id,

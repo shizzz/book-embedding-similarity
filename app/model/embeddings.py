@@ -1,6 +1,6 @@
 import torch
 from collections import defaultdict
-from app.models import Embedding, BookRegistry
+from app.models import BookRegistry
 from .model import Model
 from app.settings.config import ST_CHUNK_SIZE, ST_OVERLAP, ST_BATCH_SIZE
 
@@ -43,7 +43,7 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
             chunks_embedding = embeddings_chunks[chunk_indices]
             final_embedding = chunks_embedding.mean(axis=0)
 
-            book.embedding = Embedding(final_embedding)
+            book.embedding = final_embedding
             book.model_id = model.uid
 
         return registry

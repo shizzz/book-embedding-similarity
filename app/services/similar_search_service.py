@@ -1,6 +1,7 @@
 import time
+import numpy as np
 from typing import List, Tuple
-from app.models import Book, Embedding
+from app.models import Book
 from app.db import db, BookRepository
 from app.searchEngines.similarSearch import SimilarSearchEngine
 
@@ -9,7 +10,7 @@ class SimilarSearchService:
         self,
         engine: SimilarSearchEngine,
         source: Book,
-        embedding: Embedding
+        embedding: np.ndarray
     ):
         self._engine = engine
         self._source = source
