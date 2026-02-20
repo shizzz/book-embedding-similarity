@@ -1,13 +1,13 @@
 from asyncio import to_thread
 from typing import Tuple
-from app.workers import BaseWorker
+from app.workers.base import BaseDbQueueWorker
 from app.hnsw import IndexManager
 from app.model import Model, generate_embeddings
 from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
-class GenerateEmbeddingsWorker(BaseWorker):
+class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     MAX_BOOK_BATCH_SIZE: int = 500
 
     def __init__(self, **kwargs):
@@ -54,10 +54,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
     async def pull_queue(self) -> None:
         registry = BookRegistry()
-        async for book in self.engine.search_books():         
-            if self._cancellation_token.is_set():
-                return
-        
+        async for book in self.engine.search_books():       
             await self.engine.enrich_book_data(book)
             book.id = self._book_id
             self._book_id += 1
@@ -70,11 +67,11 @@ class GenerateEmbeddingsWorker(BaseWorker):
                 await self.queue.put(
                     Task(
                             name=f"{book.source_link} ({batch_size})", 
-                            entity=registry.copy(),
+                            entity=registry,
                             action=Action.INSERT
                         )
                     )
-                registry.clear()
+                registry = BookRegistry()
             
         if len(registry) > 0:                
             await self.queue.put(

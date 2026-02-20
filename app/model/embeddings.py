@@ -45,5 +45,5 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
 
             book.embedding = final_embedding
             book.model_id = model.uid
-
+            
         return registry

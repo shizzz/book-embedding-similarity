@@ -1,14 +1,14 @@
 import asyncio
 from asyncio import to_thread
-from typing import List, Tuple
-from app.workers import BaseWorker
+from typing import List
+from app.workers.base import BaseDbQueueWorker
 from app.services import BulkSimilarSearchService
 from app.models import Task, Book, Task, TaskResult, Action
 from app.db import db, BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK
 
-class GenerateSimilarWorker(BaseWorker):
+class GenerateSimilarWorker(BaseDbQueueWorker):
     _service: BulkSimilarSearchService
     _limit: int = SIMILARS_PER_BOOK
 
@@ -72,12 +72,16 @@ class GenerateSimilarWorker(BaseWorker):
             )
 
         del books_with_embeddings
+        await self.enqueue_shutdown_signals_async()
+
+    async def pull_queue(self) -> None:
+        self._queue_pulled = True
 
     async def get_total(self) -> int:
         return self._task_total
     
     async def fin(self) -> None:
-        return
+        pass
 
     def save_to_db(self, conn, task: Task) -> int:
         SimilarRepository.save(conn, task.entity)
