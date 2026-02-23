@@ -79,7 +79,7 @@ class DbQueue(Generic[TEntity]):
             total = sum(len(task.entity) for task in buffer)
 
             if total >= self._queue_batch_size or task is None:
-                done = await asyncio.to_thread(self._save, list(buffer))
+                done = await asyncio.to_thread(self._save, buffer.copy())
                 await self._ui.done_async(self._queue_progress_idx, done)
                 for t in buffer:
                     del t.entity

@@ -8,7 +8,7 @@ from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
 class GenerateEmbeddingsWorker(BaseDbQueueWorker):
-    MAX_BOOK_BATCH_SIZE: int = 500
+    MAX_BOOK_BATCH_SIZE: int = 100
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -16,7 +16,6 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX)
         self._get_book_idx: int = None
         self._book_id: int = 1
-        self._db_queue_batch_size = 100
 
         self._model = Model()
 
@@ -72,6 +71,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                         )
                     )
                 registry = BookRegistry()
+                del book
             
         if len(registry) > 0:                
             await self.queue.put(
