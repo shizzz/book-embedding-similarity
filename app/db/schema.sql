@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE TABLE IF NOT EXISTS embeddings (
     book_id INTEGER PRIMARY KEY,
     embedding NUMPY,
+    source_text TEXT,
     model CHAR(32) NOT NULL,
     source_length INTEGER NULL,
     token_length INTEGER NULL,
