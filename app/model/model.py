@@ -202,7 +202,7 @@ class Model:
             # безопасное эмпирическое потребление на один chunk
             mem_per_chunk_mb = self._estimate_mem_per_chunk_mb(self.transformer.max_seq_length)
 
-            batch_size = max(1, int(free_vram_mb * 0.7 / mem_per_chunk_mb))  # margin 30%
+            batch_size = max(1, int(free_vram_mb * 0.9 / mem_per_chunk_mb))  # margin 10%
             
             # если используем многопоточность, делим batch на количество потоков
             if hasattr(self, "_threads") and self._threads > 1:
@@ -230,8 +230,18 @@ class Model:
         bytes_per_param = 2 if dtype in (torch.float16, torch.bfloat16) else 4
 
         # attention + intermediates coefficient
-        K = 4.0
+        K = 1.87
 
         mem_bytes = seq_len_tokens * hidden * layers * bytes_per_param * K
 
-        return mem_bytes / (1024 ** 2)
+        return mem_bytes / (1024 ** 2)  
+    
+    def _measure_mem_per_chunk(self):
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+
+        dummy = ["test"] * 32
+        self.transformer.encode(dummy, convert_to_numpy=True)
+        peak = torch.cuda.max_memory_allocated()
+
+        return peak / 32 / (1024**2)
