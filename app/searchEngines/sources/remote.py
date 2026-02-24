@@ -169,11 +169,11 @@ class RemoteBookScanner:
                 self._archive_locks[archive_name] = lock
 
             async with lock:
-                await asyncio.to_thread(
-                    self._download_archive,
-                    archive_name,
-                    local_path
+                url = os.path.join(
+                    self._remote_path,
+                    archive_name
                 )
+                await self._download_archive(url, local_path)
 
         return local_path
 
