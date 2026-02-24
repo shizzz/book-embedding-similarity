@@ -2,6 +2,7 @@ import torch
 from collections import defaultdict
 from app.models import BookRegistry
 from .model import Model
+from app.settings.config import ST_CHUNK_SIZE, ST_OVERLAP, ST_BATCH_SIZE
 
 def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
         all_chunks = []
@@ -15,11 +16,11 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
 
             start = 0
             while start < len(text):
-                end = start + model.st_chunk_size
+                end = start + ST_CHUNK_SIZE
                 chunk = text[start:end]
                 all_chunks.append(chunk)
                 book_to_chunks[idx].append(len(all_chunks) - 1)
-                start += model.st_chunk_size - model.st_overlap
+                start += ST_CHUNK_SIZE - ST_OVERLAP
 
         if not all_chunks:
             return registry
@@ -27,7 +28,7 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
         # кодируем все chunks батчами
         embeddings_chunks = model.transformer.encode(
             all_chunks,
-            batch_size=model.st_batch_size,
+            batch_size=ST_BATCH_SIZE,
             convert_to_numpy=True,
             normalize_embeddings=True
         )

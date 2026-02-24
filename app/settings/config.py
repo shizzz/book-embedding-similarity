@@ -26,6 +26,9 @@ DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE",20000))
 
 
 MODEL_NAME: str = os.getenv("MODEL_NAME","intfloat/multilingual-e5-large")
+ST_CHUNK_SIZE: int  = int(os.getenv("ST_CHUNK_SIZE",2500))
+ST_OVERLAP: int = int(os.getenv("ST_OVERLAP",300))
+ST_BATCH_SIZE: int = int(os.getenv("ST_BATCH_SIZE",8))
 
 ST_MIN_CHARS: int = int(os.getenv("ST_MIN_CHARS",3000))
 ST_TARGET_CHARS: int = int(os.getenv("ST_TARGET_CHARS",16000))

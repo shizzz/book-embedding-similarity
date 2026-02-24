@@ -268,10 +268,10 @@ class RemoteBookScanner:
             return await asyncio.to_thread(_read, z)
     
     async def open_zip(self, archive_url: str) -> zipfile.ZipFile:
-        if self._is_remote:     
-            remote = urlparse(archive_url)
-            archive_name = RemoteBookScanner._get_filename(archive_url)
+        remote = urlparse(archive_url)
+        archive_name = RemoteBookScanner._get_filename(archive_url)
 
+        if self._is_remote:     
             local_path = os.path.join(
                 self._cache_dir,
                 archive_name
@@ -286,10 +286,8 @@ class RemoteBookScanner:
                 if not os.path.exists(local_path):
                     await self._download_archive(remote.path, local_path)
         else:
-            local_path = os.path.join(
-                self.folder,
-                archive_name
-            )
+            local_path = archive_url
+            
         return zipfile.ZipFile(local_path)
         
     @asynccontextmanager
