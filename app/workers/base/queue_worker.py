@@ -76,4 +76,4 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
         total = await self.get_total()
         
         if self.show_ui:
-            await self.ui.update_total(total)
+            await self.ui.update_total_async(total)

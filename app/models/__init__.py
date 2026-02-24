@@ -1,5 +1,5 @@
 from .book import Book, BookRegistry
-from .task import Task, TaskResult, Action
+from .task import Task, TaskResult, Action, Dataset
 from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar
 
@@ -9,6 +9,7 @@ __all__ = [
     "Task",
     "TaskResult",
     "Action",
+    "Dataset",
     "FeedbackReq",
     "Feedback",
     "Feedbacks",

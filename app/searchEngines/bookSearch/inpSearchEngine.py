@@ -2,7 +2,7 @@ import asyncio
 import os
 import zipfile
 from typing import AsyncGenerator
-from app.db import db, BookRepository
+from app.workers.sources.ui import StatsUI
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
@@ -12,20 +12,10 @@ from app.settings.config import INPX_FOLDER
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
 
-    def __init__(self, folder: str):
+    def __init__(self, folder: str, ui: StatsUI = None):
         self.folder = folder
-        self._completed_books: set[str] = set()
-        self._completed_books_loaded = asyncio.Event()
-
-    # -----------------------------
-    # Загрузка уже обработанных книг
-    # -----------------------------
-    async def _load_completed_books(self):
-        try:
-            with db() as conn:
-                self._completed_books = set(BookRepository.get_names(conn))
-        finally:
-            self._completed_books_loaded.set()
+        self.ui = ui
+        self._locks: dict[str, asyncio.Lock] = {}
 
     # -----------------------------
     # Парсинг одного файла внутри ZIP
@@ -84,17 +74,13 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     def _should_skip(self, book: dict) -> bool:
         if book["lang"] != "ru" or book["deleted"] or not book["file"]:
             return True
-        if f'{book["file"]}.{book["ext"]}' in self._completed_books:
-            return True
         return False
 
     # -----------------------------
     # Поиск книг (async)
     # -----------------------------
     async def search_books(self) -> AsyncGenerator[Book, None]:
-        await self._completed_books_loaded.wait()
-
-        with RemoteBookScanner(self.folder, self._completed_books) as scanner:
+        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
             zipf = await scanner.open_zip(INPX_FOLDER)
             
             for info in zipf.infolist():
@@ -130,10 +116,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # Подсчет общего количества книг
     # -----------------------------
     async def get_total(self) -> int:
-        await self._load_completed_books()
-        await self._completed_books_loaded.wait()
-        
-        with RemoteBookScanner(self.folder, self._completed_books) as scanner:
+        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
             zipf = await scanner.open_zip(INPX_FOLDER)
 
             total = 0
@@ -160,7 +143,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # -----------------------------
     async def enrich_book_data(self, book: Book):
         archive_name, file_name = book.source_link.split("/", 1)
-        with RemoteBookScanner(self.folder, self._completed_books) as scanner:
+        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
             data = await scanner.get_book_data(archive_name, file_name)
         fb2 = FB2Book(data)
         fb2.enrich_book(book)

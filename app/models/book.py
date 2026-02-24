@@ -2,6 +2,12 @@ import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
 
+def safe_get(row, key, default=None):
+    try:
+        return row[key]
+    except (KeyError, IndexError, TypeError):
+        return default
+
 @dataclass
 class Book:
     id: Optional[int]
@@ -32,7 +38,8 @@ class Book:
             source_type: str = None,
             source_link: str = None,
             embedding: np.ndarray = None,
-            model_id: str = None):
+            model_id: str = None,
+            text: str = None):
         self.id = id
         self.file_name = file_name
         self.title = title
@@ -42,6 +49,7 @@ class Book:
         self.source_link = source_link
         self.embedding = embedding
         self.model_id = model_id
+        self.text = text
 
         if authors == None and author != None:
             self.authors = self._parse_authors(author)
@@ -56,8 +64,11 @@ class Book:
                 file_name=row["book"],
                 title=row["title"],
                 author=row["author"],
-                source_type=row["source_type"],
-                source_link=row["source_link"],
+                source_type=safe_get(row, "source_type"),
+                source_link=safe_get(row, "source_link"),
+                embedding=safe_get(row, "embedding"),
+                text=safe_get(row, "source_text"),
+                model_id=safe_get(row, "model"),
             )
         else:
             return None

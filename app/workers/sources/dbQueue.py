@@ -45,7 +45,7 @@ class DbQueue(Generic[TEntity]):
     async def put(self, done: int, task: Task):
         self._queue_total += done
         await self.queue.put(task)
-        await self._ui.update_total(
+        await self._ui.update_total_async(
             idx=self._queue_progress_idx,
             total=self._queue_total
         )

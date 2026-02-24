@@ -10,8 +10,11 @@ from rich.progress import (
     TextColumn,
     TimeRemainingColumn,
     TimeElapsedColumn,
+    TaskProgressColumn,
     TaskID
 )
+from collections import deque
+from time import perf_counter
 
 from app.settings.config import MAX_WORKERS
 
@@ -23,6 +26,7 @@ class StatsUI:
         self._label = title
         self._bars: Dict[int, Progress] = {}
         self._tasks: Dict[int, TaskID] = {}
+        self._speed_history = {} 
 
         self.stats = {
             "Total": 0,
@@ -35,7 +39,7 @@ class StatsUI:
 
         self.lock = asyncio.Lock()
         self.console = Console()
-        self.add_progress("Прогресс анализа книг", "Книг")
+        self.add_progress("Прогресс анализа книг", "книг", True)
 
     def _make_table(self) -> Table:
         table = Table(title=self._label, expand=True)
@@ -54,6 +58,42 @@ class StatsUI:
             info.append(f"{key}: {self.stats[key]}\n")
         return info
 
+    def _compute_speed(self, idx: int, count: int) -> str:
+        now = perf_counter()
+
+        if idx not in self._speed_history:
+            self._speed_history[idx] = {
+                "deque": deque(maxlen=10),
+                "total_count": 0.0
+            }
+
+        data = self._speed_history[idx]
+        dq = data["deque"]
+
+        # если deque заполнен, вычитаем count старого элемента
+        if len(dq) == dq.maxlen:
+            _, old_count = dq[0]
+            data["total_count"] -= old_count
+
+        dq.append((now, count))
+        data["total_count"] += count
+
+        # скорость = сумма / разница во времени между первым и последним элементом
+        if len(dq) > 1:
+            total_time = dq[-1][0] - dq[0][0]
+            speed = data["total_count"] / total_time if total_time > 0 else 0
+        else:
+            speed = 0
+
+        if speed >= 10:
+            speed_fmt = f"{speed:.0f}"
+        elif speed >= 1:
+            speed_fmt = f"{speed:.1f}"
+        else:
+            speed_fmt = f"{speed:.2f}"
+
+        return speed_fmt
+        
     def layout(self) -> Table:
         grid = Table.grid(expand=True)
         grid.add_row(self._make_table())
@@ -78,19 +118,29 @@ class StatsUI:
         self.live.update(self.layout())
 
     async def done_async(self, idx: int = 0, count: int = 1):
+        speed = self._compute_speed(idx, count)
         async with self.lock:
             if idx == 0:
                 self.stats["Done"] += count
                 self.stats["Remaining"] -= count
 
-            self._bars[idx].update(task_id=self._tasks[idx], advance=count)
+            self._bars[idx].update(
+                task_id=self._tasks[idx],
+                advance=count,
+                custom_speed=speed
+            )
             self.live.update(self.layout())
 
     def done(self, idx: int = 0, count: int = 1):
-        self._bars[idx].update(task_id=self._tasks[idx], advance=count)
+        speed = self._compute_speed(idx, count)
+        self._bars[idx].update(
+            task_id=self._tasks[idx], 
+            advance=count,
+            custom_speed=speed
+        )
         self.live.update(self.layout())
 
-    async def update_total(self, total: int, idx: int = 0):
+    async def update_total_async(self, total: int, idx: int = 0):
         async with self.lock:
             if idx == 0:
                 old_total = self.stats["Total"]
@@ -101,6 +151,19 @@ class StatsUI:
 
             self._bars[idx].update(self._tasks[idx], total=total)
 
+    def update_total(self, total: int, idx: int = 0):
+        self._bars[idx].update(self._tasks[idx], total=total)
+
+    async def decrease_total_async(self, decrease: int = 1):
+        async with self.lock:
+            old_total = self.stats["Total"]
+            total = old_total - decrease
+
+            self.stats["Total"] = total
+            self.stats["Remaining"] -= decrease
+
+            self._bars[0].update(self._tasks[0], total=total)
+
     async def error(self, idx: int = 0):
         async with self.lock:
             self.stats["Errors"] += 1
@@ -108,31 +171,55 @@ class StatsUI:
         self._bars[idx].update(self._tasks[idx], advance=1)
         self.live.update(self.layout())
 
-    def add_progress(self, descr: str, unit: str) -> int:
+    def add_progress(
+            self,
+            descr: str, 
+            unit: str,
+            show_elapsed: bool = False
+        ) -> int:
         idx = max(self._bars.keys(), default=-1) + 1
 
-        self._bars[idx] = Progress(  
-            TextColumn(
-                "[bold cyan]{task.description:>20}",
-                justify="left",
-            ),
+        fixed_len = 25
+        descr_fixed = descr.ljust(fixed_len)[:fixed_len]
+
+        columns = [
+            TextColumn("[bold cyan]{task.description:>20}", justify="left"),
             BarColumn(bar_width=40),
+            TextColumn("{task.completed:>6}/{task.total:<6}", justify="right"),
+            TaskProgressColumn(),
             TextColumn(
-                "{task.completed:>6}/{task.total:<6}",
-                justify="right"
-            ),    
-            TextColumn(
-                "{task.speed} {task.fields[unit]}/с",
+                "{task.fields[custom_speed]} {task.fields[unit]}/с",
                 justify="right",
             ),
             TimeRemainingColumn(),
-            TimeElapsedColumn(),
-        )
+        ]
+        if show_elapsed:
+            columns.append(TimeElapsedColumn())
+
+        self._bars[idx] = Progress(*columns)
 
         self._tasks[idx] = self._bars[idx].add_task(
-            description=f"[bold green]{descr}",
+            description=f"[bold green]{descr_fixed}",
             total=0,
             unit=unit,
+            custom_speed=0
         )
 
         return idx
+    
+    def remove_progress(self, idx: int) -> None:
+        if idx not in self._bars:
+            return
+
+        bar = self._bars[idx]
+
+        try:
+            bar.stop()
+        except Exception:
+            pass
+
+        del self._bars[idx]
+
+        if idx in self._tasks:
+            del self._tasks[idx]
+        self.live.update(self.layout())

@@ -13,6 +13,21 @@ class BookRepository:
         b.source_link
     FROM books b
     """
+
+    GET_FULL_QUERY = """
+    SELECT
+        b.id,
+        b.book,
+        b.title,
+        b.author,
+        b.source_type,
+        b.source_link,
+        e.embedding,
+        e.source_text,
+        e.model
+    FROM books b
+    JOIN embeddings e ON e.book_id = b.id
+    """
     
     @staticmethod
     def get_all(conn) -> Any:
@@ -41,6 +56,11 @@ class BookRepository:
     @staticmethod
     def get_by_file(conn, book: str) -> Any:
         row = conn.execute(f"{BookRepository.GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
+        return row if row else None
+
+    @staticmethod
+    def get_full_by_file(conn, book: str) -> Any:
+        row = conn.execute(f"{BookRepository.GET_FULL_QUERY} WHERE b.book = ?",(book,)).fetchone()
         return row if row else None
     
     @staticmethod
@@ -108,7 +128,7 @@ class BookRepository:
 
         cursor.executemany(
             """
-            INSERT INTO books (id, book, uid, title, author, added_at, source_type, source_link)
+            INSERT OR REPLACE INTO books (id, book, uid, title, author, added_at, source_type, source_link)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [

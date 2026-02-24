@@ -18,7 +18,7 @@ TRANSFORM_FILE = Path(os.getenv("TRANSFORM_FILE", str(DATA_DIR / "embedding_tran
 BOOK_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/lib.rus.ec/")
 INPX_FOLDER = os.getenv("INPX_FOLDER","/mnt/data/librusec/lib/librusec_local_fb2.inpx")
 
-MAX_WORKERS = int(os.getenv("MAX_WORKERS",7))
+MAX_WORKERS = int(os.getenv("MAX_WORKERS",4))
 
 SIMILARS_PER_BOOK = int(os.getenv("SIMILARS_PER_BOOK",100))
 
@@ -26,9 +26,6 @@ DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE",20000))
 
 
 MODEL_NAME: str = os.getenv("MODEL_NAME","intfloat/multilingual-e5-large")
-ST_CHUNK_SIZE: int  = int(os.getenv("ST_CHUNK_SIZE",2500))
-ST_OVERLAP: int = int(os.getenv("ST_OVERLAP",300))
-ST_BATCH_SIZE: int = int(os.getenv("ST_BATCH_SIZE",8))
 
 ST_MIN_CHARS: int = int(os.getenv("ST_MIN_CHARS",3000))
 ST_TARGET_CHARS: int = int(os.getenv("ST_TARGET_CHARS",16000))
