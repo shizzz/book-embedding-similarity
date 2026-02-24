@@ -184,7 +184,7 @@ class Model:
 
             print(f"Прогнозированная похожесть \"{src_book.title}\" --> \"{tgt_book.title}\": ранее: {weight} теперь: {score}")
 
-    def _auto_st_params(self, avg_chunk_tokens=512, overlap_ratio=0.1) -> None:
+    def _auto_st_params(self, avg_chunk_tokens=512, overlap_ratio=0.12) -> None:
         # Chunk size и overlap
         chunk_size = avg_chunk_tokens * 5  # 1 токен ~ 5 символов
         overlap = int(chunk_size * overlap_ratio)

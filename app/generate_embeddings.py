@@ -5,8 +5,9 @@ def main():
     worker = GenerateEmbeddingsWorker(
         max_workers=4,
         title="Generate embeddings", 
+        max_batch_size=10,
         queue_size=50,
-        db_queue_batch_size=50,
+        db_queue_batch_size=10,
         db_queue_max_size=50)
     asyncio.run(worker.run())
 
