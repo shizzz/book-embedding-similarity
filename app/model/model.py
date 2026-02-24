@@ -35,12 +35,16 @@ class Model:
             self.load_local_model(model_path)
             
         self.uid = self.get_model_uid()
+        self._auto_st_params()
 
         print("CUDA available:", torch.cuda.is_available())
         if torch.cuda.is_available():
             print("CUDA version:", torch.version.cuda)
             print("GPU count:", torch.cuda.device_count())
             print("GPU name:", torch.cuda.get_device_name(0))
+        print("Chunk size:", self.st_chunk_size)
+        print("Chunk overlap:", self.st_overlap)
+        print("Batch size:", self.st_batch_size)
 
     
     def load_local_model(self, model_path: str):
@@ -180,3 +184,54 @@ class Model:
                 weight = SimilarRepository.get_score(conn, src_book.id, tgt_book.id)
 
             print(f"Прогнозированная похожесть \"{src_book.title}\" --> \"{tgt_book.title}\": ранее: {weight} теперь: {score}")
+
+    def _auto_st_params(self, overlap_ratio=0.12) -> None:
+        # Chunk size и overlap
+        chunk_size = self.transformer.max_seq_length * 5  # 1 токен ~ 5 символов
+        overlap = int(chunk_size * overlap_ratio)
+
+        # Batch size
+        if torch.cuda.is_available():
+            free_vram = (
+                torch.cuda.get_device_properties(0).total_memory
+                - torch.cuda.memory_reserved()
+                - torch.cuda.memory_allocated()
+            )
+            free_vram_mb = free_vram / (1024 ** 2)
+
+            # безопасное эмпирическое потребление на один chunk
+            mem_per_chunk_mb = self._estimate_mem_per_chunk_mb(self.transformer.max_seq_length)
+
+            batch_size = max(1, int(free_vram_mb * 0.7 / mem_per_chunk_mb))  # margin 30%
+            
+            # если используем многопоточность, делим batch на количество потоков
+            if hasattr(self, "_threads") and self._threads > 1:
+                batch_size = max(1, batch_size // self._threads)
+        else:
+            batch_size = 8
+
+        self.st_chunk_size = chunk_size
+        self.st_overlap = overlap
+        self.st_batch_size = batch_size
+
+    def _estimate_mem_per_chunk_mb(self, seq_len_tokens: int) -> float:
+        """
+        Универсальная оценка памяти на chunk на GPU.
+        Работает для любых transformer моделей.
+        """
+        model = self.transformer._first_module().auto_model
+        config = model.config
+
+        hidden = config.hidden_size
+        layers = config.num_hidden_layers
+
+        # определяем precision
+        dtype = next(model.parameters()).dtype
+        bytes_per_param = 2 if dtype in (torch.float16, torch.bfloat16) else 4
+
+        # attention + intermediates coefficient
+        K = 4.0
+
+        mem_bytes = seq_len_tokens * hidden * layers * bytes_per_param * K
+
+        return mem_bytes / (1024 ** 2)
