@@ -1,15 +1,28 @@
 import asyncio
+import argparse
 from app.workers import GenerateEmbeddingsWorker
+from app.settings.config import MAX_WORKERS
 
-def main():
+def main(args=None):
+    batch_size = args.batch_size or 10
+    db_queue_batch_size = batch_size
+    queue_size = batch_size * MAX_WORKERS * 3
+
     worker = GenerateEmbeddingsWorker(
-        max_workers=4,
         title="Generate embeddings", 
-        max_batch_size=10,
-        queue_size=50,
-        db_queue_batch_size=10,
-        db_queue_max_size=50)
+        max_batch_size=batch_size,
+        queue_size=queue_size,
+        db_queue_batch_size=db_queue_batch_size,
+        db_queue_max_size=queue_size)
     asyncio.run(worker.run())
 
+def add_args(parser: argparse.ArgumentParser):
+    parser.add_argument("batch_size", type=int, help="Количество книг для генерации векторов в пакете")
+
+def parse_args(args=None):
+    parser = argparse.ArgumentParser(description="Генерирование векторов книг")
+    add_args(parser)
+    return parser.parse_args(args)
+
 if __name__ == "__main__":
-    main()
+    main(parse_args())
