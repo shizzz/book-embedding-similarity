@@ -162,25 +162,20 @@ class RemoteBookScanner:
             archive_name
         )
 
-        if os.path.exists(local_path):
-            return local_path
+        if not os.path.exists(local_path):
+            lock = self._archive_locks.get(archive_name)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._archive_locks[archive_name] = lock
 
-        lock = self._archive_locks.get(archive_name)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._archive_locks[archive_name] = lock
+            async with lock:
+                await asyncio.to_thread(
+                    self._download_archive,
+                    archive_name,
+                    local_path
+                )
 
-        async with lock:
-            if os.path.exists(local_path):
-                return local_path
-
-            await asyncio.to_thread(
-                self._download_archive,
-                archive_name,
-                local_path
-            )
-
-            return local_path
+        return local_path
 
     async def _download_archive(self, archive_url: str, local_path: str):
         def _sftp_download():
@@ -273,22 +268,28 @@ class RemoteBookScanner:
             return await asyncio.to_thread(_read, z)
     
     async def open_zip(self, archive_url: str) -> zipfile.ZipFile:
-        remote = urlparse(archive_url)
-        archive_name = RemoteBookScanner._get_filename(archive_url)
+        if self._is_remote:     
+            remote = urlparse(archive_url)
+            archive_name = RemoteBookScanner._get_filename(archive_url)
 
-        local_path = os.path.join(
-            self._cache_dir,
-            archive_name
-        )
+            local_path = os.path.join(
+                self._cache_dir,
+                archive_name
+            )
 
-        lock = self._archive_locks.get(archive_name)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._archive_locks[archive_name] = lock
+            lock = self._archive_locks.get(archive_name)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._archive_locks[archive_name] = lock
 
-        async with lock:     
-            if not os.path.exists(local_path):
-                await self._download_archive(remote.path, local_path)
+            async with lock:     
+                if not os.path.exists(local_path):
+                    await self._download_archive(remote.path, local_path)
+        else:
+            local_path = os.path.join(
+                self.folder,
+                archive_name
+            )
         return zipfile.ZipFile(local_path)
         
     @asynccontextmanager

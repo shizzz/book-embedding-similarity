@@ -20,6 +20,7 @@ class Model:
     uid: str
 
     def __init__(self, threads):
+        print("Model:", MODEL_NAME)
         self._threads = threads
         model_dir = DATA_DIR / Model.MODEL_DIR
         model_path = Model.get_model_dir()
