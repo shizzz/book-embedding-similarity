@@ -3,7 +3,7 @@ import asyncio
 import numpy as np
 from typing import Optional, List, Tuple
 
-from app.db import db, SimilarRepository
+from app.db import DB, SimilarRepository
 from app.models import Book
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
@@ -59,7 +59,7 @@ class Similarity:
                 progress_callback=lambda p: self.update_progress(book.file_name, p)
             )
 
-            with db() as conn:
+            with DB() as conn:
                 SimilarRepository.replace(conn, similars)
 
             state.set_done(similars)

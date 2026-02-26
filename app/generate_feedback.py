@@ -1,21 +1,21 @@
 import argparse
 from typing import Optional, List
 import openai
-from app.db import db, BookRepository, SimilarRepository, FeedbackRepository
+from app.db import DB, BookRepository, SimilarRepository, FeedbackRepository
 from app.models import Book
 from app.settings.config import DEEPSEEK_API_KEY, OPENAI_API_KEY, LM_STUDIO_BASE_URL
 
 client = None
 
 def get_book_info(book_file: str) -> Optional[Book]:
-    with db() as conn:
+    with DB() as conn:
         book_row = BookRepository.get_by_file(conn, book_file)
         if not book_row:
             return None
         return Book.map(book_row)
 
 def get_similar_books(source_book_id: int) -> List[tuple]:
-    with db() as conn:
+    with DB() as conn:
         similars = SimilarRepository.get(conn, source_book_id, limit=100)
         return similars
 
@@ -112,7 +112,7 @@ def call_lm_studio(prompt: str) -> int | None:
         return None
 
 def save_feedback(source_book_id: int, candidate_book_id: int, label: float):
-    with db() as conn:
+    with DB() as conn:
         FeedbackRepository.submit(conn, source_book_id, candidate_book_id, label)
 
 def main(book_file: str):
@@ -151,7 +151,7 @@ def main(book_file: str):
             print(f"  Ошибка обработки: {e}")
 
 def get_book_info_by_id(book_id: int) -> Optional[Book]:
-    with db() as conn:
+    with DB() as conn:
         book_row = BookRepository.get_by_id(conn, book_id)
         if not book_row:
             return None

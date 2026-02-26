@@ -4,7 +4,7 @@ import gc
 from app.common.types import TEntity
 from typing import Generic, List
 from app.models import Task
-from app.db import db
+from app.db import DB
 from .ui import StatsUI
 
 class DbQueue(Generic[TEntity]):
@@ -55,7 +55,7 @@ class DbQueue(Generic[TEntity]):
         while not self._stop_event.is_set():
             await self._step_async(buffer)
 
-        with db() as conn:
+        with DB() as conn:
             while self._step(conn, buffer):
                 pass
 
@@ -63,7 +63,7 @@ class DbQueue(Generic[TEntity]):
 
     def _save(self, tasks: List[Task]) -> int:
         total = 0
-        with db() as conn:
+        with DB() as conn:
             for task in tasks:
                 total += self._save_func(conn, task)
         return total

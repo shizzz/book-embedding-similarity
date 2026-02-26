@@ -6,7 +6,7 @@ import torch
 from typing import Dict, Tuple
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
-from app.db import db, FeedbackRepository, BookRepository, SimilarRepository, EmbeddingsRepository
+from app.db import DB, FeedbackRepository, BookRepository, SimilarRepository, EmbeddingsRepository
 from app.models import Feedbacks, Book
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.utils import FB2Book
@@ -79,7 +79,7 @@ class Model:
         examples = []
         results: Dict[int, Tuple[Book, Book]] = {}
 
-        with db() as conn:
+        with DB() as conn:
             feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
             book_ids = set()
 
@@ -142,7 +142,7 @@ class Model:
         X = []  # old embeddings
         Y = []  # new embeddings
 
-        with db() as conn:
+        with DB() as conn:
             books = BookRepository.get_all(conn)
 
             for row in books[:5000]:  # достаточно 1-5k примеров
@@ -180,7 +180,7 @@ class Model:
             emb_tgt = self.transformer.encode(tgt_text)
             score = np.dot(emb_src, emb_tgt)
 
-            with db() as conn:
+            with DB() as conn:
                 weight = SimilarRepository.get_score(conn, src_book.id, tgt_book.id)
 
             print(f"Прогнозированная похожесть \"{src_book.title}\" --> \"{tgt_book.title}\": ранее: {weight} теперь: {score}")

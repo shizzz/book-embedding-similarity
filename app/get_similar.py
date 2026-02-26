@@ -5,7 +5,7 @@ from typing import List, Tuple
 from app.models import Similar, Book
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
-from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository
+from app.db import DB, BookRepository, SimilarRepository, EmbeddingsRepository
 from app.settings.config import LIB_URL
 
 def make_lib_url(file_name: str) -> str:
@@ -51,7 +51,7 @@ async def main(args=None):
     start = time.perf_counter()
     limit: int = 100
 
-    with db() as conn:
+    with DB() as conn:
         book_task = Book.map(BookRepository.get_full_by_file(conn, args.file_name))
 
         if not book_task:
@@ -90,7 +90,7 @@ async def main(args=None):
         except FileNotFoundError as e:
             print(f"Режим '{other_mode}' не выполнен: {e}")
     
-    with db() as conn:
+    with DB() as conn:
         SimilarRepository.replace(conn, similars)
 
     print_similar_books(

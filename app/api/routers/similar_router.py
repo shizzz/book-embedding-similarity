@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from app.db import db, BookRepository, SimilarRepository, FeedbackRepository
+from app.db import DB, BookRepository, SimilarRepository, FeedbackRepository
 from app.models import Book, Feedbacks
 from app.utils import Html
 from app.services import TaskState, Similarity
@@ -47,7 +47,7 @@ async def similar_events(
     async def event_stream():
         start = time.perf_counter()
 
-        with db() as conn:
+        with DB() as conn:
             book = Book.map(BookRepository.get_full_by_file(conn, file))
             if not book:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
@@ -82,7 +82,7 @@ async def similar_events(
 
             if state.result is not None:
                 elapsed = time.perf_counter() - start
-                with db() as conn:                 
+                with DB() as conn:                 
                     feedbacks = Feedbacks(FeedbackRepository.get(conn, book.id))
 
                 html = Html.render_similar_table(request, book, state.result, elapsed, feedbacks)

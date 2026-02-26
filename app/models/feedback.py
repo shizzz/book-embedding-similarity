@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
-from app.db import db, FeedbackRepository
+from app.db import DB, FeedbackRepository
 from app.settings.config import FEEDBACK_BOOST_FACTOR
 
 class FeedbackReq(BaseModel):

@@ -38,6 +38,7 @@ class BaseWorker(ABC):
     async def thread(self, worker_id: int) -> None:
         pass
 
+    @abstractmethod
     async def fin(self) -> None:
         pass
     

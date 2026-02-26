@@ -3,7 +3,7 @@ from typing import Tuple
 from app.workers.base import BaseDbQueueWorker
 from app.hnsw import IndexManager
 from app.model import Model, generate_embeddings
-from app.db import db, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
+from app.db import DB, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
 from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
@@ -29,7 +29,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     
     async def prepare(self) -> None:
         self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
-        with db() as conn:
+        with DB() as conn:
             self._book_id = BookRepository.get_max_id(conn)
             self._remove_invalid_embeddings(conn)
     
@@ -39,7 +39,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         return total
 
     async def fin(self) -> None:
-        with db() as conn:
+        with DB() as conn:
             embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
             feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
             books: list[Book] = [
@@ -53,8 +53,11 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
             books=books,
         )
 
+        self.logger.info("Чистка базы даных")
+        DB().vacuum()
+
     async def pull_queue(self) -> None:
-        with db() as conn:
+        with DB() as conn:
             existed_books = set(BookRepository.get_names(conn))
 
         registries: dict[
@@ -189,7 +192,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     
     async def _enrich_from_db(self, book: Book) -> Book:
         def _sync():
-            with db() as conn:
+            with DB() as conn:
                 return Book.map(BookRepository.get_full_by_file(conn, book.file_name))
 
         return await asyncio.to_thread(_sync)

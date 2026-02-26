@@ -1,4 +1,4 @@
-from .connection import db
+from .connection import DB
 from .migrate import Migrator
 from .books import BookRepository
 from .feedback import FeedbackRepository

@@ -2,7 +2,7 @@ from asyncio import to_thread
 from app.workers.base import BaseDbQueueWorker
 from app.services import BulkSimilarSearchService
 from app.models import Task, Book, Task, TaskResult, Action, BookRegistry
-from app.db import db, BookRepository, SimilarRepository
+from app.db import DB, BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK
 
@@ -34,7 +34,7 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
     async def prepare(self) -> None:
         self.logger.info(f"Очистка таблицы similar")
 
-        with db() as conn:
+        with DB() as conn:
             SimilarRepository.clear(conn)
 
         self._engine = SimilarSearchEngineFactory.create(
@@ -49,7 +49,7 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
         self.logger.info(f"Добавление книг и эмбеддингов в очередь")  
         registry = BookRegistry()
         expected_dim = None
-        with db() as conn:
+        with DB() as conn:
             for book_id, book_name, title, author, _, _, embedding in BookRepository.get_all_with_embeddings(conn):
                 if expected_dim is None:
                     expected_dim = embedding.shape[0]
@@ -94,6 +94,10 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
     async def get_total(self) -> int:
         await self._queue_pulled.wait()
         return self._task_total
+
+    async def fin(self) -> None:
+        self.logger.info("Чистка базы даных")
+        DB().vacuum()
 
     def save_to_db(self, conn, task: Task) -> int:
         SimilarRepository.save(conn, task.entity)

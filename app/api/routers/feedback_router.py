@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from app.models import Book, FeedbackReq, Feedbacks
-from app.db import db, BookRepository, FeedbackRepository, SimilarRepository
+from app.db import DB, BookRepository, FeedbackRepository, SimilarRepository
 
 router = APIRouter()
 
 @router.post("/")
 async def submit_feedback(fb: FeedbackReq):
     try:
-        with db() as conn:
+        with DB() as conn:
             source = Book.map(BookRepository.get_by_file(conn, fb.source_file_name))
             candidate = Book.map(BookRepository.get_by_file(conn, fb.candidate_file_name))
 
@@ -26,7 +26,7 @@ async def submit_feedback(fb: FeedbackReq):
 @router.get("/")
 async def get_all_feedback():
     try:
-        with db() as conn:
+        with DB() as conn:
             feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
 
         return {

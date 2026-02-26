@@ -2,7 +2,7 @@ from typing import Literal
 from faiss import IndexIDMap
 from app.hnsw import IndexManager
 from app.hnsw.rerankers import LightGBMReranker
-from app.db import db, BookRepository
+from app.db import DB, BookRepository
 from app.models import Book, BookRegistry
 from .similarSearchEngine import SimilarSearchEngine
 from .indexSimilarSearchEngine import IndexSimilarSearchEngine
@@ -27,7 +27,7 @@ class SimilarSearchEngineFactory:
             hnsw = IndexManager(logger=logger)
             index: IndexIDMap = hnsw.load_from_file()
 
-            with db() as conn:
+            with DB() as conn:
                 books: list[Book] = [
                     Book.map_row(row)
                     for row in BookRepository.get_all_with_embeddings(conn)

@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Tuple
 from app.models import BookRegistry, Book
 from app.hnsw.rerankers import Reranker
-from app.db import db, BookRepository
+from app.db import DB, BookRepository
 from .similarSearchEngine import SimilarSearchEngine
 
 class BruteforceSimilarSearchEngine(SimilarSearchEngine):
@@ -23,7 +23,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         result: List[Tuple[float, int, int]] = []
-        with db() as conn:
+        with DB() as conn:
             for source in sources:
                 candidates = []
                 seen_books: set[tuple[str, tuple[str, ...]]] = set()
