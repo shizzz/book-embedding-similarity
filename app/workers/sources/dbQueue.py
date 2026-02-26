@@ -8,52 +8,51 @@ from app.db import db
 from .ui import StatsUI
 
 class DbQueue(Generic[TEntity]):
-    def __init__(self, save_func, batch_size: int, db_queue_max_size: int, ui: StatsUI):
-        self.active: bool = True
+    def __init__(
+            self,
+            save_func,
+            batch_size: int,
+            db_queue_max_size: int,
+            ui: StatsUI
+        ):
         self.queue: asyncio.Queue[TEntity] = asyncio.Queue(maxsize=db_queue_max_size)
-        self.queue_task: asyncio.Task | None = None
+        self.task: asyncio.Task | None = None
 
-        self._queue_stop_event = asyncio.Event()
-        self._queue_total: int = 0
-        self._queue_progress_idx: int = None
-        self._queue_batch_size: int = batch_size
+        self._stop_event = asyncio.Event()
+        self._total: int = 0
+        self._progress_idx: int = None
+        self._batch_size: int = batch_size
 
         self._ui = ui
         self._save_func = save_func
-        
-        if self.active:
-            self._ui.console.log("DB save enabled")
 
     def start(self):
-        self._queue_progress_idx = self._ui.add_progress("Сохранение в БД", "пакетов")
-        self._dbqueue_task_queue = asyncio.create_task(self._loop())
+        self._progress_idx = self._ui.add_progress("Сохранение в БД", "пакетов")
+        self.task = asyncio.create_task(self._loop())
 
     async def stop(self):
-        self._queue_stop_event.set()
+        self._stop_event.set()
         
-        if self.active:
-            db_queue_size = self.queue.qsize()
-            if db_queue_size > 0:
-                self._ui.console.log(f"Still have {db_queue_size} records to save into database")
-                self.queue.put_nowait(None)
+        db_queue_size = self.queue.qsize()
+        if db_queue_size > 0:
+            self._ui.console.log(f"Still have {db_queue_size} records to save into database")
 
-            if self.queue_task:
-                await self.queue_task
+        self.queue.put_nowait(None)
 
-        self.active = False
+        await self.task
 
     async def put(self, done: int, task: Task):
-        self._queue_total += done
+        self._total += done
         await self.queue.put(task)
         await self._ui.update_total_async(
-            idx=self._queue_progress_idx,
-            total=self._queue_total
+            idx=self._progress_idx,
+            total=self._total
         )
 
     async def _loop(self):
         buffer = []
 
-        while not self._queue_stop_event.is_set():
+        while not self._stop_event.is_set():
             await self._step_async(buffer)
 
         with db() as conn:
@@ -78,9 +77,9 @@ class DbQueue(Generic[TEntity]):
 
             total = sum(len(task.entity) for task in buffer)
 
-            if total >= self._queue_batch_size or task is None:
+            if total >= self._batch_size or task is None:
                 done = await asyncio.to_thread(self._save, buffer.copy())
-                await self._ui.done_async(self._queue_progress_idx, done)
+                await self._ui.done_async(self._progress_idx, done)
                 for t in buffer:
                     del t.entity
                 buffer.clear()
@@ -97,7 +96,7 @@ class DbQueue(Generic[TEntity]):
         if buffer:
             for task in buffer:
                 done = self._save_func(conn, task)
-                self._ui.done(self._queue_progress_idx, done)
+                self._ui.done(self._progress_idx, done)
                 del task.entity
             buffer.clear()
             gc.collect()
@@ -109,7 +108,7 @@ class DbQueue(Generic[TEntity]):
 
         if task is not None:
             done = self._save_func(conn, task)
-            self._ui.done(self._queue_progress_idx, done)
+            self._ui.done(self._progress_idx, done)
 
         self.queue.task_done()
 

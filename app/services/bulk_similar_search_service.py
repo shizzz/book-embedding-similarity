@@ -1,25 +1,17 @@
 from typing import List, Tuple
-from app.models import Book
+from app.models import BookRegistry
 from app.searchEngines.similarSearch import SimilarSearchEngine
 
 class BulkSimilarSearchService:
     def __init__(
         self,
         engine: SimilarSearchEngine,
-        books: List[Book],
-        embeddings: List[Tuple[int, bytes]],
         logger = None, 
     ):
         self.engine = engine
-        self.books = books
-        self.embeddings = embeddings
         self.logger = logger
 
-    def run(self, source_book: Book, source_embedding: bytes) -> List[Tuple[float, int, int]]:
-        query_emb = source_embedding
-        similars = self.engine.search(
-            source=source_book, 
-            embedding=query_emb
-        )
+    def run(self, source_books: BookRegistry) -> List[Tuple[float, int, int]]:
+        similars = self.engine.search(sources=source_books)
 
         return similars

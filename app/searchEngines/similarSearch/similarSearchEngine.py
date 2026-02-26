@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Tuple
 from app.hnsw.rerankers import Reranker
-from app.models import Book
+from app.models import Book, BookRegistry
 
 class SimilarSearchEngine:
     def __init__(self, exclude_same_authors: bool, reranker: Reranker = None):
@@ -9,29 +9,30 @@ class SimilarSearchEngine:
         self._reranker = reranker
 
     def _should_skip(
-            self,
-            source: Book,
-            candidate_name: str,
-            candidate_title: str,
-            seen: set[tuple[str, tuple[str, ...]]],
-            candidate_authors: list[str] = None,
-        ) -> bool:
-        if source.file_name is not None and source.file_name == candidate_name:
+        self,
+        source: Book,
+        candidate: Book,
+        seen: set[tuple[str, tuple[str, ...]]]
+    ) -> bool:
+        # 1. тот же файл
+        if source.file_name and source.file_name == candidate.file_name:
             return True
 
-        if source.title is not None and source.title == candidate_title:
+        # 2. то же название
+        if source.title and source.title == candidate.title:
             return True
 
-        key = (
-            candidate_title,
-            tuple(sorted(candidate_authors)) if candidate_authors else ()
-        )
+        # 3. исключение по авторам
+        if self._exclude_same_authors and source.authors and candidate.authors:
+            if source.authors & candidate.authors:
+                return True
 
+        # 4. проверка уникальности (title + authors)
+        key = (candidate.title, candidate.authors_key)
         if key in seen:
             return True
-        
-        seen.add(key)
 
+        seen.add(key)
         return False
 
     def _rerank(
@@ -50,7 +51,6 @@ class SimilarSearchEngine:
         valid = []
 
         for sim, book in candidates:
-            # Фича только исходный sim
             X.append([sim])
             valid.append(book)
 
@@ -72,8 +72,7 @@ class SimilarSearchEngine:
 
     def search(
         self,
-        source: Book,
-        embedding: np.ndarray,
+        sources: BookRegistry,
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
         raise NotImplementedError()

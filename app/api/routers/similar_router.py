@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from app.db import db, BookRepository, SimilarRepository, EmbeddingsRepository, FeedbackRepository
+from app.db import db, BookRepository, SimilarRepository, FeedbackRepository
 from app.models import Book, Feedbacks
 from app.utils import Html
 from app.services import TaskState, Similarity
@@ -48,7 +48,7 @@ async def similar_events(
         start = time.perf_counter()
 
         with db() as conn:
-            book = Book.map(BookRepository.get_by_file(conn, file))
+            book = Book.map(BookRepository.get_full_by_file(conn, file))
             if not book:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
                 return
@@ -65,14 +65,12 @@ async def similar_events(
                 yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
                 return
 
-            embedding_raw = EmbeddingsRepository.get(conn, book.id)
-
         if book.file_name not in similarity.tasks:
             similarity.tasks[book.file_name] = TaskState()
             asyncio.get_running_loop().run_in_executor(
                 executor,
                 similarity.compute_similar,
-                book, embedding_raw, limit, exclude_same_author
+                book, limit, exclude_same_author
             )
 
         state = similarity.tasks[book.file_name]

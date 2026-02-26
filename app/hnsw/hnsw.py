@@ -35,9 +35,17 @@ class IndexManager:
         valid_embeddings = []
         valid_ids = []
 
+        expected_dim = None
         with tqdm(total=len(embeddings), desc="Загружаем embeddings", unit="строк", unit_scale=True) as pbar:
             for book_id, vec in embeddings:
+                if expected_dim is None:
+                    expected_dim = vec.shape[0]
+                if vec.shape[0] != expected_dim:
+                    print(f"Книга={book_id} с размерностью {vec.shape[0]} не соответствует общей {expected_dim}")
+                    pbar.update(1)
+                    continue
                 if vec is None:
+                    pbar.update(1)
                     continue
                 valid_embeddings.append(vec)
                 valid_ids.append(book_id)
@@ -145,17 +153,53 @@ class IndexManager:
                 raise TypeError("Загруженный индекс не является IndexIDMap или HNSWFlat")
 
         # Обновляем efSearch
-        if isinstance(index.index, faiss.IndexHNSWFlat):
-            index.index.hnsw.efSearch = HNSW_EF_SEARCH
-        elif isinstance(index, faiss.IndexHNSWFlat):
-            index.hnsw.efSearch = HNSW_EF_SEARCH
-        else:
-            # на всякий случай
+        try:
+            if isinstance(index.index, faiss.IndexHNSWFlat):
+                index.index.hnsw.efSearch = HNSW_EF_SEARCH
+            elif isinstance(index, faiss.IndexHNSWFlat):
+                index.hnsw.efSearch = HNSW_EF_SEARCH
+            else:
+                if self.logger:
+                    self.logger.warning("Не удалось обновить efSearch — неизвестный тип индекса")
+        except Exception as e:
             if self.logger:
-                self.logger.warning("Не удалось обновить efSearch — неизвестный тип индекса")
+                self.logger.warning(f"Ошибка при установке efSearch: {e}")
+
+        # --- перенос на GPU если доступен ---
+        self._gpu_res = None
+
+        try:
+            ngpu = faiss.get_num_gpus()
+        except Exception:
+            ngpu = 0
+
+        if ngpu > 0:
+            try:
+                if self.logger:
+                    self.logger.info(f"Обнаружено GPU: {ngpu}, переносим индекс на GPU")
+
+                self._gpu_res = faiss.StandardGpuResources()
+
+                # переносим IndexIDMap целиком
+                index = faiss.index_cpu_to_gpu(self._gpu_res, 0, index)
+
+                if self.logger:
+                    self.logger.info("Индекс успешно перенесён на GPU")
+
+            except Exception as e:
+                self._gpu_res = None
+                if self.logger:
+                    self.logger.warning(f"Не удалось перенести индекс на GPU, используем CPU: {e}")
+        else:
+            if self.logger:
+                self.logger.info("GPU не обнаружен, используем CPU индекс")
 
         if self.logger:
-            self.logger.info(f"Индекс загружен из '{self.index_file}' (ntotal: {index.ntotal:,})")
+            device = "GPU" if self._gpu_res else "CPU"
+            self.logger.info(
+                f"Индекс загружен из '{self.index_file}' "
+                f"(ntotal: {index.ntotal:,}, device: {device})"
+            )
 
         self._index = index
         return index

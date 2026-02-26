@@ -1,4 +1,6 @@
 .vscode
+.continue
+data
 __pycache__
 *.pyc
 *.db
@@ -9,7 +11,5 @@ __pycache__
 .env
 .docker-compose.yml
 reranker.lgb
-data/models
-data/cache
 build
 dist

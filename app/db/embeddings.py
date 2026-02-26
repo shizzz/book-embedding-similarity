@@ -50,3 +50,8 @@ class EmbeddingsRepository:
     @staticmethod
     def count(conn) -> int:
         return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+    
+    @staticmethod
+    def delete(conn, to_delete: list[int]) -> None:
+        query = f"DELETE FROM embeddings WHERE book_id IN ({','.join(['?']*len(to_delete))})"
+        conn.execute(query, to_delete)

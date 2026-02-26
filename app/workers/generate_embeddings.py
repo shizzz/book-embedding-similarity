@@ -10,7 +10,7 @@ from app.searchEngines.bookSearch import BookSearchEngineFactory
 class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     def __init__(self, max_batch_size: int = 50, **kwargs):
         super().__init__(**kwargs)
-        self.hnsw = IndexManager(batch_size=10000)
+        self.hnsw = IndexManager(batch_size=10000, logger=self.logger)
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, self.ui)
         self._get_book_idx: int = None
         self._book_id: int = 1
@@ -18,17 +18,20 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
         self._model = Model(self.max_workers)
 
-    async def process(self, task: Task) -> TaskResult:
+    async def process(self, task: Task, _thread_id: int) -> TaskResult:
         result = await asyncio.to_thread(self._process_book, task.entity)
+        done = len(task.entity)
         return task.to_result(
-            len(task.entity),
-            result
+            done=done,
+            db_queue_count=done,
+            entity=result
         )
     
     async def prepare(self) -> None:
         self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
         with db() as conn:
             self._book_id = BookRepository.get_max_id(conn)
+            self._remove_invalid_embeddings(conn)
     
     async def get_total(self) -> int:
         total = await self.engine.get_total()
@@ -77,6 +80,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                     datasets.append(Dataset.EMBEDDING)
 
                 if len(datasets) == 0:
+                    await self.ui.done_async(self._get_book_idx)
                     await self.ui.decrease_total_async()
                     continue
             else:
@@ -140,7 +144,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
             await self.queue.put(
                 Task(
-                    ame=f"{first_book_name} {action.name} {dataset_str} ({len(registry)})",
+                    name=f"{first_book_name} {action.name} {dataset_str} ({len(registry)})",
                     entity=registry,
                     action=action,
                     dataset=list(datasets)
@@ -149,7 +153,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
         # shutdown workers
         await self.enqueue_shutdown_signals_async()
-        self._queue_pulled = True
+        self._queue_pulled.set()
 
     def save_to_db(self, conn, task: Task) -> int:
         if Dataset.BOOK in task.dataset:
@@ -190,3 +194,19 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
         return await asyncio.to_thread(_sync)
              
+    def _remove_invalid_embeddings(self, conn):
+        to_delete = []
+        expected_dim = None
+
+        for book_id, emb in EmbeddingsRepository.get_all(conn):
+            if expected_dim is None:
+                expected_dim = emb.shape[0]
+
+            if emb.shape[0] != expected_dim:
+                print(f"Удаляем book_id={book_id} с размерностью {emb.shape}")
+                to_delete.append(book_id)
+
+        if to_delete:
+            print(f"Удалено {len(to_delete)} записей")
+        else:
+            print("Все эмбеддинги корректны")

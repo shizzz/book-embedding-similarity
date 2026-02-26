@@ -12,10 +12,10 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
         super().__init__(*args, **kwargs)
 
         self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue(maxsize=queue_size)
-        self._queue_pulled: bool = False
+        self._queue_pulled = asyncio.Event()
 
     @abstractmethod
-    async def process(self, task: Task) -> TaskResult:
+    async def process(self, task: Task, thread_id: int) -> TaskResult:
         raise NotImplementedError("process_book must be implemented by subclass")
 
     @abstractmethod
@@ -29,14 +29,18 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
     async def post_process(self, result: TaskResult) -> None:
         pass
 
+    async def thread_start(self, thread_id: int) -> None:
+        pass
+
     def create_tasks(self) -> list[asyncio.Task]:
         return [
             asyncio.create_task(self._get_total()),
             asyncio.create_task(self.pull_queue())
         ]
 
-    async def worker(self, worker_id: int) -> None:
-        while not self._queue_pulled or not self.queue.empty():
+    async def thread(self, thread_id: int) -> None:
+        await self.thread_start(thread_id)
+        while not self._queue_pulled.is_set() or not self.queue.empty():
             task = await self.queue.get()
 
             if task is None:
@@ -45,9 +49,9 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
 
             try:
                 if self.show_ui:
-                    await self.ui.set_thread(worker_id, task.name)
+                    await self.ui.set_thread(thread_id, task.name)
 
-                result = await self.process(task)
+                result = await self.process(task, thread_id)
                 await self.post_process(result)
 
                 if self.show_ui:
@@ -56,7 +60,7 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
                 if self.show_ui:
                     await self.ui.error()
                 traceback.print_exc()
-                self.ui.console.log(f"ERROR processing {task.name}: {error}")
+                self.logger.error(f"ERROR processing {task.name}: {error}")
             finally:
                 if hasattr(task, "entity"):
                     del task.entity

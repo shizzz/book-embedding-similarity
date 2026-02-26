@@ -52,17 +52,15 @@ async def main(args=None):
     limit: int = 100
 
     with db() as conn:
-        book_task = Book.map(BookRepository.get_by_file(conn, args.file_name))
+        book_task = Book.map(BookRepository.get_full_by_file(conn, args.file_name))
 
         if not book_task:
             print(f"Книга {args.file_name} не найдена в реестре")
             return
-        
-        embedding = EmbeddingsRepository.get(conn, book_task.id)
 
-    if embedding is None:
-        print(f"У книги {args.file_name} не сгенерирован вектор")
-        return
+        if book_task.embedding is None:
+            print(f"У книги {args.file_name} не сгенерирован вектор")
+            return
         
     
     print(f"Поиск TOP({limit}) книг похожих на \"{book_task.title}\" {book_task.file_name}")
@@ -71,14 +69,10 @@ async def main(args=None):
     compare = getattr(args, "compare", False)
 
     def run_service(selected_mode: str):
-        engine = SimilarSearchEngineFactory.create(selected_mode, limit, False)
-        service = SimilarSearchService(
-            engine=engine,
-            source=book_task,
-            embedding=embedding
-        )
+        engine = SimilarSearchEngineFactory.create(selected_mode, limit, True)
+        service = SimilarSearchService(engine=engine)
         local_start = time.perf_counter()
-        result = service.run()
+        result = service.run(source=book_task)
         elapsed_local = time.perf_counter() - local_start
         return result, elapsed_local
 

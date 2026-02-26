@@ -1,4 +1,5 @@
 from typing import Literal
+from faiss import IndexIDMap
 from app.hnsw import IndexManager
 from app.hnsw.rerankers import LightGBMReranker
 from app.db import db, BookRepository
@@ -20,10 +21,11 @@ class SimilarSearchEngineFactory:
         limit: int,
         exclude_same_authors: bool,
         step_percent: int = 5,
+        logger=None,
     ) -> SimilarSearchEngine:
         if mode == SimilarSearchEngineFactory.INDEX:
-            hnsw = IndexManager()
-            index = hnsw.load_from_file()
+            hnsw = IndexManager(logger=logger)
+            index: IndexIDMap = hnsw.load_from_file()
 
             with db() as conn:
                 books: list[Book] = [

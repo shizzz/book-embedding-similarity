@@ -13,7 +13,8 @@ def main(args=None):
         max_batch_size=batch_size,
         queue_size=queue_size,
         db_queue_batch_size=db_queue_batch_size,
-        db_queue_max_size=queue_size)
+        db_queue_max_size=queue_size
+    )
     asyncio.run(worker.run())
 
 def add_args(parser: argparse.ArgumentParser):

@@ -103,12 +103,11 @@ class StatsUI:
             grid.add_row(self._bars[idx])
         return grid
     
-    async def init(self):
-        async with self.lock:
-            self.stats["Total"] = 0
-            self.stats["Remaining"] = 0
-            self.stats["Done"] = 0
-            self.stats["Errors"] = 0
+    def init(self):
+        self.stats["Total"] = 0
+        self.stats["Remaining"] = 0
+        self.stats["Done"] = 0
+        self.stats["Errors"] = 0
 
         self._bars[0].update(self._tasks[0], total=0)
 

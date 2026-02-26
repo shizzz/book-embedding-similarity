@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Tuple
-from app.models import Book
+from app.models import BookRegistry, Book
 from app.hnsw.rerankers import Reranker
 from app.db import db, BookRepository
 from .similarSearchEngine import SimilarSearchEngine
@@ -19,51 +19,50 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
 
     def search(
         self,
-        source: Book,
-        embedding: np.ndarray,
+        sources: BookRegistry,
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
-        with db() as conn:
-            candidates = []
-            seen_books: set[tuple[str, tuple[str, ...]]] = set()
-            current = 0
-            total = BookRepository.count_embeddings(conn)
-            step = max(1, total * self._step_percent // 100)
-
-            for row in BookRepository.get_all_with_embeddings(conn):
-                current += 1
-
-                book_id, book, title, _, _, _, emb_norm = row
-
-                if self._should_skip(
-                    source=source,
-                    candidate_name=book,
-                    candidate_title=title,
-                    seen=seen_books
-                ):
-                    continue
-
-                try:
-                    score = np.dot(emb_norm, embedding)
-
-                    candidates.append((score, book_id))
-
-                except Exception:
-                    continue
-
-                if progress_callback and current % step == 0:
-                    percent = min(99, current * 100 // total)
-                    progress_callback(percent)
-
-
-        reranked = self._rerank(candidates=candidates,)
-        top = reranked[: self._limit]
-
-        if not top:
-            return []
-
         result: List[Tuple[float, int, int]] = []
-        for score, candidate in top:
-            result.append((score, source.id, candidate))
+        with db() as conn:
+            for source in sources:
+                candidates = []
+                seen_books: set[tuple[str, tuple[str, ...]]] = set()
+                current = 0
+                total = BookRepository.count_embeddings(conn)
+                step = max(1, total * self._step_percent // 100)
+
+                for row in BookRepository.get_all_with_embeddings(conn):
+                    current += 1
+
+                    book_id, book, title, author, _, _, emb_norm = row
+
+                    if self._should_skip(
+                        source=source,
+                        candidate_name=book,
+                        candidate_title=title,
+                        seen=seen_books,
+                        candidate_authors=Book._parse_authors(author)
+                    ):
+                        continue
+
+                    try:
+                        score = np.dot(emb_norm, source.embedding)
+                        candidates.append((score, book_id))
+                    except Exception:
+                        continue
+
+                    if progress_callback and current % step == 0:
+                        percent = min(99, current * 100 // total)
+                        progress_callback(percent)
+
+
+            reranked = self._rerank(candidates=candidates,)
+            top = reranked[: self._limit]
+
+            if not top:
+                return []
+
+            for score, candidate in top:
+                result.append((score, source.id, candidate))
 
         return result

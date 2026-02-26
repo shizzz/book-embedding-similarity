@@ -14,7 +14,7 @@ class Book:
     file_name: str
     title: Optional[str]
     author: Optional[str]
-    authors: Optional[List[str]]
+    authors: Optional[frozenset]
     data: Optional[bytes]
     source_type: Optional[str]
     source_link: Optional[str]
@@ -51,10 +51,8 @@ class Book:
         self.model_id = model_id
         self.text = text
 
-        if authors == None and author != None:
-            self.authors = self._parse_authors(author)
-        else:
-            self.authors = authors
+        self.authors = frozenset(self._parse_authors(author)) if authors is None and author else frozenset(authors or [])
+        self.authors_key = tuple(sorted(self.authors)) if self.authors else ()
 
     @classmethod
     def map(cls, row) -> "Book":

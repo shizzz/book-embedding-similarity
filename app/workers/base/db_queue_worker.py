@@ -32,4 +32,4 @@ class BaseDbQueueWorker(BaseQueueWorker[TEntity], ABC):
         await self._db_queue.stop()
     
     async def post_process(self, result: TaskResult) -> None:
-        await self._db_queue.put(result.done, result.to_task())
+        await self._db_queue.put(result.db_queue_count, result.to_task())

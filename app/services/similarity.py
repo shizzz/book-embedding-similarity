@@ -41,7 +41,6 @@ class Similarity:
     def compute_similar(
         self, 
         book: Book,
-        embedding: np.ndarray,
         limit: int,
         exclude_same_author: bool
     ):
@@ -53,13 +52,10 @@ class Similarity:
             engine = SimilarSearchEngineFactory.create(
                 SimilarSearchEngineFactory.INDEX, limit, exclude_same_author, 1
             )
-            service = SimilarSearchService(
-                engine=engine,
-                source=book,
-                embedding=embedding
-            )
+            service = SimilarSearchService(engine=engine)
 
             similars = service.run(
+                source=book,
                 progress_callback=lambda p: self.update_progress(book.file_name, p)
             )
 
