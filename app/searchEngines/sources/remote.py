@@ -2,17 +2,14 @@ import os
 import zipfile
 import uuid
 import asyncio
-from app.workers.sources.ui import StatsUI
+import paramiko
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
-
-import paramiko
-
 from smbprotocol.connection import Connection, Dialects
 from smbprotocol.session import Session
 from smbprotocol.tree import TreeConnect
 from smbprotocol.open import Open
-
+from typing import Any
 from app.settings.config import CACHE_DIR
 
 
@@ -20,7 +17,7 @@ class RemoteBookScanner:
     TYPE = "remote"
     CHUNK_SIZE: int = 1024 * 1024  # 1MB
 
-    def __init__(self, folder: str, ui: StatsUI = None, locks: dict[str, asyncio.Lock] = {}):
+    def __init__(self, folder: str, ui: Any = None, locks: dict[str, asyncio.Lock] = {}):
         self.folder = folder
         self._cache_dir = CACHE_DIR
         self._ssh_client = None

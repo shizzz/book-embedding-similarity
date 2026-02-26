@@ -1,6 +1,5 @@
 import asyncio
-from app.workers.sources.ui import StatsUI
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
@@ -10,7 +9,7 @@ from app.searchEngines.sources import RemoteBookScanner
 class ZipBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "zip"
 
-    def __init__(self, folder: str, ui: StatsUI = None):
+    def __init__(self, folder: str, ui: Any = None):
         self.folder = folder
         self.ui = ui
         self._locks: dict[str, asyncio.Lock] = {}

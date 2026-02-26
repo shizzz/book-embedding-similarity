@@ -1,6 +1,8 @@
 import os
 import faiss
 import numpy as np
+from typing import List
+from app.models import BookRegistry, Book
 from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE
 from .trainers.rerankerTrainer import RerankerTrainer
 try:
@@ -218,27 +220,26 @@ class IndexManager:
     def rebuild_trainer(
             self,
             feedbacks=None,
-            books=None,
+            books:List[Book]=None,
     ):
         if self.logger:
             self.logger.info("Обучаем reranker по feedback")
 
         self.reranker_trainer.train(
             feedbacks=feedbacks,
-            embeddings=self.embeddings,
+            index=self._index,
             books=books
         )
         
     def rebuild(
         self,
         feedbacks=None,
-        books=None,
+        books: BookRegistry=None,
         train_reranker: bool = True,
     ):
         if (
             train_reranker
             and self.reranker_trainer
-            and feedbacks
             and books
         ):
             self.rebuild_trainer(feedbacks, books)

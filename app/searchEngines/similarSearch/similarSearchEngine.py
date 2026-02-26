@@ -35,39 +35,37 @@ class SimilarSearchEngine:
         seen.add(key)
         return False
 
-    def _rerank(
-        self,
-        candidates: list[tuple[float, Book]],
-    ):
-        # Если модели нет или кандидатов нет — возвращаем исходные
+    def _apply_reranker_delta(self, sims: np.ndarray, ids: np.ndarray, alpha: float = 0.2):
+        """
+        Применяет дельту модели к FAISS score.
+        Возвращает просто order индексов для сортировки.
+        """
+        ranks = np.arange(len(sims), dtype=np.float32)
+        features = np.column_stack([sims, ranks]).astype(np.float32)
+
+        delta = self.model.predict(features)
+        final_scores = sims + alpha * delta
+
+        # возвращаем только индексы в порядке сортировки
+        order = np.argsort(-final_scores)
+        return order
+    
+    def _rerank(self, candidates: list[tuple[float, Book]]):
         if not candidates:
             return candidates
-        
+
         if not self._reranker or not self._reranker.model:
             candidates.sort(key=lambda x: x[0], reverse=True)
             return candidates
 
-        X = []
-        valid = []
+        sims = np.array([s for s, _ in candidates], dtype=np.float32)
+        ids  = np.array([c.id for _, c in candidates], dtype=np.int32)
 
-        for sim, book in candidates:
-            X.append([sim])
-            valid.append(book)
+        order = self._apply_reranker_delta(sims, ids, alpha=0.2)
 
-        X = np.array(X, dtype=np.float32)
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
+        id_to_candidate = {c.id: c for _, c in candidates}
+        reranked = [id_to_candidate[i] for i in ids[order]]
 
-        try:
-            scores = self._reranker.model.predict(X, raw_score=False)
-
-            if scores is None or np.all(np.isnan(scores)) or np.all(scores < 1e-6):
-                scores = np.array([sim for sim, _ in candidates], dtype=np.float32)
-        except Exception:
-            scores = np.array([sim for sim, _ in candidates], dtype=np.float32)
-
-        reranked = list(zip(scores, valid))
-        reranked.sort(key=lambda x: x[0], reverse=True)
         return reranked
 
     def search(

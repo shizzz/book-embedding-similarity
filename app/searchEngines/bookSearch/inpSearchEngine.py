@@ -1,8 +1,7 @@
 import asyncio
 import os
 import zipfile
-from typing import AsyncGenerator
-from app.workers.sources.ui import StatsUI
+from typing import AsyncGenerator, Any
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
@@ -12,7 +11,7 @@ from app.settings.config import INPX_FOLDER
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
 
-    def __init__(self, folder: str, ui: StatsUI = None):
+    def __init__(self, folder: str, ui: Any = None):
         self.folder = folder
         self.ui = ui
         self._locks: dict[str, asyncio.Lock] = {}

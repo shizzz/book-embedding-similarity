@@ -5,7 +5,7 @@ import numpy as np
 from typing import Tuple
 from app.hnsw import IndexManager
 from app.model import Model
-from app.models import Book, Feedbacks
+from app.models import Book, Feedbacks, BookRegistry
 from app.hnsw.trainers import LightGBMRerankerTrainer
 from app.db import db, FeedbackRepository, EmbeddingsRepository, BookRepository
 from app.settings.config import LIB_URL, MODEL_NAME
@@ -28,7 +28,7 @@ def sync_feedbacks(conn):
     FeedbackRepository.delete_all(conn)
     feedbacks.insert_feedbacks(conn)
 
-def get_data() -> Tuple[list[Tuple[int, bytes]], Feedbacks, list[Book]]:
+def get_data() -> Tuple[list[Tuple[int, bytes]], Feedbacks, BookRegistry]:
     with db() as conn:
         sync_feedbacks(conn)
         embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
@@ -38,7 +38,7 @@ def get_data() -> Tuple[list[Tuple[int, bytes]], Feedbacks, list[Book]]:
             for row in BookRepository.get_all(conn)
         ]
 
-    return (embeddings, feedbacks, books)
+    return (embeddings, feedbacks, BookRegistry(books))
 
 def learn_hnsw(embeddings, feedbacks, books):
     print(f"Обновление поисковой модели")
