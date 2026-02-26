@@ -1,6 +1,7 @@
 import sqlite3
-from contextlib import contextmanager
 import numpy as np
+import zlib
+from contextlib import contextmanager
 from app.settings.config import DB_FILE
 
 def normalize(vec: np.ndarray) -> np.ndarray:
@@ -10,9 +11,23 @@ def normalize(vec: np.ndarray) -> np.ndarray:
         return np.zeros_like(vec, dtype=np.float32)
     return vec / norm
 
+# --- Адаптер для сжатия текста перед записью ---
+def adapt_text(text: str) -> bytes:
+    if text is None:
+        return None
+    return zlib.compress(text.encode("utf-8"))
+
+# --- Конвертер для распаковки текста при чтении ---
+def convert_text(blob: bytes) -> str:
+    if blob is None:
+        return None
+    return zlib.decompress(blob).decode("utf-8")
+
 # --- Регистрация адаптера NumPy ↔ BLOB ---
 sqlite3.register_adapter(np.ndarray, lambda arr: normalize(arr).tobytes())
 sqlite3.register_converter("NUMPY", lambda b: np.frombuffer(b, dtype=np.float32))
+sqlite3.register_adapter(str, adapt_text)
+sqlite3.register_converter("COMPRESSED_TEXT", convert_text)
 
 @contextmanager
 def db():
