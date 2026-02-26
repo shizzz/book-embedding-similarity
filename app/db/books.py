@@ -109,7 +109,7 @@ class BookRepository:
                 uid,
                 title,
                 author,
-                datetime.now().isoformat(),  # ← правильное место
+                datetime.now().isoformat(),
                 source_type,
                 source_link,
             )

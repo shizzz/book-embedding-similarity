@@ -1,5 +1,6 @@
-from typing import Iterator, Tuple
 import numpy as np
+from typing import Iterator, Tuple
+from .connection import DB
 
 class EmbeddingsRepository:
     GET_QUERY: str = "SELECT book_id, embedding FROM embeddings"
@@ -35,7 +36,7 @@ class EmbeddingsRepository:
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             [
-                (book.id, book.embedding, book.text, book.model_id, book.source_length, book.token_length)
+                (book.id, book.embedding, DB.adapt_text(book.text), book.model_id, book.source_length, book.token_length)
                 for book in books
             ]
         )

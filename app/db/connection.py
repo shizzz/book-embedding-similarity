@@ -24,19 +24,11 @@ class DB:
 
         sqlite3.register_adapter(np.ndarray, lambda arr: normalize(arr).tobytes())
         sqlite3.register_converter("NUMPY", lambda b: np.frombuffer(b, dtype=np.float32))
-
-        # --- Сжатый текст ---
-        def adapt_text(text: str) -> bytes:
-            if text is None:
-                return None
-            return zlib.compress(text.encode("utf-8"))
-
         def convert_text(blob: bytes) -> str:
             if blob is None:
                 return None
             return zlib.decompress(blob).decode("utf-8")
 
-        sqlite3.register_adapter(str, adapt_text)
         sqlite3.register_converter("COMPRESSED_TEXT", convert_text)
 
     def __enter__(self):
@@ -57,3 +49,9 @@ class DB:
     def vacuum(self):
         with DB(autocommit=False) as conn:
             conn.execute("VACUUM;")
+
+    @staticmethod
+    def adapt_text(text: str) -> bytes:
+        if text is None:
+            return None
+        return zlib.compress(text.encode("utf-8"))
