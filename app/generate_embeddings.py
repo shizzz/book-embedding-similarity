@@ -6,7 +6,7 @@ from app.settings.config import MAX_WORKERS
 def main(args=None):
     batch_size = args.batch_size or 10
     db_queue_batch_size = batch_size
-    queue_size = batch_size * MAX_WORKERS * 3
+    queue_size = batch_size * MAX_WORKERS * 10
 
     worker = GenerateEmbeddingsWorker(
         title="Generate embeddings", 

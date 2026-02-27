@@ -3,6 +3,7 @@ import zipfile
 import uuid
 import asyncio
 import paramiko
+import io
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 from smbprotocol.connection import Connection, Dialects
@@ -16,6 +17,10 @@ from app.settings.config import CACHE_DIR
 class RemoteBookScanner:
     TYPE = "remote"
     CHUNK_SIZE: int = 1024 * 1024  # 1MB
+    _zip_cache: dict[str, tuple[zipfile.ZipFile, io.BytesIO, int]] = {}
+    _access_counter: int = 0
+    _cache_lock = asyncio.Lock()
+    _max_idle_accesses = 1000
 
     def __init__(self, folder: str, ui: Any = None, locks: dict[str, asyncio.Lock] = {}):
         self.folder = folder
@@ -31,8 +36,12 @@ class RemoteBookScanner:
 
         if self._is_remote:
             os.makedirs(self._cache_dir, exist_ok=True)
-
-        self._init_connection()
+            parsed = urlparse(self.folder)
+            if self._is_ssh:
+                self._remote_path = parsed.path
+            elif self._is_smb:
+                _, *parts = parsed.path.lstrip("/").split("/")
+                self._remote_path = "/".join(parts)
             
     def __enter__(self):
         return self
@@ -40,47 +49,54 @@ class RemoteBookScanner:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def _init_connection(self):
+    def _ensure_connection(self):
+        if not self._is_remote:
+            return
+
+        if self._ssh_client or self._smb_connection:
+            return
+
         if self._is_ssh:
             parsed = urlparse(self.folder)
+
             self._ssh_client = paramiko.SSHClient()
             self._ssh_client.set_missing_host_key_policy(
                 paramiko.AutoAddPolicy()
             )
+
             self._ssh_client.connect(
                 hostname=parsed.hostname,
                 port=parsed.port or 22,
                 username=parsed.username,
                 password=parsed.password,
             )
+
             self._sftp = self._ssh_client.open_sftp()
             self._remote_path = parsed.path
 
         elif self._is_smb:
             parsed = urlparse(self.folder)
+
             host = parsed.hostname
             share, *parts = parsed.path.lstrip("/").split("/")
+
             self._remote_path = "/".join(parts)
-            self._smb_connection = Connection(
-                uuid.uuid4(),
-                host,
-                445
-            )
+
+            self._smb_connection = Connection(uuid.uuid4(), host, 445)
             self._smb_connection.connect(Dialects.SMB_3_1_1)
+
             self._smb_session = Session(
                 self._smb_connection,
                 parsed.username,
                 parsed.password
             )
             self._smb_session.connect()
+
             self._smb_tree = TreeConnect(
                 self._smb_session,
                 f"\\\\{host}\\{share}"
             )
-
             self._smb_tree.connect()
-        else:
-            self._remote_path = self.folder
 
     # -------------------------
     # flags
@@ -114,6 +130,7 @@ class RemoteBookScanner:
             self._smb_connection.disconnect()
 
     def list_archives(self) -> list[str]:
+        self._ensure_connection()
         if self._sftp:
             files = self._sftp.listdir(self._remote_path)
 
@@ -215,6 +232,7 @@ class RemoteBookScanner:
             print()
 
         if self._is_remote:         
+            self._ensure_connection()
             archive_name = RemoteBookScanner._get_filename(archive_url)
             if self._ui: self._progress_idx = self._ui.add_progress(f"Загрузка {archive_name}", "B")
 
@@ -290,9 +308,40 @@ class RemoteBookScanner:
     @asynccontextmanager
     async def open_zip_ctx(self, archive_name: str):
         archive_path = await self._fetch_archive(archive_name)
-        zipf = await asyncio.to_thread(zipfile.ZipFile, archive_path)
-        try:
-            yield zipf
-        finally:
-            await asyncio.to_thread(zipf.close)
+
+        async with RemoteBookScanner._cache_lock:
+            RemoteBookScanner._access_counter += 1
+            access = RemoteBookScanner._access_counter
+
+            cached = RemoteBookScanner._zip_cache.get(archive_name)
+
+            if cached:
+                zipf, mem, _ = cached
+                RemoteBookScanner._zip_cache[archive_name] = (zipf, mem, access)
+            else:
+                data = await asyncio.to_thread(
+                    lambda: open(archive_path, "rb").read()
+                )
+
+                mem = io.BytesIO(data)
+                zipf = zipfile.ZipFile(mem)
+
+                RemoteBookScanner._zip_cache[archive_name] = (
+                    zipf,
+                    mem,
+                    access
+                )
+
+            # cleanup старых
+            to_remove = [
+                name
+                for name, (_, _, last) in RemoteBookScanner._zip_cache.items()
+                if access - last > RemoteBookScanner._max_idle_accesses
+            ]
+
+            for name in to_remove:
+                zipf_old, mem_old, _ = RemoteBookScanner._zip_cache.pop(name)
+                zipf_old.close()
+
+        yield zipf
     
