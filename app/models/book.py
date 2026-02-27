@@ -25,8 +25,9 @@ class Book:
     embedding: np.ndarray = None
     model_id: str = None
     text: str = None
-    source_length: int = 0
-    token_length: int = 0
+    shape: int = None
+    source_length: int = None
+
 
     T = TypeVar("T")
 
@@ -45,7 +46,10 @@ class Book:
             source_link: str = None,
             embedding: np.ndarray = None,
             model_id: str = None,
-            text: str = None):
+            text: str = None,
+            shape: int = None,
+            source_length: int = None
+        ):
         self.id = id
         self.file_name = file_name
         self.title = title
@@ -59,10 +63,12 @@ class Book:
         self.embedding = embedding
         self.model_id = model_id
         self.text = text
+        self.shape = shape
+        self.source_length = source_length
 
         self.authors = frozenset(self._parse_array(author)) if authors is None and author else frozenset(authors or [])
         self.authors_key = tuple(sorted(self.authors)) if self.authors else ()
-
+        
     @classmethod
     def map(cls, row) -> "Book":
         if row:
@@ -78,7 +84,8 @@ class Book:
                 source_link=safe_get(row, "source_link"),
                 embedding=safe_get(row, "embedding"),
                 text=safe_get(row, "source_text"),
-                model_id=safe_get(row, "model"),
+                shape=safe_get(row, "shape"),
+                source_length=safe_get(row, "source_length"),
             )
         else:
             return None
@@ -113,6 +120,10 @@ class Book:
             for a in source.split("||")
             if a.strip()
         ]
+
+    @property
+    def source_chunk_length(self):
+        return len(self.text)
 
 @dataclass
 class BookRegistry:

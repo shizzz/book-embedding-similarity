@@ -15,10 +15,11 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE TABLE IF NOT EXISTS embeddings (
     book_id INTEGER PRIMARY KEY,
     embedding NUMPY,
+    shape INTEGER NULL,
     source_text COMPRESSED_TEXT,
     model CHAR(32) NOT NULL,
     source_length INTEGER NULL,
-    token_length INTEGER NULL,
+    source_chunk_length INTEGER NULL,
     FOREIGN KEY(book_id) REFERENCES books(id)
 );
 

@@ -28,9 +28,6 @@ class FB2Book:
             if not getattr(book, attr):
                 setattr(book, attr, getter())
 
-        book.source_length = len(book.data) if book.data else 0
-        book.token_length = len(book.text) if book.text else 0
-
     # =====================
     # TEXT
     # =====================

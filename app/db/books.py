@@ -27,7 +27,9 @@ class BookRepository:
         b.source_link,
         e.embedding,
         e.source_text,
-        e.model
+        e.model,
+        e.source_length,
+        e.shape
     FROM books b
     JOIN embeddings e ON e.book_id = b.id
     """

@@ -115,7 +115,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                     authors = self._parse_authors(book["author"])
                     file_name = f"{book['file']}.{book['ext']}"
                     link = f"{archive_name}/{file_name}"
-                    
+
                     yield Book(
                         file_name=file_name,
                         title=book["title"],
@@ -161,5 +161,6 @@ class InpBookSearchEngine(BaseBookSearchEngine):
         archive_name, file_name = book.source_link.split("/", 1)
         with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
             data = await scanner.get_book_data(archive_name, file_name)
+            book.source_length = len(data)
         fb2 = FB2Book(data)
         fb2.enrich_book(book)

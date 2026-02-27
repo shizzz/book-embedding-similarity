@@ -16,15 +16,22 @@ class EmbeddingsRepository:
         for row in cursor:
             yield (row["book_id"], row["embedding"])
 
-    def save(conn, book_id: int, embedding: np.ndarray, model: str,
-             source_length: int = None, token_length: int = None):
+    def save(
+            conn,
+            book_id: int,
+            embedding: np.ndarray,
+            model: str,
+            source_length: int = None,
+            source_chunk_length: int = None,
+            shape: int = None
+    ):
         conn.execute(
             """
             INSERT OR REPLACE INTO embeddings
-            (book_id, embedding, model, source_length, token_length)
+            (book_id, embedding, model, source_length, source_chunk_length, shape)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (book_id, embedding, model, source_length, token_length)
+            (book_id, embedding, model, source_length, source_chunk_length, shape)
         )
 
     @staticmethod
@@ -32,11 +39,11 @@ class EmbeddingsRepository:
         conn.executemany(
             """
             INSERT OR REPLACE INTO embeddings
-            (book_id, embedding, source_text, model, source_length, token_length)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (book_id, embedding, source_text, model, source_length, source_chunk_length, shape)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (book.id, book.embedding, DB.adapt_text(book.text), book.model_id, book.source_length, book.token_length)
+                (book.id, book.embedding, DB.adapt_text(book.text), book.model_id, book.source_length, book.source_chunk_length, book.shape)
                 for book in books
             ]
         )

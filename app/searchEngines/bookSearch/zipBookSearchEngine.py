@@ -52,6 +52,7 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
         archive_name, file_name = book.source_link.split("/", 1)
 
         with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            book.data = await scanner.get_book_data(archive_name, file_name)
-            fb2 = FB2Book(book.data)
+            data = await scanner.get_book_data(archive_name, file_name)
+            book.source_length = len(data)
+            fb2 = FB2Book(data)
             fb2.enrich_book(book)
