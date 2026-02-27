@@ -3,7 +3,7 @@ from typing import Tuple
 from app.workers.base import BaseDbQueueWorker
 from app.hnsw import IndexManager
 from app.model import Model, generate_embeddings
-from app.db import DB, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository
+from app.db import DB, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository, ModelRepository
 from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
@@ -32,6 +32,11 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         with DB() as conn:
             self._book_id = BookRepository.get_max_id(conn)
             self._remove_invalid_embeddings(conn)
+            self._model_id = ModelRepository.get_or_create(
+                conn=conn,
+                name=self._model.name,
+                uid=self._model.uid
+            )
     
     async def get_total(self) -> int:
         total = await self.engine.get_total()
@@ -78,7 +83,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
                 if (
                     book.embedding is None or
-                    book.model_id != self._model.uid
+                    book.model_id != self._model_id
                 ):
                     datasets.append(Dataset.EMBEDDING)
 
@@ -112,6 +117,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 registry = BookRegistry()
                 registries[key] = registry
 
+            book.model_id = self._model_id
             registry.append(book)
 
             await self.ui.done_async(self._get_book_idx)

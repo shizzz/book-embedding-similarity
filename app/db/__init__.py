@@ -5,6 +5,7 @@ from .feedback import FeedbackRepository
 from .similar import SimilarRepository
 from .embeddings import EmbeddingsRepository
 from .authors import AuthorRepository
+from .model import ModelRepository
 
 __all__ = [
     "db",
@@ -13,5 +14,6 @@ __all__ = [
     "FeedbackRepository",
     "SimilarRepository",
     "EmbeddingsRepository",
-    "AuthorRepository"
+    "AuthorRepository",
+    "ModelRepository"
 ]

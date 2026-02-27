@@ -59,7 +59,6 @@ def generate_embeddings(model: "Model", registry: "BookRegistry") -> "BookRegist
 
         book.embedding = final_embedding
         book.shape = final_embedding.shape[0]
-        book.model_id = model.uid
         del final_embedding
 
     return registry

@@ -23,7 +23,7 @@ class Book:
     source_link: Optional[str]
     uid: str = None
     embedding: np.ndarray = None
-    model_id: str = None
+    model_id: int = None
     text: str = None
     shape: int = None
     source_length: int = None
@@ -45,7 +45,7 @@ class Book:
             source_type: str = None,
             source_link: str = None,
             embedding: np.ndarray = None,
-            model_id: str = None,
+            model_id: int = None,
             text: str = None,
             shape: int = None,
             source_length: int = None
@@ -77,6 +77,7 @@ class Book:
                 file_name=row["book"],
                 title=row["title"],
                 author=row["author"],
+                model_id=safe_get(row, "model"),
                 serie=safe_get(row, "serie"),
                 generes=safe_get(row, "generes").split("||"),
                 year=safe_get(row, "year"),

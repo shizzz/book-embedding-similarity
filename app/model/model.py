@@ -20,7 +20,8 @@ class Model:
     uid: str
 
     def __init__(self, threads):
-        print("Model:", MODEL_NAME)
+        self.name = MODEL_NAME
+        print("Model:", self.name)
         self._threads = threads
         model_dir = DATA_DIR / Model.MODEL_DIR
         model_path = Model.get_model_dir()
@@ -29,7 +30,7 @@ class Model:
         if os.path.exists(model_path):
             self.load_local_model(model_path)
         else:
-            transformer = SentenceTransformer(MODEL_NAME)
+            transformer = SentenceTransformer(self.name)
             transformer.save(str(model_path))
             del transformer
             self.load_local_model(model_path)
