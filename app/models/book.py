@@ -15,6 +15,9 @@ class Book:
     title: Optional[str]
     author: Optional[str]
     authors: Optional[frozenset]
+    serie: Optional[str]
+    generes: Optional[List[str]]
+    year: Optional[int]
     data: Optional[bytes]
     source_type: Optional[str]
     source_link: Optional[str]
@@ -34,6 +37,9 @@ class Book:
             title: str = None,
             author: str = None,
             authors: List[str] = None,
+            serie: str = None,
+            generes: List[str] = None,
+            year: int = None,
             data: bytes = None,
             source_type: str = None,
             source_link: str = None,
@@ -44,6 +50,9 @@ class Book:
         self.file_name = file_name
         self.title = title
         self.author = author
+        self.serie = serie
+        self.generes = generes
+        self.year = year
         self.data = data
         self.source_type = source_type
         self.source_link = source_link
@@ -51,7 +60,7 @@ class Book:
         self.model_id = model_id
         self.text = text
 
-        self.authors = frozenset(self._parse_authors(author)) if authors is None and author else frozenset(authors or [])
+        self.authors = frozenset(self._parse_array(author)) if authors is None and author else frozenset(authors or [])
         self.authors_key = tuple(sorted(self.authors)) if self.authors else ()
 
     @classmethod
@@ -62,6 +71,9 @@ class Book:
                 file_name=row["book"],
                 title=row["title"],
                 author=row["author"],
+                serie=safe_get(row, "serie"),
+                generes=safe_get(row, "generes").split("||"),
+                year=safe_get(row, "year"),
                 source_type=safe_get(row, "source_type"),
                 source_link=safe_get(row, "source_link"),
                 embedding=safe_get(row, "embedding"),
@@ -92,13 +104,13 @@ class Book:
         }
 
     @staticmethod
-    def _parse_authors(author: str | None) -> List[str]:
-        if not author:
+    def _parse_array(source: str | None) -> List[str]:
+        if not source:
             return []
 
         return [
             a.strip()
-            for a in author.split(",")
+            for a in source.split("||")
             if a.strip()
         ]
 

@@ -40,18 +40,16 @@ class FB2Book:
         min_chars: int = ST_MIN_CHARS,
         max_title_chars: int = ST_MAX_TITLE_CHARS,
         max_description_chars: int = ST_MAX_DESCRIPTION_CHARS,
+        sections: int = 7,
     ) -> str:
         """
         Возвращает текст книги для embedding.
 
         Структура:
-            [TITLE]
             title
 
-            [DESCRIPTION]
             description
 
-            [BODY]
             sampled body text (target_chars)
         """
 
@@ -68,8 +66,7 @@ class FB2Book:
             if text:
                 paragraphs.append(text)
 
-        if not paragraphs:
-            paragraphs = []
+        total = len(paragraphs)
 
         total_chars = sum(len(p) + 2 for p in paragraphs)
 
@@ -89,30 +86,16 @@ class FB2Book:
         # -------- short book fallback --------
         if total_chars <= target_chars:
             body_text = "\n\n".join(paragraphs)
-
-            parts = []
-
-            if title:
-                parts.append(f"[TITLE]\n{title}")
-
-            if description:
-                parts.append(f"[DESCRIPTION]\n{description}")
-
-            parts.append(f"[BODY]\n{body_text}")
-
-            return "\n\n".join(parts)
+            if body_text:
+                parts.append(f"[BODY]\n{body_text}")
+            return "\n\n".join(parts).strip()
 
         # -------- collect body --------
-        total = len(paragraphs)
         used = set()
-        used_add = used.add
-        used_contains = used.__contains__
         body_parts = []
-
         remaining = target_chars
 
         def try_add(idx: int) -> bool:
-            """Try to add paragraph without exceeding budget."""
             nonlocal remaining
 
             if idx in used:
@@ -124,47 +107,49 @@ class FB2Book:
             if size > remaining:
                 return False
 
-            if used_contains(idx):
-                return False
-
-            used_add(idx)
+            used.add(idx)
             body_parts.append(p)
             remaining -= size
-
             return True
 
-        def collect_forward(start, budget):
-            length = 0
-            i = start
-
-            while i < total and length < budget and remaining > 0:
-                if try_add(i):
-                    length += len(paragraphs[i]) + 2
-                i += 1
-
-        def collect_backward(start, budget):
-            length = 0
-            i = start
-
-            while i >= 0 and length < budget and remaining > 0:
-                if try_add(i):
-                    length += len(paragraphs[i]) + 2
-                i -= 1
-
+        # -------- multi-section sampling --------
         if total > 0 and remaining > 0:
 
-            per_section = target_chars // 3
+            sections = max(1, min(sections, total))
+            per_section_budget = target_chars // sections
 
-            # start
-            collect_forward(0, per_section)
+            for s in range(sections):
 
-            # middle (balanced)
-            mid = total // 2
-            collect_forward(mid, per_section // 2)
-            collect_backward(mid - 1, per_section // 2)
+                if remaining <= 0:
+                    break
 
-            # end
-            collect_backward(total - 1, per_section)
+                # центр секции
+                center = int((s + 0.5) * total / sections)
+
+                # расширяемся вокруг центра
+                left = center
+                right = center + 1
+
+                local_used = 0
+
+                while local_used < per_section_budget and remaining > 0:
+
+                    added = False
+
+                    if left >= 0:
+                        if try_add(left):
+                            local_used += len(paragraphs[left]) + 2
+                            added = True
+                        left -= 1
+
+                    if right < total and local_used < per_section_budget:
+                        if try_add(right):
+                            local_used += len(paragraphs[right]) + 2
+                            added = True
+                        right += 1
+
+                    if not added:
+                        break
 
         # -------- fallback if too small --------
         body_text = "\n\n".join(body_parts)
@@ -181,10 +166,9 @@ class FB2Book:
                 if len(body_text) >= min_chars:
                     break
 
-        # -------- hard safety trim --------
+        # -------- hard trim --------
         body_text = body_text[:target_chars].strip()
 
-        # -------- assemble final text --------
         if body_text:
             parts.append(f"[BODY]\n{body_text}")
 

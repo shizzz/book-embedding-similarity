@@ -20,6 +20,9 @@ class BookRepository:
         b.book,
         b.title,
         b.author,
+        b.serie,
+        b.generes,
+        b.year,
         b.source_type,
         b.source_link,
         e.embedding,
@@ -128,8 +131,8 @@ class BookRepository:
 
         cursor.executemany(
             """
-            INSERT OR REPLACE INTO books (id, book, uid, title, author, added_at, source_type, source_link)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO books (id, book, uid, title, author, serie, generes, year, added_at, source_type, source_link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -138,6 +141,9 @@ class BookRepository:
                     book.uid,
                     book.title,
                     book.author,
+                    book.serie,
+                    "||".join(book.generes),
+                    book.year,
                     now,
                     book.source_type,
                     book.source_link,

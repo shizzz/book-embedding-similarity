@@ -1,6 +1,7 @@
 import asyncio
 import os
 import zipfile
+from datetime import datetime
 from typing import AsyncGenerator, Any
 from app.models import Book
 from app.utils import FB2Book
@@ -66,6 +67,19 @@ class InpBookSearchEngine(BaseBookSearchEngine):
             parts = [part.strip() for part in author.split(",") if part.strip()]
             authors.append(" ".join(parts))
         return authors
+    
+    # -----------------------------
+    # Преобразование авторов
+    # -----------------------------
+    def _parse_array(self, authors_str: str) -> list[str]:
+        result = []
+        for author in authors_str.split(":"):
+            author = author.strip()
+            if not author:
+                continue
+            parts = [part.strip() for part in author.split(",") if part.strip()]
+            result.append(" ".join(parts))
+        return result
 
     # -----------------------------
     # Пропуск ненужных книг
@@ -101,12 +115,15 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                     authors = self._parse_authors(book["author"])
                     file_name = f"{book['file']}.{book['ext']}"
                     link = f"{archive_name}/{file_name}"
-
+                    
                     yield Book(
                         file_name=file_name,
                         title=book["title"],
-                        author=", ".join(authors),
+                        author="||".join(authors),
                         authors=authors,
+                        serie=book["series"],
+                        generes=[g.strip() for g in book["genere"].split(":") if g.strip()],
+                        year=datetime.fromisoformat(book["date"]).year,
                         source_type=self.TYPE,
                         source_link=link
                     )

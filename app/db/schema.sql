@@ -1,12 +1,15 @@
 CREATE TABLE IF NOT EXISTS books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book TEXT,
-    uid TEXT,
-    title TEXT,
-    author TEXT,
-    added_at TEXT,
-    source_type TEXT,
-    source_link TEXT
+    uid TEXT NULL,
+    title TEXT NULL,
+    author TEXT NULL,
+    serie TEXT NULL,
+    generes TEXT NULL,
+    year INTEGER NULL,
+    added_at TEXT NULL,
+    source_type TEXT NULL,
+    source_link TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS embeddings (
@@ -45,6 +48,8 @@ CREATE TABLE IF NOT EXISTS feedback (
     candidate_book_id INTEGER NOT NULL,
     label FLOAT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ranker INTEGER NOT NULL DEFAULT 0,
+    model INTEGER NOT NULL DEFAULT 0,
     UNIQUE(source_book_id, candidate_book_id),
     FOREIGN KEY (source_book_id) REFERENCES books(id),
     FOREIGN KEY (candidate_book_id) REFERENCES books(id)

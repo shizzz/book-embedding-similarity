@@ -34,20 +34,20 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
                 for row in BookRepository.get_all_with_embeddings(conn):
                     current += 1
 
-                    book_id, book, title, author, _, _, emb_norm = row
+                    source = Book.map(row)
 
                     if self._should_skip(
                         source=source,
-                        candidate_name=book,
-                        candidate_title=title,
+                        candidate_name=source.file_name,
+                        candidate_title=source.title,
                         seen=seen_books,
-                        candidate_authors=Book._parse_authors(author)
+                        candidate_authors=source.authors
                     ):
                         continue
 
                     try:
-                        score = np.dot(emb_norm, source.embedding)
-                        candidates.append((score, book_id))
+                        score = np.dot(source.embedding, source.embedding)
+                        candidates.append((score, source.id))
                     except Exception:
                         continue
 
