@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id INTEGER NOT NULL,
+    data COMPRESSED_TEXT NOT NULL,
+    length INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chunks_book_id
+ON chunks(book_id);

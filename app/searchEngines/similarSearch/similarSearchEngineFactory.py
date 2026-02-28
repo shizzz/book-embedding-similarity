@@ -2,7 +2,8 @@ from typing import Literal
 from faiss import IndexIDMap
 from app.hnsw import IndexManager
 from app.hnsw.rerankers import LightGBMReranker
-from app.db import DB, BookRepository
+from app.db import DBRouter
+from app.db.repositories import BookRepository
 from app.models import Book, BookRegistry
 from .similarSearchEngine import SimilarSearchEngine
 from .indexSimilarSearchEngine import IndexSimilarSearchEngine

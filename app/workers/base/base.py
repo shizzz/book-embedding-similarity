@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from asyncio import create_task, gather
 from rich.live import Live
 from app.workers.sources import StatsUI, ConsoleHandler
-from app.db import Migrator
+from app.db import Migrator, DBRouter
 from app.settings.config import MAX_WORKERS
 
 class BaseWorker(ABC):
@@ -17,6 +17,7 @@ class BaseWorker(ABC):
     ):
         self.max_workers: int = max_workers
         self.show_ui: bool = show_ui
+        self._router = DBRouter()
         
         if self.show_ui:
             self.ui = StatsUI(max_workers=self.max_workers, title=title)
@@ -54,7 +55,8 @@ class BaseWorker(ABC):
     async def run(self):
         try:
             self.logger.info("DB Init...")
-            await asyncio.to_thread(Migrator().apply_schema)
+            Migrator(self._router).migrate_chunks()
+            Migrator(self._router).migrate_meta()
 
             self.logger.info("Prepare...")
             await self.prepare()
@@ -62,12 +64,18 @@ class BaseWorker(ABC):
             self.logger.info("Run...")
             await self.before_run()
 
-            tasks = self.create_tasks()
-            tasks.extend(
-                create_task(self.thread(i))
+            producer_tasks = self.create_tasks()
+
+            await asyncio.sleep(0)
+
+            worker_tasks = [
+                asyncio.create_task(self.thread(i))
                 for i in range(1, self.max_workers + 1)
-            )
-            await gather(*tasks)
+            ]
+
+            if producer_tasks:
+                await asyncio.gather(*producer_tasks)
+            await asyncio.gather(*worker_tasks)
 
             self.logger.info("Finalise")
             await self.before_fin()

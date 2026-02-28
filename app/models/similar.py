@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 from app.models.book import Book
-from app.db import DB, BookRepository
+from app.db import DBRouter
+from app.db.repositories import BookRepository
 
 @dataclass(frozen=True, slots=True)
 class Similar:
@@ -52,9 +53,9 @@ class Similar:
             book_ids.add(source_id)
             book_ids.add(candidate_id)
 
-        with DB() as conn:
-            raw_books = BookRepository.get_many(conn, list[int](book_ids))
-            books_by_id = Book.map_by_id(raw_books, Book.map)
+        router = DBRouter()
+        raw_books = BookRepository(router).get_many(list[int](book_ids))
+        books_by_id = Book.map_by_id(raw_books, Book.map)
 
         result: List[Similar] = []
         for score, source_id, candidate_id in rows:

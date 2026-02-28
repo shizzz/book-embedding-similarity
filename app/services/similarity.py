@@ -3,7 +3,8 @@ import asyncio
 import numpy as np
 from typing import Optional, List, Tuple
 
-from app.db import DB, SimilarRepository
+from app.db import DBRouter
+from app.db.repositories import SimilarRepository
 from app.models import Book
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService

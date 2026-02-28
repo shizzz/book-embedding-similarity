@@ -1,7 +1,8 @@
 import time
 from typing import List, Tuple
 from app.models import Book, BookRegistry
-from app.db import DB, BookRepository
+from app.db import DBRouter
+from app.db.repositories import BookRepository
 from app.searchEngines.similarSearch import SimilarSearchEngine
 
 class SimilarSearchService:
@@ -12,8 +13,8 @@ class SimilarSearchService:
         self._engine = engine
         self.last_run_seconds = None
         
-        with DB() as conn:
-            self._total = BookRepository.count_embeddings(conn)
+        router = DBRouter()
+        self._total = BookRepository(router).count_embeddings()
 
     def run(self, source: Book, progress_callback=None) -> List[Tuple[float, int, int]]:
         if source.embedding is None:

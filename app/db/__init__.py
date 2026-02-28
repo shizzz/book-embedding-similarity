@@ -1,19 +1,13 @@
-from .connection import DB
-from .migrate import Migrator
-from .books import BookRepository
-from .feedback import FeedbackRepository
-from .similar import SimilarRepository
-from .embeddings import EmbeddingsRepository
-from .authors import AuthorRepository
-from .model import ModelRepository
+from .migrator import Migrator
+from .pool import SQLitePool
+from .pooled_connection import PooledConnection
+from .router import DBRouter
+from .adapters import SQLiteAdapters
 
 __all__ = [
-    "db",
     "Migrator",
-    "BookRepository",
-    "FeedbackRepository",
-    "SimilarRepository",
-    "EmbeddingsRepository",
-    "AuthorRepository",
-    "ModelRepository"
+    "SQLitePool",
+    "PooledConnection",
+    "DBRouter",
+    "SQLiteAdapters"
 ]

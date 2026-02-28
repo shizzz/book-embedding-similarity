@@ -18,7 +18,7 @@ TRANSFORM_FILE = Path(os.getenv("TRANSFORM_FILE", str(DATA_DIR / "embedding_tran
 BOOK_FOLDER = os.getenv("BOOK_FOLDER","/mnt/data/librusec/lib/lib.rus.ec/")
 INPX_FOLDER = os.getenv("INPX_FOLDER","/mnt/data/librusec/lib/librusec_local_fb2.inpx")
 
-MAX_WORKERS = int(os.getenv("MAX_WORKERS",4))
+MAX_WORKERS = int(os.getenv("MAX_WORKERS",2))
 
 SIMILARS_PER_BOOK = int(os.getenv("SIMILARS_PER_BOOK",100))
 

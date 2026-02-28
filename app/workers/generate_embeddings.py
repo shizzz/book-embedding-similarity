@@ -3,7 +3,8 @@ from typing import Tuple
 from app.workers.base import BaseDbQueueWorker
 from app.hnsw import IndexManager
 from app.model import Model, generate_embeddings
-from app.db import DB, BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository, ModelRepository
+from app.db import DBRouter, Migrator
+from app.db.repositories import BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository, ModelRepository, ChunkRepository
 from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 
@@ -14,6 +15,8 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, self.ui)
         self._get_book_idx: int = None
         self._book_id: int = 1
+        self._chunk_id: int = 1
+        self._emb_id: int = 1
         self.max_batch_size: int = max_batch_size
 
         self._model = Model(self.max_workers)
@@ -29,14 +32,17 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     
     async def prepare(self) -> None:
         self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
-        with DB() as conn:
-            self._book_id = BookRepository.get_max_id(conn)
-            self._remove_invalid_embeddings(conn)
-            self._model_id = ModelRepository.get_or_create(
-                conn=conn,
-                name=self._model.name,
-                uid=self._model.uid
-            )
+        
+        #self._remove_invalid_embeddings()
+        self._model_id = ModelRepository(self._router).get_or_create(
+            name=self._model.name,
+            uid=self._model.uid
+        )
+        Migrator(self._router).migrate_embeddings(self._model_id)
+        
+        self._book_id = BookRepository(self._router).get_max_id()
+        self._chunk_id = ChunkRepository(self._router).get_max_id()
+        self._emb_id = EmbeddingsRepository(self._router, self._model_id).get_max_id()
     
     async def get_total(self) -> int:
         total = await self.engine.get_total()
@@ -44,26 +50,22 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         return total
 
     async def fin(self) -> None:
-        with DB() as conn:
-            embeddings = list[Tuple[int, bytes]](EmbeddingsRepository.get_all(conn))
-            feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
-            books: list[Book] = [
-                Book.map_row(row)
-                for row in BookRepository.get_all(conn)
-            ]
+        pass
+        # embeddings = list[Tuple[int, bytes]](EmbeddingsRepository(self._router, self._model_id).get_all())
+        # feedbacks = Feedbacks(FeedbackRepository(self._router).get_all())
+        # books: list[Book] = [
+        #     Book.map_row(row)
+        #     for row in BookRepository(self._router).get_all()
+        # ]
             
-        self.hnsw.load_emb(embeddings)
-        self.hnsw.rebuild(
-            feedbacks=feedbacks,
-            books=books,
-        )
-
-        self.logger.info("Чистка базы даных")
-        DB().vacuum()
+        # self.hnsw.load_emb(embeddings)
+        # self.hnsw.rebuild(
+        #     feedbacks=feedbacks,
+        #     books=books,
+        # )
 
     async def pull_queue(self) -> None:
-        with DB() as conn:
-            existed_books = set(BookRepository.get_names(conn))
+        existed_books = set(BookRepository(self._router).get_names())
 
         registries: dict[
             tuple[Action, frozenset[Dataset]],
@@ -78,7 +80,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 action = Action.UPDATE
                 book = await self._enrich_from_db(book)
 
-                if book.text is None:
+                if book.chunks is None:
                     datasets.append(Dataset.BOOK)
 
                 if (
@@ -100,13 +102,18 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                     Dataset.AUTHOR
                 ])
 
-            if book.text is None:
+            if book.chunks is None:
                 await self.engine.enrich_book_data(book)
+                for chunk in book.chunks:
+                    chunk.chunk_id = self._chunk_id
+                    self._chunk_id += 1
 
             # Назначаем ID если отсутствует
             if book.id is None:
                 book.id = self._book_id
                 self._book_id += 1
+                for chunk in book.chunks:
+                    chunk.book_id = book.id
 
             # Получаем registry по ключу
             key = (action, frozenset(datasets))
@@ -164,20 +171,33 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         await self.enqueue_shutdown_signals_async()
         self._queue_pulled.set()
 
-    def save_to_db(self, conn, task: Task) -> int:
+    def save_to_db(self, router: DBRouter, task: Task) -> int:
+        chunks = []
+        embeddings = []
+        for book in task.entity:
+            chunks.extend(book.chunks)
+            embeddings.extend(book.embedding)
+
         if Dataset.BOOK in task.dataset:
-            BookRepository.save_bulk(conn, task.entity)
+            BookRepository(router).save_bulk(task.entity)
+            ChunkRepository(router).create_many(chunks)
             
         if Dataset.EMBEDDING in task.dataset:
-            EmbeddingsRepository.save_bulk(conn, task.entity)
+            EmbeddingsRepository(router, self._model_id).save_bulk(embeddings)
             
         if Dataset.AUTHOR in task.dataset and task.action == Action.INSERT:
-            AuthorRepository.save_bulk(conn, task.entity)
+            AuthorRepository(router).save_bulk(task.entity)
 
         return len(task.entity)
 
     def _process_book(self, registry: BookRegistry) -> BookRegistry:
-        return generate_embeddings(self._model, registry)
+        result = generate_embeddings(self._model, registry)
+        for book in result:
+            for emb in book.embedding:
+                emb.book_id = book.id
+                emb.emb_id = self._emb_id
+                self._emb_id += 1
+        return result
 
     def _adaptive_batch_size(self, queue_size: int,) -> int:
         """
@@ -198,16 +218,18 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     
     async def _enrich_from_db(self, book: Book) -> Book:
         def _sync():
-            with DB() as conn:
-                return Book.map(BookRepository.get_full_by_file(conn, book.file_name))
+            book = Book.map(BookRepository(self._router).get_full_by_file(book.file_name))
+            if book:
+                book.chunks = ChunkRepository(self._router).get_by_book(book.id)
+                book.embedding = EmbeddingsRepository(self._router, self._model_id).get(book.id)
 
         return await asyncio.to_thread(_sync)
              
-    def _remove_invalid_embeddings(self, conn):
+    def _remove_invalid_embeddings(self):
         to_delete = []
         expected_dim = None
 
-        for book_id, emb in EmbeddingsRepository.get_all(conn):
+        for book_id, emb in EmbeddingsRepository.get_all():
             if expected_dim is None:
                 expected_dim = emb.shape[0]
 

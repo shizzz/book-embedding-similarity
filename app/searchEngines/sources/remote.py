@@ -192,22 +192,39 @@ class RemoteBookScanner:
         return local_path
 
     async def _download_archive(self, archive_url: str, local_path: str):
+        tmp_path = local_path + ".tmp"
+
         def _sftp_download():
-            with self._sftp.file(archive_url, "rb") as remote_file, open(local_path, "wb") as out_file:
+            self._ensure_connection()
+            archive_name = RemoteBookScanner._get_filename(archive_url)
+            if self._ui:
+                self._progress_idx = self._ui.add_progress(f"Загрузка {archive_name}", "B")
+
+            # Проверяем, сколько уже скачано
+            downloaded = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+
+            with self._sftp.file(archive_url, "rb") as remote_file:
                 total_size = remote_file.stat().st_size
-                downloaded = 0
+                if downloaded:
+                    remote_file.seek(downloaded)
 
-                if self._ui: self._ui.update_total(total_size, self._progress_idx)
+                mode = "ab" if downloaded else "wb"
+                with open(tmp_path, mode) as out_file:
+                    if self._ui:
+                        self._ui.update_total(total_size, self._progress_idx)
 
-                while True:
-                    chunk = remote_file.read(self.CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    out_file.write(chunk)
-                    downloaded += len(chunk)
-                    if self._ui: self._ui.done(self._progress_idx, len(chunk))
+                    while True:
+                        chunk = remote_file.read(self.CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        out_file.write(chunk)
+                        downloaded += len(chunk)
+                        if self._ui:
+                            self._ui.done(self._progress_idx, len(chunk))
 
-                print()
+            os.rename(tmp_path, local_path)
+            if self._ui:
+                self._ui.remove_progress(self._progress_idx)
 
         def _smb_download():
             path_parts = archive_url.split("/")
@@ -215,26 +232,34 @@ class RemoteBookScanner:
 
             f = Open(self._smb_tree, remote_file_path)
             f.create()
-            downloaded = 0
-            total_size = f.size  # если Open предоставляет размер файла
-            if self._ui: self._ui.update_total(total_size, self._progress_idx)
+            total_size = f.size
+            downloaded = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+            if downloaded:
+                f.seek(downloaded)
 
-            with open(local_path, "wb") as out_file:
+            mode = "ab" if downloaded else "wb"
+            if self._ui:
+                archive_name = os.path.basename(remote_file_path)
+                self._progress_idx = self._ui.add_progress(f"Загрузка {archive_name}", "B")
+                self._ui.update_total(total_size, self._progress_idx)
+
+            with open(tmp_path, mode) as out_file:
                 while True:
                     chunk = f.read(self.CHUNK_SIZE)
                     if not chunk:
                         break
                     out_file.write(chunk)
                     downloaded += len(chunk)
-                    if self._ui: self._ui.done(self._progress_idx, len(chunk))
+                    if self._ui:
+                        self._ui.done(self._progress_idx, len(chunk))
 
             f.close()
-            print()
+            os.rename(tmp_path, local_path)
+            if self._ui:
+                self._ui.remove_progress(self._progress_idx)
 
-        if self._is_remote:         
+        if self._is_remote:
             self._ensure_connection()
-            archive_name = RemoteBookScanner._get_filename(archive_url)
-            if self._ui: self._progress_idx = self._ui.add_progress(f"Загрузка {archive_name}", "B")
 
         if self._is_ssh:
             await asyncio.to_thread(_sftp_download)
@@ -242,8 +267,6 @@ class RemoteBookScanner:
             await asyncio.to_thread(_smb_download)
         else:
             raise ValueError("No valid remote connection")
-        
-        if self._ui: self._ui.remove_progress(self._progress_idx)
 
     async def scan_archive(
         self,

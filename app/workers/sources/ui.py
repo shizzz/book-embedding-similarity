@@ -63,27 +63,32 @@ class StatsUI:
 
         if idx not in self._speed_history:
             self._speed_history[idx] = {
-                "deque": deque(maxlen=10),
-                "total_count": 0.0
+                "last_time": now,
+                "ema_speed": 0.0
             }
+            return "0"
 
         data = self._speed_history[idx]
-        dq = data["deque"]
 
-        # если deque заполнен, вычитаем count старого элемента
-        if len(dq) == dq.maxlen:
-            _, old_count = dq[0]
-            data["total_count"] -= old_count
+        dt = now - data["last_time"]
+        data["last_time"] = now
 
-        dq.append((now, count))
-        data["total_count"] += count
+        if dt <= 0:
+            return "0"
 
-        # скорость = сумма / разница во времени между первым и последним элементом
-        if len(dq) > 1:
-            total_time = dq[-1][0] - dq[0][0]
-            speed = data["total_count"] / total_time if total_time > 0 else 0
+        instant_speed = count / dt
+
+        alpha = 0.2  # чем меньше — тем плавнее
+
+        if data["ema_speed"] == 0:
+            data["ema_speed"] = instant_speed
         else:
-            speed = 0
+            data["ema_speed"] = (
+                alpha * instant_speed +
+                (1 - alpha) * data["ema_speed"]
+            )
+
+        speed = data["ema_speed"]
 
         if speed >= 10:
             speed_fmt = f"{speed:.0f}"

@@ -1,6 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
+from .embedding import Embedding
+from .chunk import Chunk
 
 def safe_get(row, key, default=None):
     try:
@@ -22,12 +24,10 @@ class Book:
     source_type: Optional[str]
     source_link: Optional[str]
     uid: str = None
-    embedding: np.ndarray = None
+    embedding: List[Embedding] = None
     model_id: int = None
-    text: str = None
-    shape: int = None
+    chunks: List[Chunk] = None
     source_length: int = None
-
 
     T = TypeVar("T")
 
@@ -44,9 +44,9 @@ class Book:
             data: bytes = None,
             source_type: str = None,
             source_link: str = None,
-            embedding: np.ndarray = None,
+            embedding: List[Embedding] = None,
             model_id: int = None,
-            text: str = None,
+            chunks: List[Chunk] = None,
             shape: int = None,
             source_length: int = None
         ):
@@ -62,7 +62,7 @@ class Book:
         self.source_link = source_link
         self.embedding = embedding
         self.model_id = model_id
-        self.text = text
+        self.chunks = chunks
         self.shape = shape
         self.source_length = source_length
 

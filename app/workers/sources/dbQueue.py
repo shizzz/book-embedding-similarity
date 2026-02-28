@@ -4,7 +4,7 @@ import gc
 from app.common.types import TEntity
 from typing import Generic, List
 from app.models import Task
-from app.db import DB
+from app.db import DBRouter
 from .ui import StatsUI
 
 class DbQueue(Generic[TEntity]):
@@ -13,7 +13,8 @@ class DbQueue(Generic[TEntity]):
             save_func,
             batch_size: int,
             db_queue_max_size: int,
-            ui: StatsUI
+            ui: StatsUI,
+            router: DBRouter
         ):
         self.queue: asyncio.Queue[TEntity] = asyncio.Queue(maxsize=db_queue_max_size)
         self.task: asyncio.Task | None = None
@@ -25,6 +26,7 @@ class DbQueue(Generic[TEntity]):
 
         self._ui = ui
         self._save_func = save_func
+        self._router = router
 
     def start(self):
         self._progress_idx = self._ui.add_progress("Сохранение в БД", "пакетов")
@@ -55,17 +57,15 @@ class DbQueue(Generic[TEntity]):
         while not self._stop_event.is_set():
             await self._step_async(buffer)
 
-        with DB() as conn:
-            while self._step(conn, buffer):
-                pass
+        while self._step(self._router, buffer):
+            pass
 
         self._ui.console.log("Save thread stopped")
 
     def _save(self, tasks: List[Task]) -> int:
         total = 0
-        with DB() as conn:
-            for task in tasks:
-                total += self._save_func(conn, task)
+        for task in tasks:
+            total += self._save_func(self._router, task)
         return total
 
     async def _step_async(self, buffer: List[Task]):

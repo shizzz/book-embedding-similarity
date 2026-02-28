@@ -16,6 +16,13 @@ class InpBookSearchEngine(BaseBookSearchEngine):
         self.folder = folder
         self.ui = ui
         self._locks: dict[str, asyncio.Lock] = {}
+        self._semaphore = asyncio.Semaphore(3)
+        self._tasks = []
+
+    async def fetch_with_semaphore(self, archive_name):
+        async with self._semaphore:
+            with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
+                await scanner._fetch_archive(archive_name)
 
     # -----------------------------
     # Парсинг одного файла внутри ZIP
@@ -95,7 +102,15 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     async def search_books(self) -> AsyncGenerator[Book, None]:
         with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
             zipf = await scanner.open_zip(INPX_FOLDER)
-            
+
+            for info in zipf.infolist():
+                if info.is_dir():
+                    continue
+
+                archive_name = os.path.splitext(info.filename)[0] + ".zip"
+                task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
+                self._tasks.append(task)
+
             for info in zipf.infolist():
                 if info.is_dir():
                     continue

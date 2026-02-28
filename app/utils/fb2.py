@@ -1,8 +1,8 @@
 from lxml import etree
 import re
 from typing import List, Optional
-from app.models import Book
-from app.settings.config import ST_MIN_CHARS, ST_TARGET_CHARS, ST_MAX_TITLE_CHARS, ST_MAX_DESCRIPTION_CHARS
+from app.models import Book, Chunk
+from app.settings.config import ST_MIN_CHARS, ST_TARGET_CHARS, ST_MAX_DESCRIPTION_CHARS
 
 class FB2Book:
     NS = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
@@ -20,34 +20,33 @@ class FB2Book:
             ("uid", self.get_id),
             ("title", self.get_title),
             ("authors", self.get_authors),
-            ("author", lambda: ", ".join(book.authors)),
-            ("text", self.extract_text)
+            ("author", lambda: ", ".join(book.authors))
         )
 
         for attr, getter in enrichers:
             if not getattr(book, attr):
                 setattr(book, attr, getter())
 
+        # --------- создаем chunks ---------
+        if not getattr(book, "chunks", None):
+            raw_chunks = self.extract_chunks()
+            book.chunks = [
+                Chunk(book_id=book.id, text=text) for text in raw_chunks
+            ]
+
     # =====================
     # TEXT
     # =====================
-    def extract_text(
+    def extract_chunks(
         self,
         target_chars: int = ST_TARGET_CHARS,
         min_chars: int = ST_MIN_CHARS,
-        max_title_chars: int = ST_MAX_TITLE_CHARS,
         max_description_chars: int = ST_MAX_DESCRIPTION_CHARS,
         sections: int = 7,
-    ) -> str:
+    ) -> list[str]:
         """
-        Возвращает текст книги для embedding.
-
-        Структура:
-            title
-
-            description
-
-            sampled body text (target_chars)
+        Возвращает список текстовых чанков книги без разрыва слов.
+        Сэмплируются несколько частей книги: начало, середина, конец и промежуточные.
         """
 
         # -------- extract paragraphs safely --------
@@ -63,113 +62,107 @@ class FB2Book:
             if text:
                 paragraphs.append(text)
 
-        total = len(paragraphs)
+        if not paragraphs:
+            return []
 
-        total_chars = sum(len(p) + 2 for p in paragraphs)
-
-        # -------- prepare title / description --------
-        parts = []
-
-        title = self.get_title()
-        if title:
-            title = re.sub(r"\s+", " ", title).strip()[:max_title_chars]
-            parts.append(f"[TITLE]\n{title}")
-
+        # -------- description --------
         description = self.get_description()
+        chunks = []
         if description:
-            description = re.sub(r"\s+", " ", description).strip()[:max_description_chars]
-            parts.append(f"[DESCRIPTION]\n{description}")
+            description = re.sub(r"\s+", " ", description).strip()
+            if len(description) > max_description_chars:
+                # обрезаем без разрыва слова
+                cutoff = description.rfind(" ", 0, max_description_chars)
+                if cutoff == -1:
+                    cutoff = max_description_chars
+                description = description[:cutoff].strip()
+            if description:
+                chunks.append(description)
 
         # -------- short book fallback --------
+        total_chars = sum(len(p) + 2 for p in paragraphs)
         if total_chars <= target_chars:
             body_text = "\n\n".join(paragraphs)
             if body_text:
-                parts.append(f"[BODY]\n{body_text}")
-            return "\n\n".join(parts).strip()
-
-        # -------- collect body --------
-        used = set()
-        body_parts = []
-        remaining = target_chars
-
-        def try_add(idx: int) -> bool:
-            nonlocal remaining
-
-            if idx in used:
-                return False
-
-            p = paragraphs[idx]
-            size = len(p) + 2
-
-            if size > remaining:
-                return False
-
-            used.add(idx)
-            body_parts.append(p)
-            remaining -= size
-            return True
+                chunks.append(body_text)
+            return chunks
 
         # -------- multi-section sampling --------
-        if total > 0 and remaining > 0:
+        total = len(paragraphs)
+        sections = max(1, min(sections, total))
+        chunk_targets = []
 
-            sections = max(1, min(sections, total))
-            per_section_budget = target_chars // sections
+        for i in range(sections):
+            idx = int(i * total / sections)
+            chunk_targets.append(idx)
 
-            for s in range(sections):
+        used = set()
+        body_parts = []
 
-                if remaining <= 0:
-                    break
-
-                # центр секции
-                center = int((s + 0.5) * total / sections)
-
-                # расширяемся вокруг центра
-                left = center
-                right = center + 1
-
-                local_used = 0
-
-                while local_used < per_section_budget and remaining > 0:
-
-                    added = False
-
-                    if left >= 0:
-                        if try_add(left):
-                            local_used += len(paragraphs[left]) + 2
-                            added = True
-                        left -= 1
-
-                    if right < total and local_used < per_section_budget:
-                        if try_add(right):
-                            local_used += len(paragraphs[right]) + 2
-                            added = True
-                        right += 1
-
-                    if not added:
+        for idx in chunk_targets:
+            left = idx
+            right = idx
+            current_chunk = []
+            current_len = 0
+            max_chunk_len = target_chars // sections
+            while current_len < max_chunk_len and (left >= 0 or right < total):
+                added = False
+                # левый параграф
+                if left >= 0 and left not in used:
+                    p = paragraphs[left]
+                    if current_len + len(p) + 2 > max_chunk_len:
+                        # обрезаем по последнему пробелу
+                        cutoff = p.rfind(" ", 0, max_chunk_len - current_len)
+                        if cutoff > 0:
+                            current_chunk.append(p[:cutoff])
+                            current_len += cutoff + 2
+                        else:
+                            current_chunk.append(p)
+                            current_len += len(p) + 2
+                        used.add(left)
                         break
-
-        # -------- fallback if too small --------
-        body_text = "\n\n".join(body_parts)
-
-        if len(body_text) < min_chars:
-
-            for i in range(total):
-                if remaining <= 0:
+                    else:
+                        current_chunk.append(p)
+                        current_len += len(p) + 2
+                        used.add(left)
+                        left -= 1
+                        added = True
+                # правый параграф
+                if right < total and right not in used:
+                    p = paragraphs[right]
+                    if current_len + len(p) + 2 > max_chunk_len:
+                        cutoff = p.rfind(" ", 0, max_chunk_len - current_len)
+                        if cutoff > 0:
+                            current_chunk.append(p[:cutoff])
+                            current_len += cutoff + 2
+                        else:
+                            current_chunk.append(p)
+                            current_len += len(p) + 2
+                        used.add(right)
+                        break
+                    else:
+                        current_chunk.append(p)
+                        current_len += len(p) + 2
+                        used.add(right)
+                        right += 1
+                        added = True
+                if not added:
                     break
+            if current_chunk:
+                body_parts.append("\n\n".join(current_chunk))
 
-                if try_add(i):
-                    body_text = "\n\n".join(body_parts)
+        # -------- fallback if too маленький --------
+        combined_len = sum(len(p) for p in body_parts)
+        i = 0
+        while combined_len < min_chars and i < total:
+            if i not in used:
+                body_parts.append(paragraphs[i])
+                combined_len += len(paragraphs[i]) + 2
+                used.add(i)
+            i += 1
 
-                if len(body_text) >= min_chars:
-                    break
-
-        # -------- hard trim --------
-        body_text = body_text[:target_chars].strip()
-
-        if body_text:
-            parts.append(f"[BODY]\n{body_text}")
-
-        return "\n\n".join(parts).strip()
+        chunks.extend(body_parts)
+        return chunks
 
     # =====================
     # METADATA

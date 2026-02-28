@@ -9,24 +9,14 @@ CREATE TABLE IF NOT EXISTS books (
     year INTEGER NULL,
     added_at TEXT NULL,
     source_type TEXT NULL,
-    source_link TEXT NULL
+    source_link TEXT NULL,
+    source_length INTEGER NULL
 );
 
 CREATE TABLE IF NOT EXISTS models (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uid CHAR(32) NOT NULL,
     name TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS embeddings (
-    book_id INTEGER PRIMARY KEY,
-    embedding NUMPY,
-    shape INTEGER NULL,
-    source_text COMPRESSED_TEXT,
-    model INTEGER NOT NULL,
-    source_length INTEGER NULL,
-    source_chunk_length INTEGER NULL,
-    FOREIGN KEY(book_id) REFERENCES books(id)
 );
 
 CREATE TABLE IF NOT EXISTS authors (
@@ -61,10 +51,21 @@ CREATE TABLE IF NOT EXISTS feedback (
     FOREIGN KEY (source_book_id) REFERENCES books(id),
     FOREIGN KEY (candidate_book_id) REFERENCES books(id)
 );
-                    
+
+CREATE TABLE IF NOT EXISTS chunks (
+    id INTEGER PRIMARY KEY,
+    book_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (book_id)
+        REFERENCES books(id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_chunks_book_id
+ON chunks(book_id);
+
 CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
-CREATE INDEX IF NOT EXISTS idx_embeddings_book_id ON embeddings(book_id);
-CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings(model);
 CREATE INDEX IF NOT EXISTS idx_similar_book_id ON similar(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id);

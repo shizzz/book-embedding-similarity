@@ -2,7 +2,8 @@ from asyncio import to_thread
 from app.workers.base import BaseDbQueueWorker
 from app.services import BulkSimilarSearchService
 from app.models import Task, Book, Task, TaskResult, Action, BookRegistry
-from app.db import DB, BookRepository, SimilarRepository
+from app.db import DBRouter
+from app.db.repositories import BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK
 

@@ -2,7 +2,8 @@ import numpy as np
 from typing import List, Tuple
 from app.models import BookRegistry, Book
 from app.hnsw.rerankers import Reranker
-from app.db import DB, BookRepository
+from app.db import DBRouter
+from app.db.repositories import BookRepository
 from .similarSearchEngine import SimilarSearchEngine
 
 class BruteforceSimilarSearchEngine(SimilarSearchEngine):
