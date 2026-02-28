@@ -52,7 +52,7 @@ async def main(args=None):
     limit: int = 100
 
     with DB() as conn:
-        book_task = Book.map(BookRepository.get_full_by_file(conn, args.file_name))
+        book_task = BookRepository.get_full_by_file(conn, args.file_name)
 
         if not book_task:
             print(f"Книга {args.file_name} не найдена в реестре")

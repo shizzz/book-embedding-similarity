@@ -68,28 +68,31 @@ class Book:
 
         self.authors = frozenset(self._parse_array(author)) if authors is None and author else frozenset(authors or [])
         self.authors_key = tuple(sorted(self.authors)) if self.authors else ()
-        
-    @classmethod
-    def map(cls, row) -> "Book":
-        if row:
-            return Book(
-                id=row["id"],
-                file_name=row["book"],
-                title=row["title"],
-                author=row["author"],
-                model_id=safe_get(row, "model"),
-                serie=safe_get(row, "serie"),
-                generes=safe_get(row, "generes").split("||"),
-                year=safe_get(row, "year"),
-                source_type=safe_get(row, "source_type"),
-                source_link=safe_get(row, "source_link"),
-                embedding=safe_get(row, "embedding"),
-                text=safe_get(row, "source_text"),
-                shape=safe_get(row, "shape"),
-                source_length=safe_get(row, "source_length"),
-            )
-        else:
-            return None
+
+    def merge_from(self, other: "Book") -> "Book":
+        if other is None:
+            return self
+
+        for key, other_value in vars(other).items():
+            if getattr(self, key, None) is None:
+                setattr(self, key, other_value)
+
+        return self
+            
+    @staticmethod
+    def from_row(row) -> "Book":
+        return Book(
+            id=row["id"],
+            file_name=row["book"],
+            title=row["title"],
+            author=row["author"],
+            serie=safe_get(row, "serie"),
+            generes=safe_get(row, "generes").split("||"),
+            year=safe_get(row, "year"),
+            source_type=safe_get(row, "source_type"),
+            source_link=safe_get(row, "source_link"),
+            source_length=safe_get(row, "source_length"),
+        )
     
     @classmethod
     def map_row(cls, row) -> "Book":

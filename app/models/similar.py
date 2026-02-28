@@ -55,7 +55,7 @@ class Similar:
 
         router = DBRouter()
         raw_books = BookRepository(router).get_many(list[int](book_ids))
-        books_by_id = Book.map_by_id(raw_books, Book.map)
+        books_by_id = Book.map_by_id(raw_books, Book.from_row)
 
         result: List[Similar] = []
         for score, source_id, candidate_id in rows:

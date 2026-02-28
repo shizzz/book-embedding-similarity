@@ -12,7 +12,7 @@ def get_book_info(book_file: str) -> Optional[Book]:
         book_row = BookRepository.get_by_file(conn, book_file)
         if not book_row:
             return None
-        return Book.map(book_row)
+        return Book.from_row(book_row)
 
 def get_similar_books(source_book_id: int) -> List[tuple]:
     with DB() as conn:
@@ -155,7 +155,7 @@ def get_book_info_by_id(book_id: int) -> Optional[Book]:
         book_row = BookRepository.get_by_id(conn, book_id)
         if not book_row:
             return None
-        return Book.map(book_row)
+        return Book.from_row(book_row)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Генерация feedback для книг с помощью ChatGPT")

@@ -61,10 +61,10 @@ class BookRepository:
             row = conn.execute(f"{BookRepository.GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
             return row if row else None
 
-    def get_full_by_file(self, book: str) -> Any:
+    def get_full_by_file(self, book: str) -> Book:
         with self.router.meta() as conn:
             row = conn.execute(f"{BookRepository.GET_FULL_QUERY} WHERE b.book = ?",(book,)).fetchone()
-            return row if row else None
+            return Book.from_row(row) if row else None
     
     def get_by_id(self, book_id: int) -> Any:
         with self.router.meta() as conn:

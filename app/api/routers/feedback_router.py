@@ -8,8 +8,8 @@ router = APIRouter()
 async def submit_feedback(fb: FeedbackReq):
     try:
         with DB() as conn:
-            source = Book.map(BookRepository.get_by_file(conn, fb.source_file_name))
-            candidate = Book.map(BookRepository.get_by_file(conn, fb.candidate_file_name))
+            source = Book.from_row(BookRepository.get_by_file(conn, fb.source_file_name))
+            candidate = Book.from_row(BookRepository.get_by_file(conn, fb.candidate_file_name))
 
             if fb.label > 0:
                 FeedbackRepository.submit(conn, source.id, candidate.id, fb.label)

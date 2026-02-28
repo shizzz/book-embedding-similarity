@@ -48,7 +48,7 @@ async def similar_events(
         start = time.perf_counter()
 
         with DB() as conn:
-            book = Book.map(BookRepository.get_full_by_file(conn, file))
+            book = BookRepository.get_full_by_file(conn, file)
             if not book:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
                 return

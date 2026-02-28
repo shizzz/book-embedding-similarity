@@ -81,7 +81,7 @@ class ChunkRepository:
                 (book_id,)
             ).fetchall()
 
-            return [Chunk.from_row(r) for r in rows]
+            return [Chunk.from_chunks_row(r) for r in rows]
 
 
     def get_text(self, chunk_id: int) -> str | None:

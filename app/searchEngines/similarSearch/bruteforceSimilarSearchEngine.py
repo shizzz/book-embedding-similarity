@@ -35,7 +35,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
                 for row in BookRepository.get_all_with_embeddings(conn):
                     current += 1
 
-                    source = Book.map(row)
+                    source = Book.from_row(row)
 
                     if self._should_skip(
                         source=source,
