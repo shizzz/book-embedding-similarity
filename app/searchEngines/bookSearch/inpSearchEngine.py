@@ -6,23 +6,14 @@ from typing import AsyncGenerator, Any
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
-from app.searchEngines.sources import RemoteBookScanner
+from app.searchEngines.sources import BookSourceManager
 from app.settings.config import INPX_FOLDER
 
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
 
     def __init__(self, folder: str, ui: Any = None):
-        self.folder = folder
-        self.ui = ui
-        self._locks: dict[str, asyncio.Lock] = {}
-        self._semaphore = asyncio.Semaphore(3)
-        self._tasks = []
-
-    async def fetch_with_semaphore(self, archive_name):
-        async with self._semaphore:
-            with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-                await scanner._fetch_archive(archive_name)
+        super().__init__(folder, ui)
 
     # -----------------------------
     # Парсинг одного файла внутри ZIP
@@ -76,7 +67,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
         return authors
     
     # -----------------------------
-    # Преобразование авторов
+    # Преобразование массивов
     # -----------------------------
     def _parse_array(self, authors_str: str) -> list[str]:
         result = []
@@ -100,9 +91,9 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # Поиск книг (async)
     # -----------------------------
     async def search_books(self) -> AsyncGenerator[Book, None]:
-        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            zipf = await scanner.open_zip(INPX_FOLDER)
+        zipf = await self._manager.open_zip(INPX_FOLDER)
 
+        if self._manager.is_remote:
             for info in zipf.infolist():
                 if info.is_dir():
                     continue
@@ -111,71 +102,69 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                 task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
                 self._tasks.append(task)
 
-            for info in zipf.infolist():
-                if info.is_dir():
+        for info in zipf.infolist():
+            if info.is_dir():
+                continue
+
+            books = await asyncio.to_thread(
+                self._parse, 
+                zipf, 
+                info.filename
+            )
+
+            archive_name = os.path.splitext(info.filename)[0] + ".zip"
+
+            for book in books:
+                if self._should_skip(book):
                     continue
 
-                books = await asyncio.to_thread(
-                    self._parse, 
-                    zipf, 
-                    info.filename
+                authors = self._parse_authors(book["author"])
+                file_name = f"{book['file']}.{book['ext']}"
+                link = f"{archive_name}/{file_name}"
+
+                yield Book(
+                    file_name=file_name,
+                    title=book["title"],
+                    author="||".join(authors),
+                    authors=authors,
+                    serie=book["series"],
+                    generes=[g.strip() for g in book["genere"].split(":") if g.strip()],
+                    year=datetime.fromisoformat(book["date"]).year,
+                    source_type=self.TYPE,
+                    source_link=link
                 )
-
-                archive_name = os.path.splitext(info.filename)[0] + ".zip"
-
-                for book in books:
-                    if self._should_skip(book):
-                        continue
-
-                    authors = self._parse_authors(book["author"])
-                    file_name = f"{book['file']}.{book['ext']}"
-                    link = f"{archive_name}/{file_name}"
-
-                    yield Book(
-                        file_name=file_name,
-                        title=book["title"],
-                        author="||".join(authors),
-                        authors=authors,
-                        serie=book["series"],
-                        generes=[g.strip() for g in book["genere"].split(":") if g.strip()],
-                        year=datetime.fromisoformat(book["date"]).year,
-                        source_type=self.TYPE,
-                        source_link=link
-                    )
 
     # -----------------------------
     # Подсчет общего количества книг
     # -----------------------------
     async def get_total(self) -> int:
-        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            zipf = await scanner.open_zip(INPX_FOLDER)
+        zipf = await self._manager.open_zip(INPX_FOLDER)
 
-            total = 0
+        total = 0
 
-            for info in zipf.infolist():
-                if info.is_dir():
+        for info in zipf.infolist():
+            if info.is_dir():
+                continue
+
+            books = await asyncio.to_thread(
+                self._parse,
+                zipf,
+                info.filename
+            )
+
+            for book in books:
+                if self._should_skip(book):
                     continue
 
-                books = await asyncio.to_thread(
-                    self._parse,
-                    zipf,
-                    info.filename
-                )
-
-                for book in books:
-                    if self._should_skip(book):
-                        continue
-
-                    total += 1
-            return total
+                total += 1
+        return total
 
     # -----------------------------
     # Получение данных книги
     # -----------------------------
     async def enrich_book_data(self, book: Book):
         archive_name, file_name = book.source_link.split("/", 1)
-        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            data = await scanner.get_book_data(archive_name, file_name)
-            book.source_length = len(data)
+        data = await self._manager.get_book_data(archive_name, file_name)
+        book.source_length = len(data)
         fb2 = FB2Book(data)
         fb2.enrich_book(book)

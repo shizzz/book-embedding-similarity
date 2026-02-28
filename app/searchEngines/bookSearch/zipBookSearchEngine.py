@@ -3,32 +3,33 @@ from typing import AsyncGenerator, Any
 from app.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
-from app.searchEngines.sources import RemoteBookScanner
 
 
 class ZipBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "zip"
 
     def __init__(self, folder: str, ui: Any = None):
-        self.folder = folder
-        self.ui = ui
-        self._locks: dict[str, asyncio.Lock] = {}
+        super().__init__(folder, ui)
 
     # -----------------------------
     # Поиск книг
     # -----------------------------
     async def search_books(self) -> AsyncGenerator[Book, None]:
-        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            archives = await asyncio.to_thread(scanner.list_archives)
+        archives = await asyncio.to_thread(self._manager.list_archives)
 
+        if self._manager.is_remote:
             for archive in archives:
-                books = await scanner.scan_archive(archive)
-                for file_name, archive_name in books:
-                    yield Book(
-                        file_name=file_name,
-                        source_type=self.TYPE,
-                        source_link=f"{archive_name}/{file_name}"
-                    )
+                task = asyncio.create_task(self.fetch_with_semaphore(archive))
+                self._tasks.append(task)
+
+        for archive in archives:
+            books = await self._manager.scan_archive(archive)
+            for file_name, archive_name in books:
+                yield Book(
+                    file_name=file_name,
+                    source_type=self.TYPE,
+                    source_link=f"{archive_name}/{file_name}"
+                )
 
     # -----------------------------
     # Подсчет общего количества книг
@@ -36,11 +37,10 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
     async def get_total(self) -> int:
         total = 0
 
-        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            archives = await asyncio.to_thread(scanner.list_archives)
+        archives = await asyncio.to_thread(self._manager.list_archives)
 
-            for archive in archives:
-                total += await scanner.archive_book_total(archive)
+        for archive in archives:
+            total += await self._manager.archive_book_total(archive)
 
         return total
 
@@ -48,11 +48,8 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
     # Получение данных книги
     # -----------------------------
     async def enrich_book_data(self, book: Book):
-        # Разделяем archive_name и file_name из ссылки
         archive_name, file_name = book.source_link.split("/", 1)
-
-        with RemoteBookScanner(self.folder, self.ui, self._locks) as scanner:
-            data = await scanner.get_book_data(archive_name, file_name)
-            book.source_length = len(data)
-            fb2 = FB2Book(data)
-            fb2.enrich_book(book)
+        data = await self._manager.get_book_data(archive_name, file_name)
+        book.source_length = len(data)
+        fb2 = FB2Book(data)
+        fb2.enrich_book(book)

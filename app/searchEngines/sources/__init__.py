@@ -1,3 +1,3 @@
-from .remote import RemoteBookScanner
+from .sourceManager import BookSourceManager
 
-__all__ = [ "RemoteBookScanner" ]
+__all__ = [ "BookSourceManager" ]
