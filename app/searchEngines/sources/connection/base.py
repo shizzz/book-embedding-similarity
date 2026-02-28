@@ -15,7 +15,7 @@ class BaseConnection(ABC):
         pass
 
     @abstractmethod
-    def download(self, remote: str, local: str, progress_callback=None):
+    def download(self, remote: str, local: str, progress_callback=None, resume_from=0):
         pass
 
     @abstractmethod

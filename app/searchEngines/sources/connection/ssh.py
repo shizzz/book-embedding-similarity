@@ -26,10 +26,20 @@ class SSHConnection(BaseConnection):
     def list_files(self):
         return self.sftp.listdir(self.remote_path)
 
-    def download(self, remote: str, local: str, progress_callback=None):
+    def download(
+        self,
+        remote: str,
+        local: str,
+        progress_callback=None,
+        resume_from: int = 0
+    ):
         full = f"{self.remote_path}/{remote}"
-        with self.sftp.file(full, "rb") as src, open(local, "wb") as dst:
-            while chunk := src.read(1024*1024):
+        mode = "ab" if resume_from else "wb"
+
+        with self.sftp.file(full, "rb") as src, open(local, mode) as dst:
+            if resume_from:
+                src.seek(resume_from)
+            while chunk := src.read(1024 * 1024):
                 dst.write(chunk)
                 if progress_callback:
                     progress_callback(len(chunk))

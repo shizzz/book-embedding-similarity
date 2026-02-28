@@ -44,14 +44,14 @@ class SMBConnection(BaseConnection):
         directory.close()
         return files
 
-    def download(self, remote: str, local: str, progress_callback=None):
+    def download(self, remote: str, local: str, progress_callback=None, resume_from=0):
         f = Open(self._smb_tree, remote)
         f.create()
-        with open(local, "wb") as dst:
-            while True:
-                chunk = f.read(1024 * 1024)
-                if not chunk:
-                    break
+        mode = "ab" if resume_from else "wb"
+        with open(local, mode) as dst:
+            if resume_from:
+                f.seek(resume_from)
+            while chunk := f.read(1024 * 1024):
                 dst.write(chunk)
                 if progress_callback:
                     progress_callback(len(chunk))
