@@ -48,17 +48,14 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
                 return
 
             try:
-                if self.show_ui:
-                    await self.ui.set_thread(thread_id, task.name)
+                await self.ui.set_thread(thread_id, task.name)
 
                 result = await self.process(task, thread_id)
                 await self.post_process(result)
 
-                if self.show_ui:
-                    await self.ui.done_async(count=result.done or 1)
+                await self.ui.done_async(count=result.done or 1)
             except Exception as error:
-                if self.show_ui:
-                    await self.ui.error()
+                await self.ui.error()
                 traceback.print_exc()
                 self.logger.error(f"ERROR processing {task.name}: {error}")
             finally:
@@ -78,6 +75,4 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
 
     async def _get_total(self):
         total = await self.get_total()
-        
-        if self.show_ui:
-            await self.ui.update_total_async(total)
+        await self.ui.update_total_async(total)

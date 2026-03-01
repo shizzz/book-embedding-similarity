@@ -2,9 +2,9 @@ import asyncio
 import traceback
 import logging
 from abc import ABC, abstractmethod
-from asyncio import create_task, gather
 from rich.live import Live
-from app.workers.sources import StatsUI, ConsoleHandler
+from app.ui import LiveUI
+from app.workers.sources import ConsoleHandler
 from app.db import Migrator, DBRouter
 from app.settings.config import MAX_WORKERS
 
@@ -12,18 +12,15 @@ class BaseWorker(ABC):
     def __init__(
         self,
         max_workers: int = MAX_WORKERS,
-        show_ui: bool = True,
         title: str = None
     ):
         self.max_workers: int = max_workers
-        self.show_ui: bool = show_ui
         self._router = DBRouter()
         
-        if self.show_ui:
-            self.ui = StatsUI(max_workers=self.max_workers, title=title)
-            self.ui.init()
-            self.ui.live = Live(self.ui.layout(), refresh_per_second=1, console=self.ui.console)
-            self.ui.live.start()
+        self.ui = LiveUI(max_workers=self.max_workers, title=title)
+        self.ui.init()
+        self.ui.live = Live(self.ui.layout(), refresh_per_second=1, console=self.ui.console)
+        self.ui.live.start()
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -85,5 +82,4 @@ class BaseWorker(ABC):
             self.logger.error(error)
             traceback.print_exc()
         finally:
-            if self.show_ui:
-                self.ui.live.stop()
+            self.ui.live.stop()

@@ -1,5 +1,5 @@
-from .ui import StatsUI
+from ...ui.live_ui import LiveUI
 from .dbQueue import DbQueue
 from .consoleHandler import ConsoleHandler
 
-__all__ = ["StatsUI", "DbQueue", "ConsoleHandler"]
+__all__ = ["LiveUI", "DbQueue", "ConsoleHandler"]

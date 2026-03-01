@@ -5,7 +5,7 @@ from app.common.types import TEntity
 from typing import Generic, List
 from app.models import Task
 from app.db import DBRouter
-from .ui import StatsUI
+from app.ui import BaseUI
 
 class DbQueue(Generic[TEntity]):
     def __init__(
@@ -13,7 +13,7 @@ class DbQueue(Generic[TEntity]):
             save_func,
             batch_size: int,
             db_queue_max_size: int,
-            ui: StatsUI,
+            ui: BaseUI,
             router: DBRouter
         ):
         self.queue: asyncio.Queue[TEntity] = asyncio.Queue(maxsize=db_queue_max_size)

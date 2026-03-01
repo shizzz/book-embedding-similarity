@@ -33,7 +33,6 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     async def prepare(self) -> None:
         self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
         
-        #self._remove_invalid_embeddings()
         self._model_id = ModelRepository(self._router).get_or_create(
             name=self._model.name,
             uid=self._model.uid
@@ -50,12 +49,9 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         return total
 
     async def fin(self) -> None:
-        service = BookEmbeddingIndexer(self._router)
-        service.build_index()
+        BookEmbeddingIndexer(self._router).build_index()
 
-        reporter = DatabaseReporter(self._router, self._model.uid)
-        report = reporter.generate(self._parsed)
-
+        report = DatabaseReporter(self._router, self._model.uid).generate(self._parsed)
         DatabaseReporter.print(report)
 
     async def pull_queue(self) -> None:
@@ -242,20 +238,3 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         db_book = await asyncio.to_thread(_sync, book.file_name)
 
         return book.merge_from(db_book)
-             
-    def _remove_invalid_embeddings(self):
-        to_delete = []
-        expected_dim = None
-
-        for book_id, emb in EmbeddingsRepository.get_all():
-            if expected_dim is None:
-                expected_dim = emb.shape[0]
-
-            if emb.shape[0] != expected_dim:
-                print(f"Удаляем book_id={book_id} с размерностью {emb.shape}")
-                to_delete.append(book_id)
-
-        if to_delete:
-            print(f"Удалено {len(to_delete)} записей")
-        else:
-            print("Все эмбеддинги корректны")

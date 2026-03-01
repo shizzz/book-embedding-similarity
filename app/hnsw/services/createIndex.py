@@ -1,16 +1,12 @@
+from tqdm import tqdm
 import faiss
 import numpy as np
-from typing import Optional, List, Tuple, Dict
+from typing import Optional, Dict, List, Tuple
 from app.db import DBRouter
 from app.db.repositories import EmbeddingsRepository, ModelRepository
 from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, MODEL_NAME
 
 class BookEmbeddingIndexer:
-    """
-    Сервис построения и поиска HNSW индекса.
-    Сама достает все embeddings через DBRouter.
-    """
-
     def __init__(
         self,
         db_router: DBRouter,
@@ -22,116 +18,80 @@ class BookEmbeddingIndexer:
         self.index_file = index_file
         self.batch_size = batch_size
         self.logger = logger
-        self._index = None
-        self.embeddings = None
-        self.ids = None
-        self.embedding_dim = None
-        self.chunk_to_book: Dict[int, int]
+        self._index: Optional[faiss.IndexIDMap] = None
+        self.embedding_dim: Optional[int] = None
+        self.chunk_to_book: Dict[int, int] = {}
+        self.id_to_pos: Dict[int, int] = {}
 
-    # ------------------------
-    # Основной метод: строим индекс
-    # ------------------------
     def build_index(self):
-        """Загружает embeddings из базы и строит индекс"""
-        self.embeddings, self.ids = self._load_embeddings()
-        return self._generate_and_save()
-
-    # ------------------------
-    # Загрузка всех эмбеддингов через репозитории
-    # ------------------------
-    def _load_embeddings(self) -> Tuple[np.ndarray, np.ndarray]:
         model_uid = ModelRepository(self.db_router).get_latest_uid(MODEL_NAME)
-        rows = EmbeddingsRepository(self.db_router, model_uid).get_all()
-        if not rows:
-            raise ValueError("Нет эмбеддингов для построения индекса")
+        repo = EmbeddingsRepository(self.db_router, model_uid)
 
-        embeddings = []
-        ids = []
-
-        for r in rows:
-            vec = r.data
-            if self.embedding_dim is None:
-                self.embedding_dim = r.shape  # берем shape из первого эмбеддинга
-            elif vec.shape[0] != self.embedding_dim:
-                raise ValueError(f"Chunk {r.chunk_id} имеет неправильную размерность {vec.shape[0]}, ожидается {self.embedding_dim}")
-
-            embeddings.append(vec)
-            ids.append(r.chunk_id)
-
-        embeddings = np.stack(embeddings)
-        ids = np.array(ids, dtype=np.int64)
-
-        if self.logger:
-            self.logger.info(f"Загружено {len(ids)} embeddings из репозитория, dim={self.embedding_dim}")
-
-        return embeddings, ids
-
-    # ------------------------
-    # Генерация и сохранение HNSW
-    # ------------------------
-    def _generate_and_save(self):
-        if self.embeddings.shape[0] == 0:
-            raise ValueError("Попытка построить индекс с пустым списком векторов")
-
-        # создаём HNSW индекс
+        # создаём индекс после первого батча
+        first_batch = next(repo.get_all_batch(self.batch_size))
+        self.embedding_dim = first_batch[0].shape
         base_index = faiss.IndexHNSWFlat(self.embedding_dim, HNSW_M, faiss.METRIC_INNER_PRODUCT)
         base_index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
         base_index.hnsw.efSearch = HNSW_EF_SEARCH
-
         index = faiss.IndexIDMap(base_index)
 
-        n_total = self.embeddings.shape[0]
-        if self.logger:
-            self.logger.info(f"Генерация HNSW: {n_total:,} векторов, dim={self.embedding_dim}")
+        pos_counter = 0
 
-        # словарь для chunk_id → book_id
-        self.chunk_to_book = {chunk.chunk_id: chunk.book_id for chunk in self._all_chunks_objects}
+        # прогресс бар по батчам
+        for batch in tqdm(repo.get_all_batch(self.batch_size), desc="Добавление в HNSW индекс"):
+            batch_embeddings = []
+            batch_ids = []
 
-        # добавление батчами
-        for i in range(0, n_total, self.batch_size):
-            end = min(i + self.batch_size, n_total)
-            batch = self.embeddings[i:end]
-            batch_ids = self.ids[i:end]
-            index.add_with_ids(batch, batch_ids)
-            if self.logger:
-                self.logger.info(f"Добавлено {end}/{n_total} векторов в индекс")
+            for r in batch:
+                vec = r.data
+                if vec.shape[0] != self.embedding_dim:
+                    raise ValueError(f"Chunk {r.chunk_id} имеет неправильную размерность {vec.shape[0]}, ожидается {self.embedding_dim}")
+                batch_embeddings.append(vec)
+                batch_ids.append(r.chunk_id)
 
-        # сохраняем индекс на диск
+                self.chunk_to_book[r.chunk_id] = r.book_id
+                self.id_to_pos[r.chunk_id] = pos_counter
+                pos_counter += 1
+
+            batch_embeddings_np = np.stack(batch_embeddings)
+            batch_ids_np = np.array(batch_ids, dtype=np.int64)
+            index.add_with_ids(batch_embeddings_np, batch_ids_np)
+
         faiss.write_index(index, self.index_file)
-        if self.logger:
-            self.logger.info(f"Индекс сохранён в '{self.index_file}'")
-
         self._index = index
+        if self.logger:
+            self.logger.info(f"Индекс построен и сохранён: {len(self.chunk_to_book)} векторов, dim={self.embedding_dim}")
         return index
 
-    # ------------------------
-    # Поиск похожих
-    # ------------------------
-    def search_similar_chunks(self, query_embeddings: np.ndarray, top_k: int = 5) -> List[List[Tuple[int, float]]]:
-        if self._index is None:
-            raise ValueError("Индекс ещё не построен")
-
-        distances, indices = self._index.search(query_embeddings, top_k)
-        results = []
-        for inds, dists in zip(indices, distances):
-            results.append(list(zip(inds.tolist(), dists.tolist())))
-        return results
-    
-    def get_embeddings_by_book_id(self, book_id: int) -> np.ndarray:
+    def get_embeddings_by_book_id(self, book_id: int, repo: Optional[EmbeddingsRepository] = None) -> np.ndarray:
         """
-        Возвращает все embeddings из индекса, принадлежащие книге book_id
+        Возвращает все embeddings по book_id.
+        Если не было построено, можно получить напрямую из базы через repo
         """
         if self._index is None:
-            raise ValueError("Индекс ещё не построен")
+            # fallback через репозиторий
+            if repo is None:
+                model_uid = ModelRepository(self.db_router).get_latest_uid(MODEL_NAME)
+                repo = EmbeddingsRepository(self.db_router, model_uid)
+            rows = [r for r in repo.get_all() if r.book_id == book_id]
+            if not rows:
+                return np.array([])
+            return np.stack([r.data for r in rows])
 
-        # собираем chunk_id, которые относятся к книге
-        relevant_chunk_ids = [chunk_id for chunk_id, b_id in self.chunk_to_book.items() if b_id == book_id]
-        
+        relevant_chunk_ids = [cid for cid, b_id in self.chunk_to_book.items() if b_id == book_id]
         if not relevant_chunk_ids:
             return np.array([])
 
-        # получаем их позиции в индексе
-        positions = [self.ids.tolist().index(cid) for cid in relevant_chunk_ids]
-        
-        # возвращаем массив embeddings
-        return self.embeddings[positions]
+        positions = [self.id_to_pos[cid] for cid in relevant_chunk_ids]
+        embeddings = []
+        for pos in positions:
+            # FAISS хранит их в порядке добавления
+            # Чтобы избежать полного хранения в RAM, можно сделать ленивый доступ, но тут просто возвращаем массив
+            embeddings.append(self._index.reconstruct(self._index.id_map.at(pos)))
+        return np.stack(embeddings)
+
+    def search_similar_chunks(self, query_embeddings: np.ndarray, top_k: int = 5) -> List[List[Tuple[int, float]]]:
+        if self._index is None:
+            raise ValueError("Индекс ещё не построен")
+        distances, indices = self._index.search(query_embeddings, top_k)
+        return [list(zip(inds.tolist(), dists.tolist())) for inds, dists in zip(indices, distances)]

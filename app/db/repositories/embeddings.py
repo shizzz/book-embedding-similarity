@@ -15,21 +15,25 @@ class EmbeddingsRepository:
             rows = conn.execute("SELECT * FROM embeddings WHERE book_id = ?", (book_id,)).fetchall()
             return [Embedding.from_row(r) for r in rows]
 
-    def get_all(self) -> list[Embedding]:
-        """
-        Возвращает все embeddings для текущей модели (model_uid).
-        """
+    def get_all_batch(self, batch_size: int = 1):
         with self.router.embeddings(self.model_uid) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT id, book_id, chunk_id, data, shape
-                FROM embeddings
-                """
-            )
-            rows = cursor.fetchall()
+            cursor.execute("SELECT COUNT(*) FROM embeddings")
+            total = cursor.fetchone()[0]
 
-        return [Embedding.from_row(r) for r in rows]
+            for offset in range(0, total, batch_size):
+                cursor.execute(
+                    """
+                    SELECT id, book_id, chunk_id, data, shape
+                    FROM embeddings
+                    LIMIT ? OFFSET ?
+                    """,
+                    (batch_size, offset)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    break
+                yield [Embedding.from_row(r) for r in rows]
 
     def save(
             self,

@@ -13,12 +13,12 @@ from rich.progress import (
     TaskProgressColumn,
     TaskID
 )
-from collections import deque
 from time import perf_counter
+from .ui import BaseUI
 
 from app.settings.config import MAX_WORKERS
 
-class StatsUI:
+class LiveUI(BaseUI):
     def __init__(self, max_workers: int = MAX_WORKERS, title: str = "Library scanner"):
         self.max_workers = max_workers
         self.live: Live = None
