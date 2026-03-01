@@ -5,7 +5,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from app.models import Book
-from app import get_similar
+from app.cli.get.main import get_similar
 
 
 class TestGetSimilarHelpers(unittest.TestCase):

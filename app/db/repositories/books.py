@@ -36,11 +36,51 @@ class BookRepository:
     def __init__(self, router: DBRouter):
         self.router = router
 
-    def get_all(self) -> Any:
-        with self.router.meta() as conn:
-            cursor = conn.execute(f"{BookRepository.GET_QUERY}")
+    def get_all(self, empty: bool = None) -> Any:
+        with self.router.transaction():
+            conn = self.router.meta()
+            query = BookRepository.GET_QUERY
+            params = ()
+
+            if empty is not None:
+                query += " WHERE b.empty = ?"
+                params = (int(empty),)
+
+            cursor = conn.execute(query, params)
             for row in cursor:
-                yield (tuple[Any, ...](row))
+                yield tuple(row)
+
+    def get_by_ids(self, ids: list[int]) -> dict[int, dict]:
+        if not ids:
+            return {}
+
+        placeholders = ",".join("?" for _ in ids)
+        query = f"{BookRepository.GET_QUERY} WHERE id IN ({placeholders})"
+        result = {}
+        with self.router.transaction():
+            conn = self.router.meta()
+            cursor = conn.execute(query, ids)
+            for row in cursor:
+                (
+                    id_, book, uid, title, author, serie, generes, year,
+                    added_at, source_type, source_link, source_length, empty
+                ) = row
+                result[id_] = {
+                    "id": id_,
+                    "book": book,
+                    "uid": uid,
+                    "title": title,
+                    "author": author,
+                    "serie": serie,
+                    "generes": generes,
+                    "year": year,
+                    "added_at": added_at,
+                    "source_type": source_type,
+                    "source_link": source_link,
+                    "source_length": source_length,
+                    "empty": empty,
+                }
+        return result
 
     def get_all_with_embeddings(self) -> Generator[Tuple[int, str, str, str, str, str, np.ndarray]]:
         with self.router.meta() as conn:

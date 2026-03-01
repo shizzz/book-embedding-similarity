@@ -1,5 +1,4 @@
 from typing import List, Tuple
-from app.models import BookRegistry
 from app.searchEngines.similarSearch import SimilarSearchEngine
 
 class BulkSimilarSearchService:
@@ -11,7 +10,10 @@ class BulkSimilarSearchService:
         self.engine = engine
         self.logger = logger
 
-    def run(self, source_books: BookRegistry) -> List[Tuple[float, int, int]]:
+    def run(
+            self, 
+            source_books: List[int]
+        ) -> List[Tuple[float, int, int]]:
         similars = self.engine.search(sources=source_books)
 
         return similars

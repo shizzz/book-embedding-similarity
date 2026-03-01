@@ -19,6 +19,7 @@ class SimilarSearchEngineFactory:
     def create(
         cls,
         mode: EngineType,
+        router: DBRouter,
         limit: int,
         exclude_same_authors: bool,
         step_percent: int = 5,
@@ -28,16 +29,10 @@ class SimilarSearchEngineFactory:
             hnsw = IndexManager(logger=logger)
             index: IndexIDMap = hnsw.load_from_file()
 
-            with DB() as conn:
-                books: list[Book] = [
-                    Book.map_row(row)
-                    for row in BookRepository.get_all_with_embeddings(conn)
-                ]
-
             return IndexSimilarSearchEngine(
                 reranker=LightGBMReranker(),
+                router=router,
                 index=index,
-                books=BookRegistry(books),
                 limit=limit,
                 exclude_same_authors=exclude_same_authors,
                 step_percent=step_percent,

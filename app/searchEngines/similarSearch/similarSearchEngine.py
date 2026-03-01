@@ -1,77 +1,148 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from app.hnsw.rerankers import Reranker
-from app.models import Book, BookRegistry
+from app.db import DBRouter
+from app.db.repositories import BookRepository
+from app.models import Book
 
 class SimilarSearchEngine:
-    def __init__(self, exclude_same_authors: bool, reranker: Reranker = None):
+    def __init__(
+            self,
+            limit: int,
+            exclude_same_authors: bool,
+            router: DBRouter,
+            reranker: Reranker = None
+        ):
+        self._limit = limit
         self._exclude_same_authors = exclude_same_authors
         self._reranker = reranker
+        self._router = router
+        self.avg_chunks_per_book: int = 7
+        self.max_chunks_per_book: int = 50
+        self.overfetch_factor: float = 2.5
+        self.min_similarity_threshold: float = 0.0
 
-    def _should_skip(
-        self,
-        source: Book,
-        candidate: Book,
-        seen: set[tuple[str, tuple[str, ...]]]
-    ) -> bool:
-        # 1. тот же файл
-        if source.file_name and source.file_name == candidate.file_name:
-            return True
+    def find_similar_books(
+            self,
+            book_ids: List[int],
+            desired_books: int = 100,
+            top_k_agg: int = 5  # количество чанков для агрегации
+        ) -> List[Dict[str, any]]:
+        pass
 
-        # 2. то же название
-        if source.title and source.title == candidate.title:
-            return True
-
-        # 3. исключение по авторам
-        if self._exclude_same_authors and source.authors and candidate.authors:
-            if source.authors & candidate.authors:
-                return True
-
-        # 4. проверка уникальности (title + authors)
-        key = (candidate.title, candidate.authors_key)
-        if key in seen:
-            return True
-
-        seen.add(key)
-        return False
-
-    def _apply_reranker_delta(self, sims: np.ndarray, ids: np.ndarray, alpha: float = 0.2):
-        """
-        Применяет дельту модели к FAISS score.
-        Возвращает просто order индексов для сортировки.
-        """
-        ranks = np.arange(len(sims), dtype=np.float32)
-        features = np.column_stack([sims, ranks]).astype(np.float32)
-
-        delta = self.model.predict(features)
-        final_scores = sims + alpha * delta
-
-        # возвращаем только индексы в порядке сортировки
-        order = np.argsort(-final_scores)
-        return order
-    
-    def _rerank(self, candidates: list[tuple[float, Book]]):
+    def enrich_with_db(self, candidates: list[dict], book_repo: BookRepository) -> list[dict]:
         if not candidates:
-            return candidates
+            return []
 
+        # Список всех уникальных candidate_id
+        candidate_ids = list({c['candidate_id'] for c in candidates})
+
+        # Получаем данные из БД
+        books_data = book_repo.get_by_ids(candidate_ids)
+
+        # Обогащаем кандидатов
+        enriched_candidates = []
+        for c in candidates:
+            candidate_id = c['candidate_id']
+            db_data = books_data.get(candidate_id, {})
+            enriched_candidates.append({
+                **c,           # source_id, candidate_id, score, matched_chunks
+                **db_data      # title, author, serie, generes, year, etc.
+            })
+
+        return enriched_candidates
+    
+    def bulk_filter_candidates(
+        self,
+        enriched_candidates: list[dict]
+    ) -> list[dict]:
+        seen_global: set[tuple[int, str, str]] = set()  # (source_id, title, author)
+        filtered = []
+
+        for c in enriched_candidates:
+            source_id = c['source_id']
+            candidate_id = c['candidate_id']
+
+            if source_id == candidate_id:
+                continue
+
+            if c.get('book') and c.get('book') == c.get('uid'):
+                continue
+
+            if self._exclude_same_authors:
+                candidate_author = c.get('author') or ""
+                source_author = c.get('source_author') or ""
+                if candidate_author and source_author:
+                    candidate_authors_set = set(map(str.strip, candidate_author.split(',')))
+                    source_authors_set = set(map(str.strip, source_author.split(',')))
+                    if candidate_authors_set & source_authors_set:
+                        continue
+
+            title = c.get('title') or ""
+            author = c.get('author') or ""
+            key = (source_id, title, author)
+            if key in seen_global:
+                continue
+            seen_global.add(key)
+
+            filtered.append(c)
+
+        return filtered
+
+    def apply_reranker(
+        self,
+        filtered_candidates: list[dict]
+    ) -> list[dict]:
         if not self._reranker or not self._reranker.model:
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            return candidates
+            return filtered_candidates
 
-        sims = np.array([s for s, _ in candidates], dtype=np.float32)
-        ids  = np.array([c.id for _, c in candidates], dtype=np.int32)
+        X = []
+        for c in filtered_candidates:
+            query_emb = np.mean([m['query_embedding'] for m in c['matched_chunks']], axis=0)
+            candidate_emb = np.mean([m['embedding'] for m in c['matched_chunks']], axis=0)
 
-        order = self._apply_reranker_delta(sims, ids, alpha=0.2)
+            dot_score = float(np.dot(query_emb, candidate_emb))
+            norm_q = np.linalg.norm(query_emb)
+            norm_c = np.linalg.norm(candidate_emb)
+            cosine_score = dot_score / (norm_q * norm_c + 1e-8)
 
-        id_to_candidate = {c.id: c for _, c in candidates}
-        reranked = [id_to_candidate[i] for i in ids[order]]
+            source_author = c.get('source_author') or ""
+            candidate_author = c.get('author') or ""
+            same_author = 1 if source_author and candidate_author and source_author == candidate_author else 0
 
-        return reranked
+            source_serie = (c.get('source_serie') or "").strip()
+            candidate_serie = (c.get('serie') or "").strip()
+            same_serie = 1 if source_serie and candidate_serie and source_serie == candidate_serie else 0
 
+            source_genres = set(map(str.strip, (c.get('source_generes') or "").split(',')))
+            candidate_genres = set(map(str.strip, (c.get('generes') or "").split(',')))
+            genre_overlap = len(source_genres & candidate_genres)
+
+            year_diff = abs((c.get('source_year') or 0) - (c.get('year') or 0))
+
+            X.append([cosine_score, dot_score, same_author, same_serie, genre_overlap, year_diff])
+
+        X_np = np.array(X, dtype=np.float32)
+        try:
+            preds = self._reranker.predict(X_np)
+            for c, p in zip(filtered_candidates, preds):
+                c['score'] = float(p)
+        except Exception:
+            pass
+
+        return filtered_candidates
+    
     def search(
         self,
-        sources: BookRegistry,
+        sources: List[int],
         progress_callback=None
     ) -> List[Tuple[float, int, int]]:
-        raise NotImplementedError()
+        matches_count = int(self._limit * 10 * self.overfetch_factor)
+        matches = self.find_similar_books(sources, matches_count)
+        enriched = self.enrich_with_db(matches, BookRepository(self._router))
+        filtered = self.bulk_filter_candidates(enriched)
+        reranked = self.apply_reranker(filtered)
 
+        # возвращаем только топ self._limit в формате Tuple[score, source_id, candidate_id]
+        reranked.sort(key=lambda x: x['score'], reverse=True)
+        return [(c['score'], c['source_id'], c['candidate_id']) for c in reranked[:self._limit]]

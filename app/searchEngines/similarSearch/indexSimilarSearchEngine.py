@@ -1,92 +1,149 @@
 import numpy as np
+from collections import defaultdict
 from faiss import IndexIDMap
-from typing import List, Sequence, Tuple
-from app.models import Book, BookRegistry
+from typing import List, Dict, Tuple
+from app.db import DBRouter
 from app.hnsw.rerankers import Reranker
 from .similarSearchEngine import SimilarSearchEngine
+from app.settings.config import CHUNK_ID_DIVISOR
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
     def __init__(
         self,
         index,
-        books: Sequence[Book],
         limit: int,
+        router: DBRouter,
         reranker: Reranker = None,
         exclude_same_authors: bool = False,
         step_percent: int = 5,
         logger = None,
     ):
-        super().__init__(exclude_same_authors, reranker)
+        super().__init__(
+            limit=limit, 
+            exclude_same_authors=exclude_same_authors, 
+            router=router, 
+            reranker=reranker
+        )
         self.index: IndexIDMap = index
-        self.books = BookRegistry(books)
-        self._limit = limit
+        self.chunk_id_divisor = CHUNK_ID_DIVISOR
         self.reranker = reranker
         self._step_percent = step_percent
         self.logger = logger
-        
-    def search(self, sources: BookRegistry, progress_callback=None) -> list[tuple[float, int, int]]:
-        if self.index is None or self.index.ntotal == 0 or not sources:
+
+    def _get_book_id(self, chunk_id: int) -> int:
+        """Извлекает book_id из composite chunk_id в индексе."""
+        return chunk_id // self.chunk_id_divisor
+    
+    def find_similar_books(
+            self,
+            book_ids: List[int],
+            desired_books: int = 100,
+            top_k_agg: int = 5  # количество чанков для агрегации
+        ) -> List[Dict[str, any]]:
+        if not book_ids:
             return []
 
-        n = len(sources)
-        dim = sources.books[0].embedding.shape[0]
+        # === 1. Восстановление query embeddings ===
+        query_embeddings = []
+        query_chunk_ids = []
+        source_for_query = []
+        reconstructed_cache = {}
 
-        # Подготовка эмбеддингов
-        embeddings = np.empty((n, dim), dtype=np.float32)
-        for i, book in enumerate(sources):
-            emb = book.embedding
-            embeddings[i] = emb if emb is not None else 0.0
-        embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
-
-        # FAISS поиск
-        k = min(self._limit * 10, self.index.ntotal)
-        scores, indices = self.index.search(embeddings, k)
-
-        results: list[tuple[float, int, int]] = []
-
-        for src_i, source in enumerate(sources):
-            seen_books: set[tuple[str, tuple[str, ...]]] = set()
-
-            # Получаем всех кандидатов
-            candidates_books = [
-                self.books.get(cid) for cid in indices[src_i] if cid != -1
-            ]
-
-            if not candidates_books:
-                continue
-
-            # Векторная фильтрация по title и file_name
-            titles = np.array([b.title or "" for b in candidates_books])
-            file_names = np.array([b.file_name or "" for b in candidates_books])
-
-            mask = (titles != (source.title or "")) & (file_names != (source.file_name or ""))
-
-            # Фильтрация по авторам через Python list comprehension
-            if self._exclude_same_authors and source.authors:
-                mask_authors = np.array([
-                    not bool(source.authors & c.authors) if c.authors else True
-                    for c in candidates_books
-                ])
-                mask &= mask_authors
-
-            filtered_candidates = [
-                (float(score), b)
-                for score, b, m in zip(scores[src_i], candidates_books, mask) if m
-            ]
-
-            # Отсекаем повторяющиеся title+authors_key
-            unique_candidates = []
-            for score, b in filtered_candidates:
-                key = (b.title, b.authors_key)
-                if key not in seen_books:
-                    seen_books.add(key)
-                    unique_candidates.append((score, b))
-                if len(unique_candidates) >= self._limit * 10:
+        for book_id in book_ids:
+            chunk_count = 0
+            for seq in range(self.max_chunks_per_book):
+                chunk_id = book_id * self.chunk_id_divisor + seq
+                try:
+                    vec = self.index.reconstruct(chunk_id)
+                    query_embeddings.append(vec)
+                    query_chunk_ids.append(chunk_id)
+                    source_for_query.append(book_id)
+                    reconstructed_cache[chunk_id] = vec
+                    chunk_count += 1
+                except Exception:
                     break
+            if chunk_count == 0 and self.logger:
+                self.logger.warning(f"Не найдено чанков для source book_id {book_id}.")
 
-            # Ререйк и добавление в результаты
-            reranked = self._rerank(unique_candidates)
-            for score, b in reranked[:self._limit]:
-                results.append((score, source.id, b.id))
+        if not query_embeddings:
+            if self.logger:
+                self.logger.warning("Не удалось восстановить query эмбеддинги для книг.")
+            return []
 
-        return results
+        query_embeddings_np = np.stack(query_embeddings)
+        num_query_chunks = len(query_embeddings)
+
+        # === 2. Рассчитываем k для FAISS ===
+        k = int(desired_books * self.avg_chunks_per_book * self.overfetch_factor)
+        if self.logger:
+            self.logger.info(
+                f"Ищем top-{k} чанков на query эмбеддинг "
+                f"(формула: {desired_books} × {self.avg_chunks_per_book} × {self.overfetch_factor})."
+            )
+
+        # === 3. FAISS search ===
+        distances, chunk_ids_results = self.index.search(query_embeddings_np, k=k)
+
+        # === 4. Группировка matches по паре (source_id, candidate_id) ===
+        pair_matches: Dict[Tuple[int, int], Dict[Tuple[int, int], float]] = defaultdict(dict)
+        query_book_ids = set(book_ids)
+
+        for q_idx in range(num_query_chunks):
+            source_id = source_for_query[q_idx]
+            query_chunk_id = query_chunk_ids[q_idx]
+            for match_idx in range(k):
+                score = distances[q_idx, match_idx]
+                candidate_chunk_id = chunk_ids_results[q_idx, match_idx]
+                if candidate_chunk_id == -1 or score < self.min_similarity_threshold:
+                    continue
+                candidate_id = self._get_book_id(candidate_chunk_id)
+                if candidate_id in query_book_ids or candidate_id <= 0 or source_id == candidate_id:
+                    continue
+
+                pair_key = (source_id, candidate_id)
+                match_key = (query_chunk_id, candidate_chunk_id)
+                if match_key not in pair_matches[pair_key] or score > pair_matches[pair_key][match_key]:
+                    pair_matches[pair_key][match_key] = score
+
+        # === 5. Агрегация top-K чанков для устойчивого score ===
+        candidates = []
+        for (source_id, candidate_id), match_scores in pair_matches.items():
+            top_scores = sorted(match_scores.values(), reverse=True)[:top_k_agg]
+            agg_score = float(np.mean(top_scores))
+            matches = [(score, q_chunk, c_chunk) for (q_chunk, c_chunk), score in match_scores.items()]
+            candidates.append((agg_score, source_id, candidate_id, matches))
+
+        # Сортируем и берём top desired_books
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        top_candidates = candidates[:desired_books]
+
+        # === 6. Формируем результат с кэшированными embeddings ===
+        result = []
+        for agg_score, source_id, candidate_id, matches in top_candidates:
+            matched_chunks = []
+            for score, query_chunk_id, candidate_chunk_id in matches:
+                try:
+                    query_embedding = reconstructed_cache[query_chunk_id]
+                    candidate_embedding = reconstructed_cache.get(candidate_chunk_id) or self.index.reconstruct(candidate_chunk_id)
+                    matched_chunks.append({
+                        'query_chunk_id': query_chunk_id,
+                        'query_embedding': query_embedding,
+                        'chunk_id': candidate_chunk_id,
+                        'embedding': candidate_embedding,
+                        'score': float(score)
+                    })
+                except Exception as e:
+                    if self.logger:
+                        self.logger.error(f"Не удалось восстановить эмбеддинги для матча {query_chunk_id}-{candidate_chunk_id}: {e}")
+                    continue
+            result.append({
+                'source_id': source_id,
+                'candidate_id': candidate_id,
+                'score': float(agg_score),
+                'matched_chunks': matched_chunks
+            })
+
+        if self.logger:
+            self.logger.info(f"Найдено {len(result)} похожих пар книг для reranking.")
+
+        return result

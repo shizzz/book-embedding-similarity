@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from app.cli import main  # импортируем функцию main из нашего пакета CLI
+from app.cli import cli  # импортируем функцию main из нашего пакета CLI
 
 if __name__ == "__main__":
-    main()
+    cli()

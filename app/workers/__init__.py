@@ -1,13 +1,13 @@
 __all__ = [
     "GenerateEmbeddingsWorker",
     "GenerateSimilarWorker",
-    "SimilarSearchWorker"
+    "SimilarSearchWorker",
 ]
 
 _lazy_mapping = {
-    "GenerateEmbeddingsWorker": "generate_embeddings",
-    "GenerateSimilarWorker": "generate_similar",
-    "SimilarSearchWorker": "similar_search"
+    "GenerateEmbeddingsWorker": "generate_embeddings_worker",
+    "GenerateSimilarWorker": "generate_similar_worker",
+    "SimilarSearchWorker": "similar_search_worker",
 }
 
 import importlib
@@ -19,7 +19,13 @@ def __getattr__(name):
         value = getattr(module, name)
         globals()[name] = value
         return value
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+    raise AttributeError(f"{__name__} has no attribute {name}")
 
 def __dir__():
     return sorted(__all__)
+
+# --- для IDE подсветки и автокомплита ---
+if False:
+    from .generate_embeddings_worker import GenerateEmbeddingsWorker
+    from .generate_similar_worker import GenerateSimilarWorker
+    from .similar_search_worker import SimilarSearchWorker

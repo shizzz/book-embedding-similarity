@@ -1,8 +1,7 @@
 from asyncio import to_thread
 from app.workers.base import BaseDbQueueWorker
 from app.services import BulkSimilarSearchService
-from app.models import Task, Book, Task, TaskResult, Action, BookRegistry
-from app.db import DBRouter
+from app.models import Task, Task, TaskResult, Action
 from app.db.repositories import BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings.config import SIMILARS_PER_BOOK
@@ -34,12 +33,11 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
 
     async def prepare(self) -> None:
         self.logger.info(f"Очистка таблицы similar")
-
-        with DB() as conn:
-            SimilarRepository.clear(conn)
+        SimilarRepository(self._router).clear()
 
         self._engine = SimilarSearchEngineFactory.create(
-            mode=SimilarSearchEngineFactory.INDEX, 
+            mode=SimilarSearchEngineFactory.INDEX,
+            router=self._router,
             limit=SIMILARS_PER_BOOK, 
             exclude_same_authors=True, 
             step_percent=1,
@@ -47,47 +45,35 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
         )
 
     async def pull_queue(self) -> None:
-        self.logger.info(f"Добавление книг и эмбеддингов в очередь")  
-        registry = BookRegistry()
-        expected_dim = None
-        with DB() as conn:
-            for book_id, book_name, title, author, _, _, embedding in BookRepository.get_all_with_embeddings(conn):
-                if expected_dim is None:
-                    expected_dim = embedding.shape[0]
-                if embedding.shape[0] != expected_dim:
-                    continue
+        self.logger.info("Добавление книг и эмбеддингов в очередь")
+        buffer = []
+        batch_name = None
 
-                self._task_total += 1
+        for book in BookRepository.get_all(self._router, False):
+            self._task_total += 1
+            buffer.append(book[0])
+            batch_name = book[1]  # сохраняем имя книги для текущего батча
 
-                book = Book(
-                    id=book_id,
-                    file_name=book_name,
-                    title=title,
-                    author=author,
-                    embedding=embedding
-                )
-                registry.append(book)
-
-                if len(registry) >= self.batch_size:
-                    self.queue.put_nowait(
-                        Task(
-                            name=book_name,
-                            entity=registry,
-                            action=Action.INSERT
-                        )
-                    )
-                    registry = BookRegistry()
-
-
-            if len(registry) > 0:
+            if len(buffer) >= self.batch_size:
                 self.queue.put_nowait(
                     Task(
-                        name=book_name,
-                        entity=registry,
+                        name=batch_name,
+                        entity=buffer.copy(),
                         action=Action.INSERT
                     )
                 )
-                registry = BookRegistry()
+                buffer = []
+
+        # остаток
+        if buffer:
+            self.queue.put_nowait(
+                Task(
+                    name=batch_name,
+                    entity=buffer,
+                    action=Action.INSERT
+                )
+            )
+            buffer = []
 
         await self.enqueue_shutdown_signals_async()
         self._queue_pulled.set()
@@ -97,9 +83,8 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
         return self._task_total
 
     async def fin(self) -> None:
-        self.logger.info("Чистка базы даных")
-        DB().vacuum()
+        pass
 
     def save_to_db(self, conn, task: Task) -> int:
-        SimilarRepository.save(conn, task.entity)
+        SimilarRepository(self._router).save(task.entity)
         return len(task.entity)
