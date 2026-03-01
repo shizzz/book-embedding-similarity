@@ -40,6 +40,27 @@ class Migrator:
         files = sorted(path.glob("*.sql"))
 
         with connection_cm as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS migrations_applied (
+                    file TEXT PRIMARY KEY,
+                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             for file in files:
+                filename = str(file.name)
+                
+                row = conn.execute(
+                    "SELECT 1 FROM migrations_applied WHERE file = ?", 
+                    (filename,)
+                ).fetchone()
+                if row:
+                    continue
+
                 sql = file.read_text(encoding="utf-8")
                 conn.executescript(sql)
+
+                conn.execute(
+                    "INSERT INTO migrations_applied(file) VALUES (?)",
+                    (filename,)
+                )
