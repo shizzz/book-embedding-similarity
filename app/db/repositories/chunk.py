@@ -36,27 +36,19 @@ class ChunkRepository:
 
         return chunk_id
 
-    def create_many(
-        self,
-        chunks: list[Chunk]
-    ) -> None:
-        """
-        chunks: [(chunk_id, text), ...]
-        """
-
-        with self.router.meta() as conn:
-            conn.executemany(
-                """
-                INSERT INTO chunks(
-                    id,
-                    book_id
-                )
-                VALUES(?,?)
-                """,
-                [e.to_tuple_meta() for e in chunks]
+    def _create_many_meta(self, conn, chunks: list[Chunk]):
+        conn.executemany(
+            """
+            INSERT INTO chunks(
+                id,
+                book_id
             )
+            VALUES(?,?)
+            """,
+            [e.to_tuple_meta() for e in chunks]
+        )
 
-        with self.router.chunks() as conn:
+    def _create_many_chunks(self, conn, chunks: list[Chunk]):
             conn.executemany(
                 """
                 INSERT INTO chunks(
@@ -69,6 +61,27 @@ class ChunkRepository:
                 """,
                 [e.to_tuple_chunks() for e in chunks]
             )
+
+    def create_many(
+        self,
+        chunks: list[Chunk],
+        conn_meta=None,
+        conn_chunks=None
+    ) -> None:
+        """
+        chunks: [(chunk_id, text), ...]
+        """
+        if conn_meta is None:
+            with self.router.meta() as conn:
+                self._create_many_meta(conn, chunks)
+        else:
+            self._create_many_meta(conn_meta, chunks)
+
+        if conn_chunks is None:
+            with self.router.chunks() as conn:
+                self._create_many_chunks(conn, chunks)
+        else:
+            self._create_many_chunks(conn_chunks, chunks)
 
     def get_by_book(self, book_id: int) -> None:
         with self.router.chunks() as conn:
@@ -98,7 +111,7 @@ class ChunkRepository:
             return row["data"] if row else None
 
     def get_max_id(self) -> int:
-        with self.router.meta() as conn:
+        with self.router.chunks() as conn:
             cursor = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'chunks'")
             row = cursor.fetchone()
             if row is None:

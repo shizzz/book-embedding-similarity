@@ -30,3 +30,22 @@ class ModelRepository:
             )
             
             return cursor.lastrowid
+        
+    def get_latest_uid(self, name: str) -> str:
+        """
+        Возвращает последний uid модели по имени, сортируя по дате создания.
+        """
+        with self.router.meta() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT uid
+                FROM models
+                WHERE name = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (name,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None

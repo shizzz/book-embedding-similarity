@@ -10,13 +10,15 @@ CREATE TABLE IF NOT EXISTS books (
     added_at TEXT NULL,
     source_type TEXT NULL,
     source_link TEXT NULL,
-    source_length INTEGER NULL
+    source_length INTEGER NULL,
+    empty INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS models (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uid CHAR(32) NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    date DATETIME DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS authors (
@@ -53,7 +55,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 
 CREATE TABLE IF NOT EXISTS chunks (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 

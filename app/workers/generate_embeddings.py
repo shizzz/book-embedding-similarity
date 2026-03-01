@@ -1,17 +1,16 @@
 import asyncio
-from typing import Tuple
 from app.workers.base import BaseDbQueueWorker
-from app.hnsw import IndexManager
+from app.hnsw.services import BookEmbeddingIndexer
 from app.model import Model, generate_embeddings
 from app.db import DBRouter, Migrator
-from app.db.repositories import BookRepository, EmbeddingsRepository, AuthorRepository, FeedbackRepository, ModelRepository, ChunkRepository
-from app.models import Book, BookRegistry, Feedbacks, Task, TaskResult, Action, Dataset
+from app.db.repositories import BookRepository, EmbeddingsRepository, AuthorRepository, ModelRepository, ChunkRepository
+from app.models import Book, BookRegistry, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
+from .sources.databaseReporter import DatabaseReporter
 
 class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     def __init__(self, max_batch_size: int = 50, **kwargs):
         super().__init__(**kwargs)
-        self.hnsw = IndexManager(batch_size=10000, logger=self.logger)
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, self.ui)
         self._get_book_idx: int = None
         self._book_id: int = 1
@@ -20,6 +19,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         self.max_batch_size: int = max_batch_size
 
         self._model = Model(self.max_workers)
+        self._parsed = 0
 
     async def process(self, task: Task, _thread_id: int) -> TaskResult:
         result = await asyncio.to_thread(self._process_book, task.entity)
@@ -50,19 +50,13 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         return total
 
     async def fin(self) -> None:
-        pass
-        # embeddings = list[Tuple[int, bytes]](EmbeddingsRepository(self._router, self._model.uid).get_all())
-        # feedbacks = Feedbacks(FeedbackRepository(self._router).get_all())
-        # books: list[Book] = [
-        #     Book.map_row(row)
-        #     for row in BookRepository(self._router).get_all()
-        # ]
-            
-        # self.hnsw.load_emb(embeddings)
-        # self.hnsw.rebuild(
-        #     feedbacks=feedbacks,
-        #     books=books,
-        # )
+        service = BookEmbeddingIndexer(self._router)
+        service.build_index()
+
+        reporter = DatabaseReporter(self._router, self._model.uid)
+        report = reporter.generate(self._parsed)
+
+        DatabaseReporter.print(report)
 
     async def pull_queue(self) -> None:
         existed_books = set(BookRepository(self._router).get_names())
@@ -74,19 +68,20 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
         async for book in self.engine.search_books():
             datasets: list[Dataset] = []
+            self._parsed += 1
 
             # Определяем action и datasets
             if book.file_name in existed_books:
                 action = Action.UPDATE
                 book = await self._enrich_from_db(book)
 
-                if book.chunks is None:
+                if book.chunks is None and not book.empty:
                     datasets.append(Dataset.BOOK)
 
-                if (book.embedding is None):
+                if book.embedding is None and not book.empty:
                     datasets.append(Dataset.EMBEDDING)
 
-                if len(datasets) == 0:
+                if len(datasets) == 0 or book.empty:
                     await self.ui.done_async(self._get_book_idx)
                     await self.ui.decrease_total_async()
                     continue
@@ -101,9 +96,12 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
             if book.chunks is None:
                 await self.engine.enrich_book_data(book)
-                for chunk in book.chunks:
-                    chunk.chunk_id = self._chunk_id
-                    self._chunk_id += 1
+                if len(book.chunks) == 0:
+                    book.empty = True
+                else:
+                    for chunk in book.chunks:
+                        chunk.chunk_id = self._chunk_id
+                        self._chunk_id += 1
 
             # Назначаем ID если отсутствует
             if book.id is None:
@@ -172,28 +170,45 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         chunks = []
         embeddings = []
         for book in task.entity:
-            chunks.extend(book.chunks)
-            embeddings.extend(book.embedding)
+            if not book.empty:
+                chunks.extend(book.chunks)
+                embeddings.extend(book.embedding)
 
-        if Dataset.BOOK in task.dataset:
-            BookRepository(router).save_bulk(task.entity)
-            ChunkRepository(router).create_many(chunks)
-            
-        if Dataset.EMBEDDING in task.dataset:
-            EmbeddingsRepository(router, self._model.uid).save_bulk(embeddings)
-            
-        if Dataset.AUTHOR in task.dataset and task.action == Action.INSERT:
-            AuthorRepository(router).save_bulk(task.entity)
+        with router.transaction() as tx:
+            if Dataset.BOOK in task.dataset:
+                BookRepository(router).save_bulk(
+                    task.entity,
+                    conn=tx.meta()
+                )
+
+                ChunkRepository(router).create_many(
+                    chunks,
+                    conn_meta=tx.meta(),
+                    conn_chunks=tx.chunks()
+                )
+
+            if Dataset.EMBEDDING in task.dataset:
+                EmbeddingsRepository(router, self._model.uid).save_bulk(
+                    embeddings,
+                    conn=tx.embeddings(self._model.uid)
+                )
+
+            if Dataset.AUTHOR in task.dataset and task.action == Action.INSERT:
+                AuthorRepository(router).save_bulk(
+                    task.entity,
+                    conn=tx.meta()
+                )
 
         return len(task.entity)
 
     def _process_book(self, registry: BookRegistry) -> BookRegistry:
         result = generate_embeddings(self._model, registry)
         for book in result:
-            for emb in book.embedding:
-                emb.book_id = book.id
-                emb.emb_id = self._emb_id
-                self._emb_id += 1
+            if book.embedding:
+                for emb in book.embedding:
+                    emb.book_id = book.id
+                    emb.emb_id = self._emb_id
+                    self._emb_id += 1
         return result
 
     def _adaptive_batch_size(self, queue_size: int,) -> int:

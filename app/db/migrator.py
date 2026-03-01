@@ -1,5 +1,5 @@
 from pathlib import Path
-from app.db.router import DBRouter
+from .router import DBRouter
 from app.settings.config import BASE_DIR
 
 class Migrator:

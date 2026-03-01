@@ -1,6 +1,7 @@
 from pathlib import Path
-from app.db.pool import SQLitePool
-from app.db.pooled_connection import PooledConnection
+from .pool import SQLitePool
+from .pooled_connection import PooledConnection
+from .transaction import DBTransaction
 from app.settings.config import DATA_DIR
 
 class DBRouter:
@@ -14,6 +15,9 @@ class DBRouter:
             self._pools[path] = SQLitePool(path)
         return self._pools[path]
 
+    def transaction(self):
+        return DBTransaction(self)
+    
     def meta(self):
         path = self.base_dir / "meta.db"
         return PooledConnection(

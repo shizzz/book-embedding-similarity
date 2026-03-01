@@ -53,11 +53,12 @@ class DbQueue(Generic[TEntity]):
 
     async def _loop(self):
         buffer = []
+        errors = 0
 
         while not self._stop_event.is_set():
-            await self._step_async(buffer)
+            await self._step_async(buffer, errors)
 
-        while self._step(self._router, buffer):
+        while self._step(self._router, buffer, errors):
             pass
 
         self._ui.console.log("Save thread stopped")
@@ -68,7 +69,7 @@ class DbQueue(Generic[TEntity]):
             total += self._save_func(self._router, task)
         return total
 
-    async def _step_async(self, buffer: List[Task]):
+    async def _step_async(self, buffer: List[Task], errors: int):
         try:
             task = await self.queue.get()
         
@@ -88,11 +89,15 @@ class DbQueue(Generic[TEntity]):
 
             return task is not None
         except Exception as e:
+            errors += 1
+            if errors > 5:
+                self.queue.task_done()
+                errors = 0
             traceback.print_exc()
             self._ui.console.log(f"Критическая ошибка при сохранение в базу данных: {e}")
             return False
     
-    def _step(self, conn, buffer: list[Task]) -> bool:
+    def _step(self, conn, buffer: list[Task], errors: int) -> bool:
         if buffer:
             for task in buffer:
                 done = self._save_func(conn, task)
@@ -106,10 +111,16 @@ class DbQueue(Generic[TEntity]):
         except asyncio.QueueEmpty:
             return
 
-        if task is not None:
-            done = self._save_func(conn, task)
-            self._ui.done(self._progress_idx, done)
+        try:
+            if task is not None:
+                done = self._save_func(conn, task)
+                self._ui.done(self._progress_idx, done)
 
-        self.queue.task_done()
+            self.queue.task_done()
+        except Exception as e:
+            errors += 1
+            if errors > 5:
+                self.queue.task_done()
+                errors = 0
 
         return task is not None

@@ -28,6 +28,7 @@ class Book:
     model_id: int = None
     chunks: List[Chunk] = None
     source_length: int = None
+    empty: bool = False
 
     T = TypeVar("T")
 
@@ -48,7 +49,8 @@ class Book:
             model_id: int = None,
             chunks: List[Chunk] = None,
             shape: int = None,
-            source_length: int = None
+            source_length: int = None,
+            empty: bool = False
         ):
         self.id = id
         self.file_name = file_name
@@ -65,6 +67,7 @@ class Book:
         self.chunks = chunks
         self.shape = shape
         self.source_length = source_length
+        self.empty = empty
 
         self.authors = frozenset(self._parse_array(author)) if authors is None and author else frozenset(authors or [])
         self.authors_key = tuple(sorted(self.authors)) if self.authors else ()
@@ -92,6 +95,7 @@ class Book:
             source_type=safe_get(row, "source_type"),
             source_link=safe_get(row, "source_link"),
             source_length=safe_get(row, "source_length"),
+            empty=safe_get(row, "empty"),
         )
     
     @classmethod

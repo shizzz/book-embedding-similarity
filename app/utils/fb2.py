@@ -46,12 +46,11 @@ class FB2Book:
     ) -> list[str]:
         """
         Возвращает список текстовых чанков книги без разрыва слов.
-        Сэмплируются несколько частей книги: начало, середина, конец и промежуточные.
+        Адаптировано для коротких книг и стихотворений.
         """
-
         # -------- extract paragraphs safely --------
         nodes = self.root.xpath(
-            ".//fb2:body//fb2:p[not(ancestor::fb2:annotation) and not(ancestor::fb2:note)]",
+            ".//fb2:body//fb2:p | .//fb2:body//fb2:poem//fb2:v",
             namespaces=self.NS
         )
 
@@ -65,13 +64,13 @@ class FB2Book:
         if not paragraphs:
             return []
 
+        chunks = []
+
         # -------- description --------
         description = self.get_description()
-        chunks = []
         if description:
             description = re.sub(r"\s+", " ", description).strip()
             if len(description) > max_description_chars:
-                # обрезаем без разрыва слова
                 cutoff = description.rfind(" ", 0, max_description_chars)
                 if cutoff == -1:
                     cutoff = max_description_chars
@@ -79,23 +78,31 @@ class FB2Book:
             if description:
                 chunks.append(description)
 
-        # -------- short book fallback --------
+        # -------- total book length --------
         total_chars = sum(len(p) + 2 for p in paragraphs)
-        if total_chars <= target_chars:
-            body_text = "\n\n".join(paragraphs)
-            if body_text:
-                chunks.append(body_text)
+
+        # -------- short book fallback --------
+        if total_chars <= target_chars * 1.5:
+            # Объединяем все параграфы, можно разбить на несколько чанков по max длине
+            current_chunk = []
+            current_len = 0
+            for p in paragraphs:
+                if current_len + len(p) + 2 > target_chars:
+                    if current_chunk:
+                        chunks.append("\n\n".join(current_chunk))
+                    current_chunk = [p]
+                    current_len = len(p) + 2
+                else:
+                    current_chunk.append(p)
+                    current_len += len(p) + 2
+            if current_chunk:
+                chunks.append("\n\n".join(current_chunk))
             return chunks
 
-        # -------- multi-section sampling --------
+        # -------- multi-section sampling (для больших книг) --------
         total = len(paragraphs)
         sections = max(1, min(sections, total))
-        chunk_targets = []
-
-        for i in range(sections):
-            idx = int(i * total / sections)
-            chunk_targets.append(idx)
-
+        chunk_targets = [int(i * total / sections) for i in range(sections)]
         used = set()
         body_parts = []
 
@@ -111,7 +118,6 @@ class FB2Book:
                 if left >= 0 and left not in used:
                     p = paragraphs[left]
                     if current_len + len(p) + 2 > max_chunk_len:
-                        # обрезаем по последнему пробелу
                         cutoff = p.rfind(" ", 0, max_chunk_len - current_len)
                         if cutoff > 0:
                             current_chunk.append(p[:cutoff])
@@ -151,7 +157,7 @@ class FB2Book:
             if current_chunk:
                 body_parts.append("\n\n".join(current_chunk))
 
-        # -------- fallback if too маленький --------
+        # -------- fallback если body_parts слишком маленькие --------
         combined_len = sum(len(p) for p in body_parts)
         i = 0
         while combined_len < min_chars and i < total:

@@ -12,7 +12,8 @@ class BookRepository:
         b.title,
         b.author,
         b.source_type,
-        b.source_link
+        b.source_link,
+        b.empty
     FROM books b
     """
 
@@ -27,7 +28,8 @@ class BookRepository:
         b.year,
         b.source_type,
         b.source_link,
-        b.source_length
+        b.source_length,
+        b.empty
     FROM books b
     """
     
@@ -122,38 +124,45 @@ class BookRepository:
             )
 
             return cursor.lastrowid
+        
+    def save_bulk(self, books: BookRegistry, conn=None):
+        if conn is None:
+            with self.router.meta() as conn:
+                self._save_bulk(conn, books)
+        else:
+            self._save_bulk(conn, books)
 
-    def save_bulk(self, books: BookRegistry):
+    def _save_bulk(self, conn, books: BookRegistry):
         if not books:
             return []
 
-        with self.router.meta() as conn:
-            now = datetime.now().isoformat()
-            cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        cursor = conn.cursor()
 
-            cursor.executemany(
-                """
-                INSERT OR REPLACE INTO books (id, book, uid, title, author, serie, generes, year, added_at, source_type, source_link, source_length)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    (
-                        book.id,
-                        book.file_name,
-                        book.uid,
-                        book.title,
-                        book.author,
-                        book.serie,
-                        "||".join(book.generes),
-                        book.year,
-                        now,
-                        book.source_type,
-                        book.source_link,
-                        book.source_length,
-                    )
-                    for book in books
-                ]
-            )
+        cursor.executemany(
+            """
+            INSERT OR REPLACE INTO books (id, book, uid, title, author, serie, generes, year, added_at, source_type, source_link, source_length, empty)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    book.id,
+                    book.file_name,
+                    book.uid,
+                    book.title,
+                    book.author,
+                    book.serie,
+                    "||".join(book.generes),
+                    book.year,
+                    now,
+                    book.source_type,
+                    book.source_link,
+                    book.source_length,
+                    book.empty,
+                )
+                for book in books
+            ]
+        )
         
     def get_max_id(self) -> int:
         with self.router.meta() as conn:
