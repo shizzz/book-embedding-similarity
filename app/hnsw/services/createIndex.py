@@ -3,6 +3,7 @@ import faiss
 import numpy as np
 from typing import Optional, Dict, List, Tuple
 from app.db import DBRouter
+from app.ui import BaseUI
 from app.db.repositories import EmbeddingsRepository, ModelRepository
 from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, MODEL_NAME
 
@@ -10,11 +11,13 @@ class BookEmbeddingIndexer:
     def __init__(
         self,
         db_router: DBRouter,
+        ui: BaseUI,
         index_file: str = INDEX_FILE,
         batch_size: int = 2048,
         logger: Optional[any] = None
     ):
         self.db_router = db_router
+        self.ui = ui
         self.index_file = index_file
         self.batch_size = batch_size
         self.logger = logger
@@ -38,7 +41,7 @@ class BookEmbeddingIndexer:
         pos_counter = 0
 
         # прогресс бар по батчам
-        for batch in tqdm(repo.get_all_batch(self.batch_size), desc="Добавление в HNSW индекс"):
+        for batch in self.ui.tqdm(repo.get_all_batch(self.batch_size), desc="Добавление в HNSW индекс"):
             batch_embeddings = []
             batch_ids = []
 

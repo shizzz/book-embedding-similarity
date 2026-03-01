@@ -15,6 +15,7 @@ from rich.progress import (
 )
 from time import perf_counter
 from .ui import BaseUI
+from .tqdmLike import TqdmLike, TqdmIterable
 
 from app.settings.config import MAX_WORKERS
 
@@ -227,3 +228,8 @@ class LiveUI(BaseUI):
         if idx in self._tasks:
             del self._tasks[idx]
         self.live.update(self.layout())
+
+    def tqdm(self, obj=None, description: str = "", total: int = 0, unit: str = "", show_elapsed: bool = False):
+        if hasattr(obj, "__iter__") and obj is not None:
+            return TqdmIterable(self, obj, description, unit, show_elapsed)
+        return TqdmLike(self, description, total, unit, show_elapsed)
