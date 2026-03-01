@@ -1,8 +1,6 @@
 import time
 import asyncio
-import numpy as np
 from typing import Optional, List, Tuple
-
 from app.db import DBRouter
 from app.db.repositories import SimilarRepository
 from app.models import Book
@@ -10,7 +8,8 @@ from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 
 class TaskState:
-    def __init__(self):
+    def __init__(self, router: DBRouter):
+        self.router = router
         self.progress: int = 0
         self.result: Optional[List[Tuple[float, int, int]]] = None
         self.error: Optional[str] = None
@@ -51,7 +50,11 @@ class Similarity:
 
         try:
             engine = SimilarSearchEngineFactory.create(
-                SimilarSearchEngineFactory.INDEX, limit, exclude_same_author, 1
+                mode=SimilarSearchEngineFactory.INDEX, 
+                router=self.router,
+                limit=limit, 
+                exclude_same_authors=exclude_same_author, 
+                step_percent=1
             )
             service = SimilarSearchService(engine=engine)
 
@@ -60,8 +63,7 @@ class Similarity:
                 progress_callback=lambda p: self.update_progress(book.file_name, p)
             )
 
-            with DB() as conn:
-                SimilarRepository.replace(conn, similars)
+            SimilarRepository(self.router).replace(similars)
 
             state.set_done(similars)
 

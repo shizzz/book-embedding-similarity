@@ -1,23 +1,23 @@
 from fastapi import APIRouter, HTTPException
 from app.models import Book, FeedbackReq, Feedbacks
-from app.db import DB, BookRepository, FeedbackRepository, SimilarRepository
+from app.db.repositories import BookRepository, FeedbackRepository, SimilarRepository
+from ..dependencies import router as dbrouter
 
 router = APIRouter()
 
 @router.post("/")
 async def submit_feedback(fb: FeedbackReq):
     try:
-        with DB() as conn:
-            source = Book.from_row(BookRepository.get_by_file(conn, fb.source_file_name))
-            candidate = Book.from_row(BookRepository.get_by_file(conn, fb.candidate_file_name))
+        source = Book.from_row(BookRepository(dbrouter).get_by_file(fb.source_file_name))
+        candidate = Book.from_row(BookRepository(dbrouter).get_by_file(fb.candidate_file_name))
 
-            if fb.label > 0:
-                FeedbackRepository.submit(conn, source.id, candidate.id, fb.label)
-            elif fb.label == 0:
-                FeedbackRepository.delete(conn, source.id, candidate.id)
-            elif fb.label < 0:
-                FeedbackRepository.submit(conn, source.id, candidate.id, fb.label)
-                SimilarRepository.delete(conn, source.id, candidate.id)
+        if fb.label > 0:
+            FeedbackRepository(dbrouter).submit(source.id, candidate.id, fb.label)
+        elif fb.label == 0:
+            FeedbackRepository(dbrouter).delete(source.id, candidate.id)
+        elif fb.label < 0:
+            FeedbackRepository(dbrouter).submit(source.id, candidate.id, fb.label)
+            SimilarRepository(dbrouter).delete(source.id, candidate.id)
 
         return {"status": "ok"}
     except Exception as e:
@@ -26,8 +26,7 @@ async def submit_feedback(fb: FeedbackReq):
 @router.get("/")
 async def get_all_feedback():
     try:
-        with DB() as conn:
-            feedbacks = Feedbacks(FeedbackRepository.get_all(conn))
+        feedbacks = Feedbacks(FeedbackRepository(dbrouter).get_all())
 
         return {
             "feedback": [

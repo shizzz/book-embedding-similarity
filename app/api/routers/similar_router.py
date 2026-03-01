@@ -5,11 +5,11 @@ import time
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from app.db import DB, BookRepository, SimilarRepository, FeedbackRepository
-from app.models import Book, Feedbacks
+from app.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
+from app.models import Feedbacks
 from app.utils import Html
 from app.services import TaskState, Similarity
-from ..dependencies import executor
+from ..dependencies import executor, router as dbrouter
 from app.settings.config import SITE_BASE_PATH
 
 router = APIRouter()
@@ -47,26 +47,25 @@ async def similar_events(
     async def event_stream():
         start = time.perf_counter()
 
-        with DB() as conn:
-            book = BookRepository.get_full_by_file(conn, file)
-            if not book:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
-                return
+        book = BookRepository(dbrouter).get_full_by_file(file)
+        if not book:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Книга не найдена'})}\n\n"
+            return
 
-            if force:
-                similarity.remove_task(book.file_name)
+        if force:
+            similarity.remove_task(book.file_name)
 
-            if not force and SimilarRepository.has_similar(conn, book.id):
-                similars = SimilarRepository.get(conn, book.id, limit)
-                feedbacks = Feedbacks(FeedbackRepository.get(conn, book.id))
+        if not force and SimilarRepository(dbrouter).has_similar(book.id):
+            similars = SimilarRepository(dbrouter).get(book.id, limit)
+            feedbacks = Feedbacks(FeedbackRepository(dbrouter).get(book.id))
 
-                elapsed = time.perf_counter() - start
-                html = Html.render_similar_table(request, book, similars, elapsed, feedbacks)
-                yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
-                return
+            elapsed = time.perf_counter() - start
+            html = Html.render_similar_table(request, book, similars, elapsed, feedbacks)
+            yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
+            return
 
         if book.file_name not in similarity.tasks:
-            similarity.tasks[book.file_name] = TaskState()
+            similarity.tasks[book.file_name] = TaskState(dbrouter)
             asyncio.get_running_loop().run_in_executor(
                 executor,
                 similarity.compute_similar,
@@ -81,9 +80,8 @@ async def similar_events(
                 break
 
             if state.result is not None:
-                elapsed = time.perf_counter() - start
-                with DB() as conn:                 
-                    feedbacks = Feedbacks(FeedbackRepository.get(conn, book.id))
+                elapsed = time.perf_counter() - start            
+                feedbacks = Feedbacks(FeedbackRepository(dbrouter).get(book.id))
 
                 html = Html.render_similar_table(request, book, state.result, elapsed, feedbacks)
                 yield f"data: {json.dumps({'type': 'done', 'html': html.body.decode()})}\n\n"
