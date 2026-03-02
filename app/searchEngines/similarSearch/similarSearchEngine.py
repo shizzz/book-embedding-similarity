@@ -3,7 +3,6 @@ from typing import List, Tuple, Dict
 from app.hnsw.rerankers import Reranker
 from app.db import DBRouter
 from app.db.repositories import BookRepository
-from app.models import Book
 
 class SimilarSearchEngine:
     def __init__(

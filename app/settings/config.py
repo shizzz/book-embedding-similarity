@@ -1,5 +1,11 @@
 from pathlib import Path
+from enum import Enum
 import os
+
+class IndexLevel(str, Enum):
+    CHUNK = "chunk"
+    DOCUMENT = "document"
+    BOTH = "both"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,7 +29,6 @@ SIMILARS_PER_BOOK = int(os.getenv("SIMILARS_PER_BOOK",100))
 
 DATABASE_QUEUE_BATCH_SIZE = int(os.getenv("DATABASE_QUEUE_BATCH_SIZE",20000))
 
-
 MODEL_NAME: str = os.getenv("MODEL_NAME","intfloat/multilingual-e5-large")
 ST_CHUNK_SIZE: int  = int(os.getenv("ST_CHUNK_SIZE",2500))
 ST_OVERLAP: int = int(os.getenv("ST_OVERLAP",300))
@@ -34,6 +39,10 @@ ST_TARGET_CHARS: int = int(os.getenv("ST_TARGET_CHARS",16000))
 ST_MAX_TITLE_CHARS: int = int(os.getenv("ST_MAX_TITLE_CHARS",300))
 ST_MAX_DESCRIPTION_CHARS: int = int(os.getenv("ST_MAX_DESCRIPTION_CHARS",2000))
 
+BUILD_INDEX_LEVEL = IndexLevel(
+    os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()
+)
+CHUNK_ID_DIVISOR = 10000
 HNSW_M: int = 32
 HNSW_EF_CONSTRUCTION: int = 200
 HNSW_EF_SEARCH: int = 64
@@ -42,4 +51,3 @@ FEEDBACK_BOOST_FACTOR: float = 0.4
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY","")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY","")
 LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL","")
-CHUNK_ID_DIVISOR = 10000
