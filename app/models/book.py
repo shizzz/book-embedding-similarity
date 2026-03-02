@@ -24,11 +24,11 @@ class Book:
     source_type: Optional[str]
     source_link: Optional[str]
     uid: str = None
+    embedding: List[Embedding] = None
     model_id: int = None
+    chunks: List[Chunk] = None
     source_length: int = None
     empty: bool = False
-    embedding: List[Embedding] = []
-    chunks: List[Chunk] = []
 
     T = TypeVar("T")
 
