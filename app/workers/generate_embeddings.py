@@ -66,10 +66,10 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 action = Action.UPDATE
                 book = await self._enrich_from_db(book)
 
-                if book.chunks is None and not book.empty:
+                if len(book.chunks) == 0 and not book.empty:
                     datasets.append(Dataset.CHUNK)
 
-                if book.embedding is None and not book.empty:
+                if len(book.embedding) == 0 and not book.empty:
                     datasets.append(Dataset.EMBEDDING)
 
                 if len(datasets) == 0 or book.empty:
