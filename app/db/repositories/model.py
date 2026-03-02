@@ -42,7 +42,7 @@ class ModelRepository:
                 SELECT uid
                 FROM models
                 WHERE name = ?
-                ORDER BY created_at DESC, id DESC
+                ORDER BY date DESC, id DESC
                 LIMIT 1
                 """,
                 (name,)

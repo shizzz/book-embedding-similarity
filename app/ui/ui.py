@@ -31,5 +31,5 @@ class BaseUI(ABC):
     async def error(self, idx: int = 0):
         pass
 
-    def tqdm(self, description: str, total: int = 0, unit: str = "", show_elapsed: bool = False):
+    def tqdm(self, desc: str, total: int = 0, unit: str = "", show_elapsed: bool = False):
         pass

@@ -48,8 +48,11 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         await self.ui.update_total_async(total, self._get_book_idx)
         return total
 
-    async def fin(self) -> None:
-        BookEmbeddingIndexer(self._router).build_index()
+    async def fin(self) -> None: 
+        BookEmbeddingIndexer(
+            db_router=self._router,
+            ui=self.ui
+        ).build_index()
 
         report = DatabaseReporter(self._router, self._model.uid).generate(self._parsed)
         DatabaseReporter.print(report)

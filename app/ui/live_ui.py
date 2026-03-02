@@ -20,9 +20,15 @@ from .tqdmLike import TqdmLike, TqdmIterable
 from app.settings.config import MAX_WORKERS
 
 class LiveUI(BaseUI):
-    def __init__(self, max_workers: int = MAX_WORKERS, title: str = "Library scanner"):
+    def __init__(
+            self,
+            max_workers: int = MAX_WORKERS, 
+            title: str = "Library scanner",
+            show_table: bool = True
+        ):
         self.max_workers = max_workers
         self.live: Live = None
+        self._show_table = show_table
         
         self._label = title
         self._bars: Dict[int, Progress] = {}
@@ -40,7 +46,9 @@ class LiveUI(BaseUI):
 
         self.lock = asyncio.Lock()
         self.console = Console()
-        self.add_progress("Прогресс анализа книг", "книг", True)
+
+        if show_table:
+            self.add_progress("Прогресс анализа книг", "книг", True)
 
     def _make_table(self) -> Table:
         table = Table(title=self._label, expand=True)
@@ -102,8 +110,9 @@ class LiveUI(BaseUI):
         
     def layout(self) -> Table:
         grid = Table.grid(expand=True)
-        grid.add_row(self._make_table())
-        grid.add_row(self._make_info())
+        if self._show_table:
+            grid.add_row(self._make_table())
+            grid.add_row(self._make_info())
 
         for idx in self._bars:
             grid.add_row(self._bars[idx])
@@ -115,7 +124,11 @@ class LiveUI(BaseUI):
         self.stats["Done"] = 0
         self.stats["Errors"] = 0
 
-        self._bars[0].update(self._tasks[0], total=0)
+        if self._show_table:
+            self._bars[0].update(self._tasks[0], total=0)
+
+        self.live = Live(self.layout(), refresh_per_second=1, console=self.console)
+        self.live.start()
 
     async def set_thread(self, worker_id: int, name: str):
         async with self.lock:
@@ -229,7 +242,7 @@ class LiveUI(BaseUI):
             del self._tasks[idx]
         self.live.update(self.layout())
 
-    def tqdm(self, obj=None, description: str = "", total: int = 0, unit: str = "", show_elapsed: bool = False):
+    def tqdm(self, obj=None, desc: str = "", total: int = 0, unit: str = "", show_elapsed: bool = False):
         if hasattr(obj, "__iter__") and obj is not None:
-            return TqdmIterable(self, obj, description, unit, show_elapsed)
-        return TqdmLike(self, description, total, unit, show_elapsed)
+            return TqdmIterable(self, obj, desc, unit, show_elapsed)
+        return TqdmLike(self, desc, total, unit, show_elapsed)

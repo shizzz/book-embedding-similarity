@@ -23,6 +23,15 @@ def get_args() -> argparse.Namespace:
         type=str, 
         help="Генерация похожих объектов"
     )
+    generate_parser.add_argument(
+        "--index", 
+        action="store_true",
+        help="Перестроить индекс"
+    )
+
+    # -----------------------
+    # Команда get
+    # -----------------------
     get_parser = subparsers.add_parser(
         "get", 
         help="Получение данных"

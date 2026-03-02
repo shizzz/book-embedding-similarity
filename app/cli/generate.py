@@ -45,3 +45,20 @@ def run(args):
             db_queue_max_size=queue_size
         )
         asyncio.run(worker.run())
+    if args.index:
+        from app.ui import LiveUI
+        from app.hnsw.services import BookEmbeddingIndexer
+        from app.db.router import DBRouter
+
+        router = DBRouter()
+        ui = LiveUI(
+            max_workers = 0,
+            title = "Create HNSW index",
+            show_table = False
+        )
+        ui.init()
+
+        BookEmbeddingIndexer(
+            db_router=router,
+            ui=ui
+        ).build_index()

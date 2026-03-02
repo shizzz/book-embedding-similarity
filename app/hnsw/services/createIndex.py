@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Optional, Dict
 from app.db import DBRouter
 from app.ui import BaseUI
+from app.utils import EmbeddingsBatchIterable
 from app.db.repositories import EmbeddingsRepository, ModelRepository
 from app.settings.config import HNSW_M, HNSW_EF_CONSTRUCTION, HNSW_EF_SEARCH, INDEX_FILE, MODEL_NAME, CHUNK_ID_DIVISOR
 
@@ -13,7 +14,7 @@ class BookEmbeddingIndexer:
         db_router: DBRouter,
         ui: BaseUI,
         index_file: str = INDEX_FILE,
-        batch_size: int = 2048,
+        batch_size: int = 5000,
         logger: Optional[any] = None
     ):
         self.db_router = db_router
@@ -30,7 +31,7 @@ class BookEmbeddingIndexer:
 
         # создаём индекс после первого батча
         first_batch = next(repo.get_all_batch(self.batch_size))
-        self.embedding_dim = first_batch[0].shape[0]  # Исправлено: shape[0] для dim
+        self.embedding_dim = first_batch[0].shape
         base_index = faiss.IndexHNSWFlat(self.embedding_dim, HNSW_M, faiss.METRIC_INNER_PRODUCT)
         base_index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
         base_index.hnsw.efSearch = HNSW_EF_SEARCH
@@ -39,9 +40,9 @@ class BookEmbeddingIndexer:
         book_chunk_counters: Dict[int, int] = defaultdict(int)  # seq для каждой книги
 
         # прогресс бар по батчам
-        for batch in self.ui.tqdm(repo.get_all_batch(self.batch_size), desc="Добавление в HNSW индекс"):
+        for batch in self.ui.tqdm(EmbeddingsBatchIterable(repo, self.batch_size), desc="Добавление в HNSW индекс"):
             batch_embeddings = []
-            batch_ids = []  # Теперь composite ID
+            batch_ids = []
 
             for r in batch:
                 vec = r.data

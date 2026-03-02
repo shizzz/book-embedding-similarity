@@ -19,8 +19,6 @@ class BaseWorker(ABC):
         
         self.ui = LiveUI(max_workers=self.max_workers, title=title)
         self.ui.init()
-        self.ui.live = Live(self.ui.layout(), refresh_per_second=1, console=self.ui.console)
-        self.ui.live.start()
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
