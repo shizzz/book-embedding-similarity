@@ -12,6 +12,7 @@ class Dataset(Enum):
     BOOK = auto()
     EMBEDDING = auto()
     AUTHOR = auto()
+    CHUNK = auto()
 
 @dataclass
 class Task(Generic[TEntity]):

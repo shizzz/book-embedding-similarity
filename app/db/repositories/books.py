@@ -4,8 +4,7 @@ import numpy as np
 from ..router import DBRouter
 from ...models.book import BookRegistry, Book
 
-class BookRepository:
-    GET_QUERY = """
+GET_QUERY = """
     SELECT
         b.id,
         b.book,
@@ -17,7 +16,7 @@ class BookRepository:
     FROM books b
     """
 
-    GET_FULL_QUERY = """
+GET_FULL_QUERY = """
     SELECT
         b.id,
         b.book,
@@ -32,14 +31,15 @@ class BookRepository:
         b.empty
     FROM books b
     """
-    
+
+class BookRepository:
     def __init__(self, router: DBRouter):
         self.router = router
 
     def get_all(self, empty: bool = None) -> Any:
         with self.router.transaction():
             conn = self.router.meta()
-            query = BookRepository.GET_QUERY
+            query = GET_QUERY
             params = ()
 
             if empty is not None:
@@ -55,7 +55,7 @@ class BookRepository:
             return {}
 
         placeholders = ",".join("?" for _ in ids)
-        query = f"{BookRepository.GET_QUERY} WHERE id IN ({placeholders})"
+        query = f"{GET_QUERY} WHERE id IN ({placeholders})"
         result = {}
         with self.router.transaction():
             conn = self.router.meta()
@@ -100,17 +100,17 @@ class BookRepository:
 
     def get_by_file(self, book: str) -> Any:
         with self.router.meta() as conn:
-            row = conn.execute(f"{BookRepository.GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
+            row = conn.execute(f"{GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
             return row if row else None
 
     def get_full_by_file(self, book: str) -> Book:
         with self.router.meta() as conn:
-            row = conn.execute(f"{BookRepository.GET_FULL_QUERY} WHERE b.book = ?",(book,)).fetchone()
+            row = conn.execute(f"{GET_FULL_QUERY} WHERE b.book = ?",(book,)).fetchone()
             return Book.from_row(row) if row else None
     
     def get_by_id(self, book_id: int) -> Any:
         with self.router.meta() as conn:
-            row = conn.execute(f"{BookRepository.GET_QUERY} WHERE b.id = ?",(book_id,)).fetchone()
+            row = conn.execute(f"{GET_QUERY} WHERE b.id = ?",(book_id,)).fetchone()
             return row if row else None
     
     def get_many(self, book_ids: list[int]) -> dict[int, Any]:
@@ -119,7 +119,7 @@ class BookRepository:
                 return {}
 
             placeholders = ",".join("?" for _ in book_ids)
-            rows = conn.execute(f"{BookRepository.GET_QUERY} WHERE id IN ({placeholders})",book_ids).fetchall()
+            rows = conn.execute(f"{GET_QUERY} WHERE id IN ({placeholders})",book_ids).fetchall()
 
             return {
                 row["id"]: row
@@ -134,7 +134,7 @@ class BookRepository:
     def embeddings_cursor(self):
         with self.router.meta() as conn:
             embeddings_cursor = conn.cursor()
-            embeddings_cursor.execute(BookRepository.GET_QUERY + " GROUP BY b.book")
+            embeddings_cursor.execute(GET_QUERY + " GROUP BY b.book")
             return embeddings_cursor
 
     def save(

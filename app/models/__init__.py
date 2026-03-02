@@ -4,6 +4,7 @@ from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar
 from .embedding import Embedding
 from .chunk import Chunk
+from .report import Report
 
 __all__ = [
     "Book",
@@ -17,5 +18,6 @@ __all__ = [
     "Feedbacks",
     "Similar",
     "Embedding",
-    "Chunk"
+    "Chunk",
+    "Report"
 ]

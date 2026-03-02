@@ -35,25 +35,6 @@ class EmbeddingsRepository:
                     break
                 yield [Embedding.from_row(r) for r in rows]
 
-    def save(
-            self,
-            book_id: int,
-            embedding: np.ndarray,
-            model: str,
-            source_length: int = None,
-            source_chunk_length: int = None,
-            shape: int = None
-    ):
-        with self.router.embeddings(self.model_uid) as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO embeddings
-                (book_id, embedding, model, source_length, source_chunk_length, shape)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (book_id, embedding, model, source_length, source_chunk_length, shape)
-            )
-
     def _save_bulk(self, conn, embeddings: list[Embedding]):
         conn.executemany(
             """
@@ -88,6 +69,18 @@ class EmbeddingsRepository:
             query = f"DELETE FROM embeddings WHERE book_id IN ({','.join(['?']*len(to_delete))})"
             conn.execute(query, to_delete)
 
+    def meta_only(self, book_id: int = None) -> tuple[int, int, int]:
+        with self.router.embeddings(self.model_uid) as conn:
+            query = "SELECT id, book_id, chunk_id, NULL AS data, shape FROM embeddings"
+            params = ()
+
+            if book_id is not None:
+                query += " WHERE book_id = ?"
+                params = (int(book_id),)
+
+            cursor = conn.execute(query, params).fetchall()
+            return [Embedding.from_row(r) for r in cursor]
+        
     def get_max_id(self) -> int:
         with self.router.embeddings(self.model_uid) as conn:
             cursor = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'embeddings'")

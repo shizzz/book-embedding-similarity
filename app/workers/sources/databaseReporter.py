@@ -1,146 +1,73 @@
-from dataclasses import dataclass
-
-
-@dataclass
-class DatabaseReport:
-    parsed_books: int
-
-    books_total: int
-    books_empty: int
-    books_without_chunks: int
-
-    chunks_total: int
-    chunks_without_embeddings: int
-
-    embeddings_total: int
-    embeddings_without_chunks: int
-
-    avg_chunks_per_book: float
-    avg_embeddings_per_chunk: float
-
+from app.models.report import Report
 
 class DatabaseReporter:
-
     def __init__(self, router, model_uid: str):
         self.router = router
         self.model_uid = model_uid
 
-    def generate(self, parsed_books_count: int) -> DatabaseReport:
+    def generate(self, new_books: set | None = None) -> Report:
+        report = Report()
 
         # --- BOOKS ---
         with self.router.meta() as conn:
-
-            books_total = conn.execute(
-                "SELECT COUNT(*) FROM books"
-            ).fetchone()[0]
-
-            books_empty = conn.execute(
-                "SELECT COUNT(*) FROM books WHERE empty = 1"
-            ).fetchone()[0]
-
-            books_without_chunks = conn.execute(
-                """
+            books_total = conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]
+            books_empty = conn.execute("SELECT COUNT(*) FROM books WHERE empty = 1").fetchone()[0]
+            books_without_chunks = conn.execute("""
                 SELECT COUNT(*)
                 FROM books b
                 LEFT JOIN chunks c ON c.book_id = b.id
                 WHERE c.id IS NULL
-                """
-            ).fetchone()[0]
+            """).fetchone()[0]
 
-            avg_chunks_per_book = conn.execute(
-                """
-                SELECT AVG(cnt)
-                FROM (
-                    SELECT COUNT(c.id) AS cnt
-                    FROM books b
-                    LEFT JOIN chunks c ON c.book_id = b.id
-                    GROUP BY b.id
-                )
-                """
-            ).fetchone()[0] or 0.0
+            # --- получаем новые книги ---
+            if new_books:
+                books_in_db = {row[0] for row in conn.execute("SELECT book FROM books").fetchall()}
+                first_10_new_books = list(new_books - books_in_db)[:10]
+            else:
+                first_10_new_books = []
+
+        # --- создаем блок Books ---
+        books_block = report.create_block("Books")
+        books_block.add("Parsed books", len(new_books) if new_books else 0)
+        books_block.add("Total books", books_total)
+        books_block.add("Empty books", books_empty)
+        books_block.add("Books without chunks", books_without_chunks)
 
         # --- CHUNKS ---
         with self.router.chunks() as conn:
+            chunks_data = conn.execute("SELECT id, book_id FROM chunks").fetchall()
+            chunks_total = len(chunks_data)
+            chunk_ids = {c[0] for c in chunks_data}
 
-            chunks_total = conn.execute(
-                "SELECT COUNT(*) FROM chunks"
-            ).fetchone()[0]
-
-            chunks_without_embeddings = conn.execute(
-                """
-                SELECT COUNT(*)
-                FROM chunks c
-                LEFT JOIN embeddings e ON e.chunk_id = c.id
-                WHERE e.id IS NULL
-                """
-            ).fetchone()[0]
-
-            avg_embeddings_per_chunk = conn.execute(
-                """
-                SELECT AVG(cnt)
-                FROM (
-                    SELECT COUNT(e.id) AS cnt
-                    FROM chunks c
-                    LEFT JOIN embeddings e ON e.chunk_id = c.id
-                    GROUP BY c.id
-                )
-                """
-            ).fetchone()[0] or 0.0
+        chunks_block = report.create_block("Chunks")
+        chunks_block.add("Total chunks", chunks_total)
 
         # --- EMBEDDINGS ---
         with self.router.embeddings(self.model_uid) as conn:
+            embeddings_data = conn.execute("SELECT id, chunk_id FROM embeddings").fetchall()
+            embeddings_total = len(embeddings_data)
+            embedding_chunk_ids = {e[1] for e in embeddings_data}
 
-            embeddings_total = conn.execute(
-                "SELECT COUNT(*) FROM embeddings"
-            ).fetchone()[0]
+        # --- вычисляем отсутствия ---
+        chunks_without_embeddings = sum(1 for cid in chunk_ids if cid not in embedding_chunk_ids)
+        embeddings_without_chunks = sum(1 for e in embeddings_data if e[1] not in chunk_ids)
 
-            embeddings_without_chunks = conn.execute(
-                """
-                SELECT COUNT(*)
-                FROM embeddings e
-                LEFT JOIN chunks c ON c.id = e.chunk_id
-                WHERE c.id IS NULL
-                """
-            ).fetchone()[0]
+        chunks_block.add("Chunks without embeddings", chunks_without_embeddings)
 
-        return DatabaseReport(
-            parsed_books=parsed_books_count,
+        embeddings_block = report.create_block("Embeddings")
+        embeddings_block.add("Total embeddings", embeddings_total)
+        embeddings_block.add("Embeddings without chunks", embeddings_without_chunks)
 
-            books_total=books_total,
-            books_empty=books_empty,
-            books_without_chunks=books_without_chunks,
+        # --- средние значения ---
+        avg_chunks_per_book = sum(1 for c in chunks_data) / max(1, len({c[1] for c in chunks_data}))
+        avg_embeddings_per_chunk = sum(1 for e in embeddings_data) / max(1, len(chunk_ids))
 
-            chunks_total=chunks_total,
-            chunks_without_embeddings=chunks_without_embeddings,
+        chunks_block.add("Average chunks per book", float(avg_chunks_per_book))
+        embeddings_block.add("Average embeddings per chunk", float(avg_embeddings_per_chunk))
 
-            embeddings_total=embeddings_total,
-            embeddings_without_chunks=embeddings_without_chunks,
+        # --- блок новых книг ---
+        if first_10_new_books:
+            new_books_block = report.create_block("New Books")
+            new_books_block.add("First 10 new books", None, extra=first_10_new_books)
 
-            avg_chunks_per_book=float(avg_chunks_per_book),
-            avg_embeddings_per_chunk=float(avg_embeddings_per_chunk),
-        )
-
-    @staticmethod
-    def print(report: DatabaseReport):
-
-        print("========== DATABASE REPORT ==========\n")
-
-        print("BOOKS")
-        print(f"Parsed books:                {report.parsed_books}")
-        print(f"Books in database:          {report.books_total}")
-        print(f"Empty books:                {report.books_empty}")
-        print(f"Books without chunks:       {report.books_without_chunks}")
-
-        print("\nCHUNKS")
-        print(f"Total chunks:               {report.chunks_total}")
-        print(f"Chunks without embeddings:  {report.chunks_without_embeddings}")
-
-        print("\nEMBEDDINGS")
-        print(f"Total embeddings:           {report.embeddings_total}")
-        print(f"Embeddings without chunks:  {report.embeddings_without_chunks}")
-
-        print("\nAVERAGES")
-        print(f"Chunks per book:            {report.avg_chunks_per_book:.2f}")
-        print(f"Embeddings per chunk:       {report.avg_embeddings_per_chunk:.2f}")
-
-        print("\n====================================")
+        return report

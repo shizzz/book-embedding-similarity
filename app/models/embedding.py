@@ -5,8 +5,8 @@ import numpy as np
 
 @dataclass
 class Embedding:
-    data: np.ndarray
-    shape: int
+    data: Optional[np.ndarray] = None
+    shape: Optional[int] = None
     emb_id: Optional[int] = None
     book_id: Optional[int] = None
     chunk_id: Optional[int] = None

@@ -3,6 +3,7 @@ from typing import Dict
 from rich.live import Live
 from rich.console import Console
 from rich.table import Table
+from rich.panel import Panel
 from rich.text import Text
 from rich.progress import (
     Progress,
@@ -17,6 +18,7 @@ from time import perf_counter
 from .ui import BaseUI
 from .tqdmLike import TqdmLike, TqdmIterable
 
+from app.models import Report
 from app.settings.config import MAX_WORKERS
 
 class LiveUI(BaseUI):
@@ -162,10 +164,13 @@ class LiveUI(BaseUI):
         async with self.lock:
             if idx == 0:
                 old_total = self.stats["Total"]
-                delta = total - old_total
+                done = self.stats["Done"]
+
+                if old_total < 0:
+                    total = total + old_total
 
                 self.stats["Total"] = total
-                self.stats["Remaining"] += delta
+                self.stats["Remaining"] = max(total - done, 0)
 
             self._bars[idx].update(self._tasks[idx], total=total)
 
@@ -246,3 +251,25 @@ class LiveUI(BaseUI):
         if hasattr(obj, "__iter__") and obj is not None:
             return TqdmIterable(self, obj, desc, unit, show_elapsed)
         return TqdmLike(self, desc, total, unit, show_elapsed)
+    
+    def report(self, report: Report):
+        """Красивый компактный отчет всех блоков"""
+        grid = Table.grid(expand=True)
+        
+        for block in report.blocks:
+            # создаём небольшую таблицу для блока
+            block_table = Table(show_header=False, box=None, expand=True)
+            block_table.add_column("Metric", style="bold cyan", no_wrap=True)
+            block_table.add_column("Value", justify="right", no_wrap=False)
+
+            for metric in block.metrics:
+                if metric.extra and isinstance(metric.extra, list):
+                    value = "\n".join(str(x) for x in metric.extra)
+                else:
+                    value = metric.value if metric.value is not None else "-"
+                block_table.add_row(metric.name, str(value))
+            
+            # добавляем блок в общий grid
+            grid.add_row(Panel(block_table, title=block.title, expand=True))
+        
+        self.console.print(grid)

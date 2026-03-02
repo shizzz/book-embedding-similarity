@@ -82,11 +82,19 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # -----------------------------
     # Пропуск ненужных книг
     # -----------------------------
-    def _should_skip(self, book: dict) -> bool:
+    def _should_skip_book(self, book: dict) -> bool:
         if book["lang"] != "ru" or book["deleted"] or not book["file"]:
             return True
         return False
 
+    # -----------------------------
+    # Пропуск ненужных архивов
+    # -----------------------------
+    def _should_skip_archive(self, archive: str) -> bool:
+        if archive in ("version.zip", "collection.zip"):
+            return True
+        return False
+    
     # -----------------------------
     # Поиск книг (async)
     # -----------------------------
@@ -98,9 +106,8 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                 if info.is_dir():
                     continue
 
-                archive_name = os.path.splitext(info.filename)[0] + ".zip"
-
-                if archive_name in ("version.zip", "collection.zip"):
+                archive_name = os.path.splitext(info.filename)[0] + ".zip"     
+                if self._should_skip_archive(archive_name):
                     continue
 
                 task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
@@ -118,11 +125,11 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
             archive_name = os.path.splitext(info.filename)[0] + ".zip"
 
-            if archive_name in ("version.zip", "collection.zip"):
+            if self._should_skip_archive(archive_name):
                 continue
             
             for book in books:
-                if self._should_skip(book):
+                if self._should_skip_book(book):
                     continue
 
                 authors = self._parse_authors(book["author"])
@@ -152,6 +159,10 @@ class InpBookSearchEngine(BaseBookSearchEngine):
         for info in zipf.infolist():
             if info.is_dir():
                 continue
+            
+            archive_name = os.path.splitext(info.filename)[0] + ".zip"     
+            if self._should_skip_archive(archive_name):
+                continue
 
             books = await asyncio.to_thread(
                 self._parse,
@@ -160,7 +171,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
             )
 
             for book in books:
-                if self._should_skip(book):
+                if self._should_skip_book(book):
                     continue
 
                 total += 1

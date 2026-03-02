@@ -19,6 +19,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         self.max_batch_size: int = max_batch_size
 
         self._model = Model(self.max_workers)
+        self._searched_books = set()
         self._parsed = 0
 
     async def process(self, task: Task, _thread_id: int) -> TaskResult:
@@ -48,15 +49,6 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         await self.ui.update_total_async(total, self._get_book_idx)
         return total
 
-    async def fin(self) -> None: 
-        BookEmbeddingIndexer(
-            db_router=self._router,
-            ui=self.ui
-        ).build_index()
-
-        report = DatabaseReporter(self._router, self._model.uid).generate(self._parsed)
-        DatabaseReporter.print(report)
-
     async def pull_queue(self) -> None:
         existed_books = set(BookRepository(self._router).get_names())
 
@@ -67,7 +59,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
         async for book in self.engine.search_books():
             datasets: list[Dataset] = []
-            self._parsed += 1
+            self._searched_books.add(book.file_name)
 
             # Определяем action и datasets
             if book.file_name in existed_books:
@@ -75,7 +67,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 book = await self._enrich_from_db(book)
 
                 if book.chunks is None and not book.empty:
-                    datasets.append(Dataset.BOOK)
+                    datasets.append(Dataset.CHUNK)
 
                 if book.embedding is None and not book.empty:
                     datasets.append(Dataset.EMBEDDING)
@@ -89,6 +81,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
                 datasets.extend([
                     Dataset.BOOK,
+                    Dataset.CHUNK,
                     Dataset.EMBEDDING,
                     Dataset.AUTHOR
                 ])
@@ -200,6 +193,15 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
         return len(task.entity)
 
+    async def fin(self) -> None: 
+        BookEmbeddingIndexer(
+            db_router=self._router,
+            ui=self.ui
+        ).build_index()
+
+        report = DatabaseReporter(self._router, self._model.uid).generate(self._searched_books)
+        self.ui.report(report)
+
     def _process_book(self, registry: BookRegistry) -> BookRegistry:
         result = generate_embeddings(self._model, registry)
         for book in result:
@@ -234,7 +236,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 return None
 
             db_book.chunks = ChunkRepository(self._router).get_by_book(db_book.id)
-            db_book.embedding = EmbeddingsRepository(self._router, self._model.uid).get(db_book.id)
+            db_book.embedding = EmbeddingsRepository(self._router, self._model.uid).meta_only(db_book.id)
 
             return db_book
 
