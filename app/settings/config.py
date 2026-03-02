@@ -10,7 +10,6 @@ CACHE_DIR = DATA_DIR / "cache"
 SITE_BASE_PATH = os.getenv("SITE_BASE_PATH", "")
 LIB_URL = os.getenv("LIB_URL", "https://lib.some.ru")
 
-DB_FILE = Path(os.getenv("DB_FILE", str(DATA_DIR / "data.db")))
 INDEX_FILE = Path(os.getenv("INDEX_FILE", str(DATA_DIR / "index.faiss")))
 RERANKER_FILE = Path(os.getenv("RERANKER_FILE", str(DATA_DIR / "reranker.lgb")))
 TRANSFORM_FILE = Path(os.getenv("TRANSFORM_FILE", str(DATA_DIR / "embedding_transform.npy")))
