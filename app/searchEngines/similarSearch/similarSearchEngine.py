@@ -145,3 +145,50 @@ class SimilarSearchEngine:
         # возвращаем только топ self._limit в формате Tuple[score, source_id, candidate_id]
         reranked.sort(key=lambda x: x['score'], reverse=True)
         return [(c['score'], c['source_id'], c['candidate_id']) for c in reranked[:self._limit]]
+
+    """
+    Контракт find_similar_books
+
+    Возвращает:
+        List[Dict], где каждый dict — кандидат для reranker’а:
+
+        {
+            "source_id": int,          # ID книги, для которой ищем похожие
+            "candidate_id": int,       # ID похожей книги
+            "score": float,            # агрегированный score между source и candidate
+            "matched_chunks": List[Dict] # список embeddings, с которыми потом считается reranker
+                Каждый dict:
+                {
+                    "query_chunk_id": Optional[int],  # None если виртуальный chunk
+                    "query_embedding": np.ndarray,    # embedding источника
+                    "chunk_id": Optional[int],        # None если виртуальный chunk
+                    "embedding": np.ndarray,          # embedding кандидата
+                    "score": float                    # score между query и этим chunk
+                }
+        }
+
+    Почему так криво:
+
+    1. Память:
+       - У нас ~300k книг, каждая с 5–10 chunk’ами → миллионы embeddings.
+       - Если использовать dataclass вместо словарей, memory footprint увеличится, объекты занимают больше места.
+       - В вебморде с 3GB RAM просто невозможно держать весь index или результат в памяти.
+
+    2. Производительность:
+       - Bruteforce перебирает всё, но batching через EmbeddingsBatchIterable + минимальный кэш source embeddings.
+       - Если попытаться создавать dataclass на каждый matched_chunk, slowdown на сотни тысяч кандидатов будет заметен.
+
+    3. Контракт:
+       - Реранкер ожидает именно словари с `matched_chunks`.
+       - Любые попытки упростить структуру или убрать matched_chunks → ломают downstream код.
+       - Поэтому приходится держать вложенные словари, даже если это “криво” и тяжеловато читать.
+
+    4. Почему не dataclass:
+       - Внутренний Python overhead на сотни тысяч объектов.
+       - Долгий GC и большее потребление памяти.
+       - Для наших целей словарь — оптимальный компромисс между скоростью, памятью и совместимостью с reranker.
+
+    Итог:
+       - Код кривой, но **memory-safe**, поддерживает **контракт reranker** и работает на вебморде с ограниченной памятью.
+       - Любые изменения структуры matched_chunks или переход на dataclass → могут привести к OOM или замедлению.
+    """
