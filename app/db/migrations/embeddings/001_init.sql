@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS embeddings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id INTEGER NOT NULL,
     chunk_id INTEGER NOT NULL,
+    seq INTEGER NULL,
     data NUMPY NOT NULL,
     shape INTEGER NOT NULL
 );

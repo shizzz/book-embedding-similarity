@@ -24,7 +24,7 @@ class EmbeddingsRepository:
             for offset in range(0, total, batch_size):
                 cursor.execute(
                     """
-                    SELECT id, book_id, chunk_id, data, shape
+                    SELECT id, book_id, chunk_id, seq, data, shape
                     FROM embeddings
                     LIMIT ? OFFSET ?
                     """,
@@ -39,8 +39,8 @@ class EmbeddingsRepository:
         conn.executemany(
             """
             INSERT OR REPLACE INTO embeddings
-            (id, book_id, chunk_id, data, shape)
-            VALUES (?,?,?,?,?)
+            (id, book_id, chunk_id, seq, data, shape)
+            VALUES (?,?,?,?,?,?)
             """,
             [e.to_tuple() for e in embeddings]
         )
@@ -71,7 +71,7 @@ class EmbeddingsRepository:
 
     def meta_only(self, book_id: int = None) -> tuple[int, int, int]:
         with self.router.embeddings(self.model_uid) as conn:
-            query = "SELECT id, book_id, chunk_id, NULL AS data, shape FROM embeddings"
+            query = "SELECT id, book_id, chunk_id, seq, NULL AS data, shape FROM embeddings"
             params = ()
 
             if book_id is not None:
