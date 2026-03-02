@@ -99,6 +99,10 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                     continue
 
                 archive_name = os.path.splitext(info.filename)[0] + ".zip"
+
+                if archive_name in ("version.zip", "collection.zip"):
+                    continue
+
                 task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
                 self._tasks.append(task)
 
@@ -114,6 +118,9 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
             archive_name = os.path.splitext(info.filename)[0] + ".zip"
 
+            if archive_name in ("version.zip", "collection.zip"):
+                continue
+            
             for book in books:
                 if self._should_skip(book):
                     continue

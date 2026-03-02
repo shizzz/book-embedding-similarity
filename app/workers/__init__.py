@@ -5,9 +5,9 @@ __all__ = [
 ]
 
 _lazy_mapping = {
-    "GenerateEmbeddingsWorker": "generate_embeddings_worker",
-    "GenerateSimilarWorker": "generate_similar_worker",
-    "SimilarSearchWorker": "similar_search_worker",
+    "GenerateEmbeddingsWorker": "generate_embeddings",
+    "GenerateSimilarWorker": "generate_similar",
+    "SimilarSearchWorker": "similar_search",
 }
 
 import importlib
@@ -26,6 +26,6 @@ def __dir__():
 
 # --- для IDE подсветки и автокомплита ---
 if False:
-    from .generate_embeddings_worker import GenerateEmbeddingsWorker
-    from .generate_similar_worker import GenerateSimilarWorker
-    from .similar_search_worker import SimilarSearchWorker
+    from .generate_embeddings import GenerateEmbeddingsWorker
+    from .generate_similar import GenerateSimilarWorker
+    from .similar_search import SimilarSearchWorker
