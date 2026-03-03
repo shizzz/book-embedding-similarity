@@ -85,6 +85,14 @@ class DatabaseReporter:
         chunks_block.add("Average chunks per book", float(avg_chunks_per_book))
         embeddings_block.add("Average embeddings per chunk", float(avg_embeddings_per_chunk))
 
+        # --- книги без эмбеддингов ---
+        books_with_embeddings = set()
+        for c in chunks_data:
+            if c[0] in embedding_chunk_ids:
+                books_with_embeddings.add(c[1])
+        books_without_embeddings = len(set(c[1] for c in chunks_data)) - len(books_with_embeddings)
+        books_block.add("Books without embeddings", books_without_embeddings)
+
         # --- новые книги ---
         if first_10_new_books:
             new_books_block = report.create_block("New Books")
