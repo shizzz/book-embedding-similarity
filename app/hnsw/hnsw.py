@@ -2,7 +2,7 @@ import os
 import faiss
 from typing import List
 from app.models import BookRegistry, Book
-from app.settings.config import DATA_DIR, HNSW_EF_SEARCH, MODEL_NAME, IndexLevel
+from app.settings.config import DATA_DIR, HNSW_EF_SEARCH, MODEL_NAME, HNSW_MMAP, IndexLevel
 from .trainers.rerankerTrainer import RerankerTrainer
 try:
     from tqdm import tqdm
@@ -24,11 +24,6 @@ class IndexManager:
         self._index = None
         self.embeddings = []
         self.embedding_dim = 0
-
-    def __estimate_hnsw_memory_gb(self, ntotal, dim, overhead_factor=1.1):
-        mem_bytes = ntotal * dim * 4
-        mem_bytes *= overhead_factor
-        return mem_bytes / (1024**3)
     
     def check_index(self):
         if os.path.exists(self.index_file):
@@ -44,7 +39,10 @@ class IndexManager:
         if not os.path.exists(index_file):
             raise FileNotFoundError(f"Файл '{index_file}' не существует")
 
-        index = faiss.read_index(index_file)
+        if HNSW_MMAP:
+            index = faiss.read_index(index_file, faiss.IO_FLAG_MMAP)
+        else:
+            index = faiss.read_index(index_file)
 
         # Проверяем, что это IndexIDMap с HNSW внутри
         if not isinstance(index, faiss.IndexIDMap):
@@ -101,7 +99,7 @@ class IndexManager:
         if self.logger:
             device = "GPU" if self._gpu_res else "CPU"
             self.logger.info(
-                f"Индекс загружен из '{self.index_file}' "
+                f"Индекс загружен из '{index_file}' "
                 f"(ntotal: {index.ntotal:,}, device: {device})"
             )
 

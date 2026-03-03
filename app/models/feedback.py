@@ -3,8 +3,6 @@ from pydantic import BaseModel
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
-from app.db import DBRouter
-from app.db.repositories import FeedbackRepository
 from app.settings.config import FEEDBACK_BOOST_FACTOR
 
 class FeedbackReq(BaseModel):
@@ -118,9 +116,3 @@ class Feedbacks:
     
     def get_rating(self, source_id: int, candidate_id: int) -> float:
         return self._pair_to_boost.get((source_id, candidate_id), 0.0)
-    
-    def insert_feedbacks(self, conn):
-        FeedbackRepository.insert_many(
-            conn,
-            [fb.to_db_tuple() for fb in self.items]
-        )

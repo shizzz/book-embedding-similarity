@@ -7,9 +7,9 @@ from app.hnsw import IndexManager
 from app.model import Model
 from app.models import Book, Feedbacks, BookRegistry
 from app.hnsw.trainers import LightGBMRerankerTrainer
-from app.db import DB, FeedbackRepository, EmbeddingsRepository, BookRepository
+from app.db.repositories import FeedbackRepository, EmbeddingsRepository, BookRepository
 from app.settings.config import LIB_URL, MODEL_NAME
-  
+
 def sync_feedbacks(conn):
     url = f"{LIB_URL}/similar/feedback/"
 
@@ -26,7 +26,10 @@ def sync_feedbacks(conn):
     data = resp.json().get("feedback", [])
     feedbacks = Feedbacks.from_dicts(data)
     FeedbackRepository.delete_all(conn)
-    feedbacks.insert_feedbacks(conn)
+    FeedbackRepository().insert_many(
+        conn,
+        [fb.to_db_tuple() for fb in feedbacks]
+    )
 
 def get_data() -> Tuple[list[Tuple[int, bytes]], Feedbacks, BookRegistry]:
     with DB() as conn:

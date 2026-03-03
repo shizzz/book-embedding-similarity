@@ -55,26 +55,22 @@ class BookRepository:
             return {}
 
         placeholders = ",".join("?" for _ in ids)
-        query = f"{GET_QUERY} WHERE id IN ({placeholders})"
+        query = f"{GET_FULL_QUERY} WHERE id IN ({placeholders})"
         result = {}
-        with self.router.transaction():
-            conn = self.router.meta()
+        with self.router.meta() as conn:
             cursor = conn.execute(query, ids)
             for row in cursor:
                 (
-                    id_, book, uid, title, author, serie, generes, year,
-                    added_at, source_type, source_link, source_length, empty
+                    id_, book, title, author, serie, generes, year, source_type, source_link, source_length, empty
                 ) = row
                 result[id_] = {
                     "id": id_,
                     "book": book,
-                    "uid": uid,
                     "title": title,
                     "author": author,
                     "serie": serie,
                     "generes": generes,
                     "year": year,
-                    "added_at": added_at,
                     "source_type": source_type,
                     "source_link": source_link,
                     "source_length": source_length,

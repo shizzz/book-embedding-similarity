@@ -90,7 +90,7 @@ class Book:
             title=row["title"],
             author=row["author"],
             serie=safe_get(row, "serie"),
-            generes=safe_get(row, "generes").split("||"),
+            generes=(safe_get(row, "generes") or "").split("||"),
             year=safe_get(row, "year"),
             source_type=safe_get(row, "source_type"),
             source_link=safe_get(row, "source_link"),

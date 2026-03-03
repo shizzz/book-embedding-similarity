@@ -4,7 +4,8 @@ from fastapi.templating import Jinja2Templates
 from typing import Literal
 
 from app.settings.config import BASE_DIR
-from app.models import Book, Similar, Feedbacks
+from app.models import Book, Feedbacks
+from .toSimilarBooks import to_similar_list
 
 class Html:
     templates = Jinja2Templates(directory=f"{BASE_DIR}/api/templates")
@@ -23,7 +24,7 @@ class Html:
         elapsed: float,
         feedbacks: Feedbacks
     ) -> HTMLResponse:
-        similars_converted = Similar.to_similar_list(similars)
+        similars_converted = to_similar_list(similars)
 
         rows = [
             {

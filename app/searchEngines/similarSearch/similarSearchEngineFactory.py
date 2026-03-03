@@ -8,7 +8,6 @@ from .indexSimilarSearchEngine import IndexSimilarSearchEngine
 from .bruteforceSimilarSearchEngine import BruteforceSimilarSearchEngine
 from app.settings.config import IndexLevel, BUILD_INDEX_LEVEL
 
-
 class SimilarSearchEngineFactory:
     INDEX = "index" 
     BRUTEFORCE = "bruteforce"
@@ -45,6 +44,7 @@ class SimilarSearchEngineFactory:
                 level=BUILD_INDEX_LEVEL,
                 exclude_same_authors=exclude_same_authors,
                 step_percent=step_percent,
+                logger=logger
             )
 
         elif mode == SimilarSearchEngineFactory.BRUTEFORCE:
@@ -54,6 +54,7 @@ class SimilarSearchEngineFactory:
                 limit=limit,
                 exclude_same_authors=exclude_same_authors,
                 step_percent=step_percent,
+                logger=logger
             )
 
         raise ValueError(f"Unknown mode: {mode}")

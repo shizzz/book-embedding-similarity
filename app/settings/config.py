@@ -43,6 +43,7 @@ BUILD_INDEX_LEVEL = IndexLevel(
     os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()
 )
 CHUNK_ID_DIVISOR = 10000
+HNSW_MMAP = False
 HNSW_M: int = 32
 HNSW_EF_CONSTRUCTION: int = 200
 HNSW_EF_SEARCH: int = 64

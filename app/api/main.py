@@ -2,10 +2,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-
 from app.db import Migrator
 from app.api.routers import similar_router, feedback_router
 from app.settings.config import SITE_BASE_PATH, BASE_DIR
+from .dependencies import router
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -17,7 +17,7 @@ path_for_static = f"{SITE_BASE_PATH}/static" if SITE_BASE_PATH else "/static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("App init...")
-    Migrator().apply_schema()
+    Migrator(router).migrate_meta()
     logger.info("App init finished")
     yield
 

@@ -13,7 +13,7 @@ from ..dependencies import executor, router as dbrouter
 from app.settings.config import SITE_BASE_PATH
 
 router = APIRouter()
-similarity = Similarity()
+similarity = Similarity(dbrouter)
 path_for_static = f"{SITE_BASE_PATH}/static" if SITE_BASE_PATH else "/static"
 
 @router.get("/", response_class=HTMLResponse)

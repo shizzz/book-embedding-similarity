@@ -35,6 +35,85 @@ class EmbeddingsRepository:
                     break
                 yield [Embedding.from_row(r) for r in rows]
 
+    def get_embeddings_by_ids(
+        self,
+        embedding_ids: list[int]
+    ) -> dict[int, tuple[np.ndarray, int]]:
+        """
+        Возвращает:
+            embedding_id -> (vector: np.ndarray, book_id: int)
+
+        Батчевый SELECT.
+        """
+        if not embedding_ids:
+            return {}
+
+        placeholders = ",".join("?" for _ in embedding_ids)
+
+        with self.router.embeddings(self.model_uid) as conn:
+            cursor = conn.execute(
+                f"""
+                SELECT id, book_id, data, shape
+                FROM embeddings
+                WHERE id IN ({placeholders})
+                """,
+                embedding_ids
+            )
+            rows = cursor.fetchall()
+
+        result = {}
+
+        for embedding_id, book_id, data, shape in rows:
+            vec = np.frombuffer(data, dtype=np.float32)
+            if shape:
+                vec = vec.reshape((shape,))
+            result[embedding_id] = (vec, book_id)
+
+        return result
+
+    def get_embeddings_by_book_ids(
+        self,
+        book_ids: list[int]
+    ) -> list:
+        """
+        Возвращает список объектов:
+            r.id
+            r.book_id
+            r.data (np.ndarray)
+        """
+        if not book_ids:
+            return []
+
+        placeholders = ",".join("?" for _ in book_ids)
+
+        with self.router.embeddings(self.model_uid) as conn:
+            cursor = conn.execute(
+                f"""
+                SELECT id, book_id, data, shape
+                FROM embeddings
+                WHERE book_id IN ({placeholders})
+                """,
+                book_ids
+            )
+            rows = cursor.fetchall()
+
+        result = []
+
+        for embedding_id, book_id, data, shape in rows:
+            vec = np.frombuffer(data, dtype=np.float32)
+            if shape:
+                vec = vec.reshape((shape,))
+
+            result.append(
+                type("EmbeddingRow", (), {
+                    "id": embedding_id,
+                    "book_id": book_id,
+                    "data": vec
+                })
+            )
+
+        return result
+
     def _save_bulk(self, conn, embeddings: list[Embedding]):
         conn.executemany(
             """
@@ -51,7 +130,6 @@ class EmbeddingsRepository:
                 self._save_bulk(conn, embeddings)
         else:
             self._save_bulk(conn, embeddings)
-
 
     def update(self, book_id: int, embedding: np.ndarray):
         with self.router.embeddings(self.model_uid) as conn:

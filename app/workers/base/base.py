@@ -2,7 +2,6 @@ import asyncio
 import traceback
 import logging
 from abc import ABC, abstractmethod
-from rich.live import Live
 from app.ui import LiveUI
 from app.workers.sources import ConsoleHandler
 from app.db import Migrator, DBRouter

@@ -1,5 +1,6 @@
 import time
 import asyncio
+import traceback
 from typing import Optional, List, Tuple
 from app.db import DBRouter
 from app.db.repositories import SimilarRepository
@@ -28,8 +29,9 @@ class TaskState:
         self.done_event.set()
 
 class Similarity:
-    def __init__(self):
+    def __init__(self, router: DBRouter):
         self.tasks: dict[str, TaskState] = {}
+        self.router = router
 
     def remove_task(self, file_name: str):
         self.tasks.pop(file_name, None)
@@ -59,7 +61,7 @@ class Similarity:
             service = SimilarSearchService(engine=engine)
 
             similars = service.run(
-                source=book,
+                source=book.id,
                 progress_callback=lambda p: self.update_progress(book.file_name, p)
             )
 
@@ -68,4 +70,5 @@ class Similarity:
             state.set_done(similars)
 
         except Exception as e:
-            state.set_error(str(e))
+            error_with_traceback = str(e) + "\n" + traceback.format_exc()
+            state.set_error(error_with_traceback)
