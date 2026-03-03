@@ -31,7 +31,7 @@ def print_similar_books(
 
         print(f"{percent:6.2f},{similar.candidate.file_name},{similar.candidate.title},{url}")
 
-async def main(mode: str, file: str):
+async def run(mode: str, file: str):
     start = time.perf_counter()
     limit: int = 100
     router = DBRouter()

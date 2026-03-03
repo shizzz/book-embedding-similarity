@@ -5,11 +5,14 @@ def main():
     args = get_args()
 
     # Обработка команд
-    if args.command == "generate":
-        from .generate import run
+    if args.entity == "embedding":
+        from app.cli.embedding import run
         run(args)
-    elif args.command == "get":
-        from .get.main import run
+    elif args.entity == "similar":
+        from app.cli.similar import run
+        run(args)
+    elif args.entity == "index":
+        from app.cli.index import run
         run(args)
 
 if __name__ == "__main__":
