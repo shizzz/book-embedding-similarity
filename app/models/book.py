@@ -28,7 +28,7 @@ class Book:
     model_id: int = None
     chunks: List[Chunk] = None
     source_length: int = None
-    empty: bool = False
+    empty: bool = None
 
     T = TypeVar("T")
 
@@ -50,7 +50,7 @@ class Book:
             chunks: List[Chunk] = None,
             shape: int = None,
             source_length: int = None,
-            empty: bool = False
+            empty: bool = None
         ):
         self.id = id
         self.file_name = file_name
