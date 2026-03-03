@@ -38,7 +38,7 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
 
     # -------- collect subchunks --------
     for book in registry:
-
+        single_chunk_mode = len(book.chunks) == 1
         if not getattr(book, "chunks", None):
             continue
 
@@ -51,6 +51,9 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
 
             # skip extremely small original chunks
             if text_len < min_chars:
+                if single_chunk_mode:
+                    all_subchunks.append(text)
+                    subchunk_meta.append((book, chunk, 0))          
                 continue
 
             # split WITHOUT overlap

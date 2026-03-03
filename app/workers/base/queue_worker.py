@@ -13,6 +13,7 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
 
         self.queue: asyncio.Queue[Task[TEntity]] = asyncio.Queue(maxsize=queue_size)
         self._queue_pulled = asyncio.Event()
+        self._progress_idx = self.ui.add_progress("Book analys process", "books")
 
     @abstractmethod
     async def process(self, task: Task, thread_id: int) -> TaskResult:
@@ -53,9 +54,9 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
                 result = await self.process(task, thread_id)
                 await self.post_process(result)
 
-                await self.ui.done_async(count=result.done or 1)
+                await self.ui.done_async(self._progress_idx, count=result.done or 1)
             except Exception as error:
-                await self.ui.error()
+                await self.ui.error(self._progress_idx)
                 traceback.print_exc()
                 self.logger.error(f"ERROR processing {task.name}: {error}")
             finally:
@@ -75,4 +76,4 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
 
     async def _get_total(self):
         total = await self.get_total()
-        await self.ui.update_total_async(total)
+        await self.ui.update_total_async(total, self._progress_idx)

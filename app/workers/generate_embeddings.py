@@ -32,7 +32,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         )
     
     async def prepare(self) -> None:
-        self._get_book_idx = self.ui.add_progress("Парсинг книг", "книг")
+        self._get_book_idx = self.ui.add_progress("Book parse", "book")
         
         self._model_id = ModelRepository(self._router).get_or_create(
             name=self._model.name,
@@ -194,12 +194,8 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         return len(task.entity)
 
     async def fin(self) -> None: 
-        BookEmbeddingIndexer(
-            db_router=self._router,
-            ui=self.ui
-        ).build_index()
-
-        report = DatabaseReporter(self._router, self._model.uid).generate(self._searched_books)
+        self.logger.info("Generate report")
+        report = DatabaseReporter(self._router, self._model.uid).generate(self._model.st_chunk_size, self._searched_books)
         self.ui.report(report)
 
     def _process_book(self, registry: BookRegistry) -> BookRegistry:

@@ -19,7 +19,8 @@ class BaseDbQueueWorker(BaseQueueWorker[TEntity], ABC):
             db_queue_batch_size,
             db_queue_max_size,
             self.ui,
-            self._router
+            self._router,
+            self.logger
         )
     
     @abstractmethod

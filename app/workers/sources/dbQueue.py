@@ -14,7 +14,8 @@ class DbQueue(Generic[TEntity]):
             batch_size: int,
             db_queue_max_size: int,
             ui: BaseUI,
-            router: DBRouter
+            router: DBRouter,
+            logger = None
         ):
         self.queue: asyncio.Queue[TEntity] = asyncio.Queue(maxsize=db_queue_max_size)
         self.task: asyncio.Task | None = None
@@ -27,9 +28,10 @@ class DbQueue(Generic[TEntity]):
         self._ui = ui
         self._save_func = save_func
         self._router = router
+        self._logger = logger
 
     def start(self):
-        self._progress_idx = self._ui.add_progress("Сохранение в БД", "пакетов")
+        self._progress_idx = self._ui.add_progress("Save to DB", "records")
         self.task = asyncio.create_task(self._loop())
 
     async def stop(self):
@@ -37,7 +39,7 @@ class DbQueue(Generic[TEntity]):
         
         db_queue_size = self.queue.qsize()
         if db_queue_size > 0:
-            self._ui.console.log(f"Still have {db_queue_size} records to save into database")
+            self._logger.info(f"Still have {db_queue_size} records to save into database")
 
         self.queue.put_nowait(None)
 
@@ -61,7 +63,7 @@ class DbQueue(Generic[TEntity]):
         while self._step(self._router, buffer, errors):
             pass
 
-        self._ui.console.log("Save thread stopped")
+        self._logger.info("Save thread stopped")
 
     def _save(self, tasks: List[Task]) -> int:
         total = 0
@@ -94,7 +96,7 @@ class DbQueue(Generic[TEntity]):
                 self.queue.task_done()
                 errors = 0
             traceback.print_exc()
-            self._ui.console.log(f"Критическая ошибка при сохранение в базу данных: {e}")
+            self._logger.error(f"Критическая ошибка при сохранение в базу данных: {e}")
             return False
     
     def _step(self, conn, buffer: list[Task], errors: int) -> bool:

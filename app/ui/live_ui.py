@@ -49,9 +49,6 @@ class LiveUI(BaseUI):
         self.lock = asyncio.Lock()
         self.console = Console()
 
-        if show_table:
-            self.add_progress("Прогресс анализа книг", "книг", True)
-
     def _make_table(self) -> Table:
         table = Table(title=self._label, expand=True)
         table.add_column("Metric")
@@ -125,9 +122,6 @@ class LiveUI(BaseUI):
         self.stats["Remaining"] = 0
         self.stats["Done"] = 0
         self.stats["Errors"] = 0
-
-        if self._show_table:
-            self._bars[0].update(self._tasks[0], total=0)
 
         self.live = Live(self.layout(), refresh_per_second=1, console=self.console)
         self.live.start()
