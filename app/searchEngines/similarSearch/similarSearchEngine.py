@@ -10,12 +10,14 @@ class SimilarSearchEngine:
             limit: int,
             exclude_same_authors: bool,
             router: DBRouter,
+            step_percent: int = 1,
             reranker: Reranker = None
         ):
         self._limit = limit
         self._exclude_same_authors = exclude_same_authors
         self._reranker = reranker
         self._router = router
+        self._step_percent = step_percent
         self.avg_chunks_per_book: int = 7
         self.max_chunks_per_book: int = 50
         self.overfetch_factor: float = 2.5

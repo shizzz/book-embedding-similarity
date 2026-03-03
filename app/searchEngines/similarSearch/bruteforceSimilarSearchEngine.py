@@ -1,24 +1,20 @@
 import numpy as np
 from typing import List, Dict
-from collections import defaultdict
-from app.db import DBRouter
-from app.db.repositories import EmbeddingsRepository
+from app.db.repositories import EmbeddingsRepository, ModelRepository
 from app.utils import EmbeddingsBatchIterable
 from .similarSearchEngine import SimilarSearchEngine
+from app.settings.config import MODEL_NAME
 
 class BruteforceSimilarSearchEngine(SimilarSearchEngine):
     def __init__(
         self,
-        db_router: DBRouter,
-        model_uid: str,
-        limit: int = 100,
-        exclude_same_authors: bool = False,
         batch_size: int = 5000,
+        *args, 
+        **kwargs
     ):
-        super().__init__(limit=limit, exclude_same_authors=exclude_same_authors, reranker=None)
-        self.db_router = db_router
-        self.model_uid = model_uid
-        self.batch_size = batch_size
+        super().__init__(*args, **kwargs)
+        self._model_uid = ModelRepository(self._router).get_latest_uid(MODEL_NAME)
+        self._batch_size = batch_size
 
     def find_similar_books(
         self,
@@ -30,14 +26,14 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
         if not book_ids:
             return []
 
-        repo = EmbeddingsRepository(self.db_router, self.model_uid)
+        repo = EmbeddingsRepository(self._router, self._model_uid)
         result = []
 
         # --- Кэш embeddings источников ---
         source_cache = {}
 
         # --- Получаем embeddings источников заранее ---
-        for batch in EmbeddingsBatchIterable(repo, self.batch_size):
+        for batch in EmbeddingsBatchIterable(repo, self._batch_size):
             for r in batch:
                 if r.book_id in book_ids and r.book_id not in source_cache:
                     source_cache[r.book_id] = r.data
@@ -54,7 +50,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
             candidates = []
             seen_books = set([source_book_id])
 
-            for batch in EmbeddingsBatchIterable(repo, self.batch_size):
+            for batch in EmbeddingsBatchIterable(repo, self._batch_size):
                 for r in batch:
                     candidate_id = r.book_id
                     if candidate_id in seen_books:

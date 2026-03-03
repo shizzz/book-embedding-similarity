@@ -89,7 +89,7 @@ class BookEmbeddingIndexer:
         book_ids = []
         merged_vectors = []
 
-        for book_id in self.ui.tqdm(book_sums.keys(), desc="Добавление в индекс"):
+        for book_id in self.ui.tqdm(book_sums.keys(), desc="Добавление в HNSW индекс DOCUMENT"):
 
             merged_vec = book_sums[book_id] / book_counts[book_id]
 
@@ -133,7 +133,7 @@ class BookEmbeddingIndexer:
         book_chunk_counters: Dict[int, int] = defaultdict(int)  # seq для каждой книги
 
         # прогресс бар по батчам
-        for batch in self.ui.tqdm(EmbeddingsBatchIterable(repo, self.batch_size), desc="Добавление в HNSW индекс"):
+        for batch in self.ui.tqdm(EmbeddingsBatchIterable(repo, self.batch_size), desc="Добавление в HNSW индекс CHUNK"):
             batch_embeddings = []
             batch_ids = []
 

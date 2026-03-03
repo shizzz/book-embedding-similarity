@@ -40,10 +40,11 @@ class IndexManager:
         pass
 
     def load_from_file(self, indexLevel: IndexLevel) -> faiss.IndexIDMap:
-        if not os.path.exists(self.index_file):
-            raise FileNotFoundError(f"Файл '{self.index_file}' не существует")
+        index_file = str(DATA_DIR / f"{MODEL_NAME}.{indexLevel.value}.faiss")
+        if not os.path.exists(index_file):
+            raise FileNotFoundError(f"Файл '{index_file}' не существует")
 
-        index = faiss.read_index(str(DATA_DIR / f"{MODEL_NAME}.{indexLevel.value}.faiss"))
+        index = faiss.read_index(index_file)
 
         # Проверяем, что это IndexIDMap с HNSW внутри
         if not isinstance(index, faiss.IndexIDMap):

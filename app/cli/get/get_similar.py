@@ -13,14 +13,13 @@ def make_lib_url(file_name: str) -> str:
 
 def print_similar_books(
     similars: List[Tuple[float, int, int]],
-    started_at: float,
-    router: DBRouter
+    started_at: float
 ):
     elapsed = time.perf_counter() - started_at
 
     print(f"Время выполнения: {elapsed:.3f} сек\n")
 
-    similars_converted = Similar(router).to_similar_list(similars)
+    similars_converted = Similar.to_similar_list(similars)
 
     for similar in similars_converted:
         percent = similar.score * 100
@@ -61,6 +60,5 @@ async def main(mode: str, file: str):
 
     print_similar_books(
         similars=similars,
-        started_at=start,
-        router=router
+        started_at=start
     )

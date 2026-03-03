@@ -1,4 +1,6 @@
+import asyncio
+from app.cli.get.get_similar import main
+
 def run(args):
     if args.similar:
-        from app.cli.get.get_similar import main
-        main(args.mode, args.file) 
+        asyncio.run(main(args.mode, args.file))

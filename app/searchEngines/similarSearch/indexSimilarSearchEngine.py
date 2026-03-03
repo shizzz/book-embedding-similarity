@@ -2,8 +2,6 @@ import numpy as np
 from collections import defaultdict
 from faiss import IndexIDMap
 from typing import List, Dict
-from app.db import DBRouter
-from app.hnsw.rerankers import Reranker
 from .similarSearchEngine import SimilarSearchEngine
 from app.settings.config import CHUNK_ID_DIVISOR, IndexLevel
 
@@ -12,31 +10,19 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         self,
         document_index: IndexIDMap,
         chunk_index: IndexIDMap,
-        limit: int,
-        router: DBRouter,
         level: IndexLevel,
-        reranker: Reranker = None,
-        exclude_same_authors: bool = False,
-        step_percent: int = 5,
-        logger=None,
+        *args, 
+        **kwargs
     ):
-        super().__init__(
-            limit=limit,
-            exclude_same_authors=exclude_same_authors,
-            router=router,
-            reranker=reranker
-        )
-        self.document_index: IndexIDMap = document_index
-        self.chunk_index: IndexIDMap = chunk_index
-        self.chunk_id_divisor = CHUNK_ID_DIVISOR
-        self.level = level
-        self.reranker = reranker
-        self._step_percent = step_percent
-        self.logger = logger
+        super().__init__(*args, **kwargs)
+        self._document_index: IndexIDMap = document_index
+        self._chunk_index: IndexIDMap = chunk_index
+        self._chunk_id_divisor = CHUNK_ID_DIVISOR
+        self._level = level
 
     def _get_book_id(self, chunk_id: int) -> int:
         """Извлекает book_id из composite chunk_id."""
-        return chunk_id // self.chunk_id_divisor
+        return chunk_id // self._chunk_id_divisor
 
     # === reconstruction helpers ===
     def _reconstruct_chunks_for_books(self, book_ids: List[int], use_virtual_chunks: bool = False):
@@ -48,20 +34,19 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         for book_id in book_ids:
             if use_virtual_chunks:
                 try:
-                    vec = self.document_index.reconstruct(book_id)
-                    virtual_chunk_id = book_id * self.chunk_id_divisor
+                    vec = self._document_index.reconstruct(book_id)
+                    virtual_chunk_id = book_id * self._chunk_id_divisor
                     embeddings.append(vec)
                     chunk_ids.append(virtual_chunk_id)
                     sources.append(book_id)
                     reconstructed_cache[virtual_chunk_id] = vec
                 except Exception:
-                    if self.logger:
-                        self.logger.warning(f"Document embedding not found for book {book_id}")
+                    continue
             else:
                 for seq in range(self.max_chunks_per_book):
-                    chunk_id = book_id * self.chunk_id_divisor + seq
+                    chunk_id = book_id * self._chunk_id_divisor + seq
                     try:
-                        vec = self.chunk_index.reconstruct(chunk_id)
+                        vec = self._chunk_index.reconstruct(chunk_id)
                         embeddings.append(vec)
                         chunk_ids.append(chunk_id)
                         sources.append(book_id)
@@ -114,18 +99,18 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
         # --- candidate selection ---
         candidate_book_ids = set()
-        if self.level in [IndexLevel.DOCUMENT, IndexLevel.BOTH]:
+        if self._level in [IndexLevel.DOCUMENT, IndexLevel.BOTH]:
             doc_embs, _, _, _ = self._reconstruct_chunks_for_books(book_ids, use_virtual_chunks=True)
             if doc_embs:
                 doc_emb_np = np.stack(doc_embs)
                 k = int(desired_books * self.overfetch_factor)
-                distances, ids = self._search_index(doc_emb_np, self.document_index, k)
+                distances, ids = self._search_index(doc_emb_np, self._document_index, k)
                 for row in ids:
                     for cid in row:
                         if cid != -1 and cid not in book_ids:
                             candidate_book_ids.add(cid)
 
-        if self.level == IndexLevel.CHUNK:
+        if self._level == IndexLevel.CHUNK:
             # fallback: all books are candidates (or chunk search could prefilter)
             candidate_book_ids = set(book_ids)
 
@@ -133,7 +118,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
             return []
 
         # --- reconstruct query chunks ---
-        use_virtual = self.level in [IndexLevel.DOCUMENT]
+        use_virtual = self._level in [IndexLevel.DOCUMENT]
         query_embeddings, query_chunk_ids, source_for_chunk, reconstructed_cache = self._reconstruct_chunks_for_books(
             book_ids, use_virtual_chunks=use_virtual
         )
@@ -145,7 +130,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
         # --- search chunk index ---
         k_chunks = int(top_k_agg * self.avg_chunks_per_book * self.overfetch_factor)
-        distances, chunk_ids_results = self._search_index(query_embeddings_np, self.chunk_index, k_chunks)
+        distances, chunk_ids_results = self._search_index(query_embeddings_np, self._chunk_index, k_chunks)
 
         # --- aggregate matches ---
         pair_matches = self._aggregate_chunk_matches(
@@ -172,7 +157,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
             matched_chunks = []
             for (query_chunk_id, candidate_chunk_id), score in matches.items():
                 query_embedding = reconstructed_cache[query_chunk_id]
-                candidate_embedding = self.chunk_index.reconstruct(candidate_chunk_id)
+                candidate_embedding = self._chunk_index.reconstruct(candidate_chunk_id)
                 matched_chunks.append({
                     "query_chunk_id": query_chunk_id,
                     "query_embedding": query_embedding,

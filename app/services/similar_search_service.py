@@ -1,8 +1,9 @@
 import time
 from typing import List, Tuple
 from app.db import DBRouter
-from app.db.repositories import BookRepository
+from app.db.repositories import EmbeddingsRepository, ModelRepository
 from app.searchEngines.similarSearch import SimilarSearchEngine
+from app.settings.config import MODEL_NAME
 
 class SimilarSearchService:
     def __init__(
@@ -13,7 +14,8 @@ class SimilarSearchService:
         self.last_run_seconds = None
         
         router = DBRouter()
-        self._total = BookRepository(router).count_embeddings()
+        model_uid = ModelRepository(router).get_latest_uid(MODEL_NAME)
+        self._total = EmbeddingsRepository(router, model_uid).count()
 
     def run(self, source: int, progress_callback=None) -> List[Tuple[float, int, int]]:
         started_at = time.perf_counter()

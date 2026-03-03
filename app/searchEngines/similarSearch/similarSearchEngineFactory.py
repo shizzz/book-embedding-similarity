@@ -27,7 +27,8 @@ class SimilarSearchEngineFactory:
         if mode == SimilarSearchEngineFactory.INDEX:
             hnsw = IndexManager(logger=logger)
 
-            chunk_index, document_index = None
+            chunk_index = None
+            document_index = None
 
             if BUILD_INDEX_LEVEL in (IndexLevel.CHUNK, IndexLevel.BOTH):
                 chunk_index: IndexIDMap = hnsw.load_from_file(IndexLevel.CHUNK)
@@ -49,6 +50,7 @@ class SimilarSearchEngineFactory:
         elif mode == SimilarSearchEngineFactory.BRUTEFORCE:
             return BruteforceSimilarSearchEngine(
                 reranker=LightGBMReranker(),
+                router=router,
                 limit=limit,
                 exclude_same_authors=exclude_same_authors,
                 step_percent=step_percent,
