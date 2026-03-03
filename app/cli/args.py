@@ -64,10 +64,44 @@ def get_args() -> argparse.Namespace:
         help="Путь к файлу (например file.fb2)"
     )
 
-    # similar index
-    sim_index_parser = similar_subparsers.add_parser(
+    # -----------------------
+    # Команда index
+    # -----------------------
+    index_parser = subparsers.add_parser(
         "index", 
-        help="Перестроить индекс"
+        help="Операции с HNSW индексом"
+    )
+    index_subparsers = index_parser.add_subparsers(dest="command", required=True)
+
+    # index generate
+    index_subparsers.add_parser(
+        "generate", 
+        help="Сгенерировать индекс"
+    )
+
+    # -----------------------
+    # Команда feedback
+    # -----------------------
+    feedback_parser = subparsers.add_parser(
+        "feedback", 
+        help="Операции с отзывами"
+    )
+    feedback_subparsers = feedback_parser.add_subparsers(dest="command", required=True)
+    feedback_generate_parser = feedback_subparsers.add_parser(
+        "generate", 
+        help="Генерация отзывов"
+    )    
+    feedback_generate_parser.add_argument(
+        "--ai",
+        choices=["chatgpt", "deepseek", "lm_studio"],
+        required=True,
+        help="AI api для генерации отзывов"
+    )
+    feedback_generate_parser.add_argument(
+        "--book", 
+        type=str, 
+        help="Книга, для которой генерируем feedback",
+        required=True
     )
 
     args = parser.parse_args()

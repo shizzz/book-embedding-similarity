@@ -14,6 +14,9 @@ def main():
     elif args.entity == "index":
         from app.cli.index import run
         run(args)
+    elif args.entity == "feedback":
+        from app.cli.feedback import run
+        run(args)
 
 if __name__ == "__main__":
     main()
