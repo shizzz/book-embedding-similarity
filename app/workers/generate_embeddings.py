@@ -75,6 +75,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 if len(datasets) == 0 or book.empty:
                     await self.ui.done_async(self._get_book_idx)
                     await self.ui.decrease_total_async()
+                    del book
                     continue
             else:
                 action = Action.INSERT
@@ -86,11 +87,10 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                     Dataset.AUTHOR
                 ])
 
-            if book.chunks is None:
+            if len(book.chunks or []) == 0:
                 await self.engine.enrich_book_data(book)
-                if len(book.chunks) == 0:
-                    book.empty = True
-                else:
+                book.empty = len(book.chunks) == 0
+                if not book.empty:
                     for chunk in book.chunks:
                         chunk.chunk_id = self._chunk_id
                         self._chunk_id += 1
@@ -162,6 +162,9 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         chunks = []
         embeddings = []
         for book in task.entity:
+            if len(book.embedding) == 0:
+                book.empty = True
+                task.dataset.append(Dataset.BOOK)
             if not book.empty:
                 chunks.extend(book.chunks)
                 embeddings.extend(book.embedding)
@@ -173,13 +176,14 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                     conn=tx.meta()
                 )
 
+            if Dataset.CHUNK in task.dataset and len(chunks) > 0:
                 ChunkRepository(router).create_many(
                     chunks,
                     conn_meta=tx.meta(),
                     conn_chunks=tx.chunks()
                 )
 
-            if Dataset.EMBEDDING in task.dataset:
+            if Dataset.EMBEDDING in task.dataset and len(embeddings) > 0:
                 EmbeddingsRepository(router, self._model.uid).save_bulk(
                     embeddings,
                     conn=tx.embeddings(self._model.uid)
@@ -190,6 +194,9 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                     task.entity,
                     conn=tx.meta()
                 )
+
+        del chunks
+        del embeddings
 
         return len(task.entity)
 
