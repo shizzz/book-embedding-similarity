@@ -58,10 +58,7 @@ def get_similar_books(source_book_id: int) -> List[tuple]:
     return similars
 
 def get_book_info_by_id(book_id: int) -> Optional[Book]:
-    book_row = BookRepository(router).get_by_id(book_id)
-    if not book_row:
-        return None
-    return Book.from_row(book_row)
+    return BookRepository(router).get_by_id(book_id)
 
 def save_feedback(source_book_id: int, candidate_book_id: int, label: float):
     FeedbackRepository(router).submit(source_book_id, candidate_book_id, label)

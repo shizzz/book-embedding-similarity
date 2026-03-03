@@ -4,7 +4,7 @@ from typing import List, Tuple
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 from app.db import DBRouter
-from app.db.repositories import BookRepository
+from app.db.repositories import BookRepository, SimilarRepository
 from app.settings.config import LIB_URL
 from app.utils import to_similar_list
 
@@ -60,6 +60,7 @@ async def run(mode: str, file: str):
 
     # Основной запуск в выбранном режиме
     similars, elapsed_main = run_service(mode)
+    SimilarRepository(router).replace(similars)
 
     print(f"Режим '{mode}' занял {elapsed_main:.3f} сек")
 
