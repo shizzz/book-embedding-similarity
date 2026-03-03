@@ -1,14 +1,15 @@
 import numpy as np
-from typing import Iterator, Tuple
 from ...models.embedding import Embedding
 from ..router import DBRouter
+from .model import ModelRepository
+from app.settings.config import MODEL_NAME
 
 class EmbeddingsRepository:
     GET_QUERY: str = "SELECT book_id, embedding FROM embeddings"
 
-    def __init__(self, router: DBRouter, model_uid: str):
+    def __init__(self, router: DBRouter, model_uid: str = None):
         self.router = router
-        self.model_uid = model_uid
+        self.model_uid = model_uid or ModelRepository(router).get_latest_uid(MODEL_NAME)
 
     def get(self, book_id: int) -> list[Embedding]:
         with self.router.embeddings(self.model_uid) as conn:

@@ -1,4 +1,3 @@
-import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
 from .embedding import Embedding
@@ -90,7 +89,10 @@ class Book:
             title=row["title"],
             author=row["author"],
             serie=safe_get(row, "serie"),
-            generes=(safe_get(row, "generes") or "").split("||"),
+            generes = [
+                g for g in (safe_get(row, "generes") or "").split("||")
+                if g
+            ],
             year=safe_get(row, "year"),
             source_type=safe_get(row, "source_type"),
             source_link=safe_get(row, "source_link"),

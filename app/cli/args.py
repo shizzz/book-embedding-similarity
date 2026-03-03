@@ -78,6 +78,10 @@ def get_args() -> argparse.Namespace:
         "generate", 
         help="Сгенерировать индекс"
     )
+    index_subparsers.add_parser(
+        "learn", 
+        help="Обучение ML модели"
+    )
 
     # -----------------------
     # Команда feedback

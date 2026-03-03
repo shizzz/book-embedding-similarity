@@ -2,7 +2,7 @@ from sqlite3 import Row
 from pydantic import BaseModel
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Iterator
 from app.settings.config import FEEDBACK_BOOST_FACTOR
 
 class FeedbackReq(BaseModel):
@@ -68,6 +68,12 @@ class Feedbacks:
 
         self._pair_to_boost = {}
         self._build_index()
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __iter__(self) -> Iterator[Feedback]:
+        return iter(self.items)
 
     @classmethod
     def from_dicts(cls, data: list[dict]) -> "Feedbacks":

@@ -104,10 +104,10 @@ class BookRepository:
             row = conn.execute(f"{GET_FULL_QUERY} WHERE b.book = ?",(book,)).fetchone()
             return Book.from_row(row) if row else None
     
-    def get_by_id(self, book_id: int) -> Any:
+    def get_by_id(self, book_id: int) -> Book:
         with self.router.meta() as conn:
             row = conn.execute(f"{GET_QUERY} WHERE b.id = ?",(book_id,)).fetchone()
-            return row if row else None
+            return Book.from_row(row) if row else None
     
     def get_many(self, book_ids: list[int]) -> dict[int, Any]:
         with self.router.meta() as conn:
