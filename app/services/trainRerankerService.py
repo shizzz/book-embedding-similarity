@@ -1,9 +1,10 @@
 from app.hnsw.trainers import RerankerTrainer
 from app.hnsw.services import LTRDatasetAssembler, RerankerFeatureExtractor, RelevanceEncoder
 from app.infrastructure.db import DBRouter
-from app.infrastructure.db.repositories import BookRepository, FeedbackRepository
-from app.infrastructure.embeddings import DBEmbeddingProvider
+from app.infrastructure.db.repositories import FeedbackRepository
 from app.infrastructure.db.services import BookEmbeddingService, PairDataLoader
+from app.infrastructure.embeddings import HybridEmbeddingProvider
+from app.infrastructure.books import HybridBookProvider
 from app.infrastructure.models import Feedbacks, BookPair
 
 class TrainRerankerService:
@@ -14,10 +15,10 @@ class TrainRerankerService:
         trainer: RerankerTrainer
     ):
         self._feedback_repo = FeedbackRepository(router)
-        self._book_repo = BookRepository(router)
-        self._embedding_provider = DBEmbeddingProvider(router)
+        self._book_provider = HybridBookProvider(router)
+        self._embedding_provider = HybridEmbeddingProvider(router)
         self._embedding_service = BookEmbeddingService(router)
-        self._feedbackDataLoader = PairDataLoader(self._book_repo, self._embedding_provider)
+        self._feedbackDataLoader = PairDataLoader(self._book_provider, self._embedding_provider)
         self._ui = ui
 
         self._dataset_builder = LTRDatasetAssembler(

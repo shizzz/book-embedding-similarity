@@ -19,7 +19,6 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         self._document_index = document_index
         self._chunk_index = chunk_index
         self._level = level
-        self._emb_repo = self._emb_provider if self._emb_provider else EmbeddingsRepository(self._router)
         
         self._level_search_map = {
             IndexLevel.DOCUMENT: self._search_document_level,
@@ -31,7 +30,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
     # EMBEDDINGS
     # ============================================================
     def _get_embeddings_by_book_ids(self, book_ids: List[int]):
-        data = self._emb_repo.get_by_book_ids(book_ids)
+        data = self._emb_provider.get_by_book_ids(book_ids)
         embeddings, embedding_ids, source_ids = [], [], []
 
         for emb_id, (vec, book_id) in data.items():
@@ -42,7 +41,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         return embeddings, embedding_ids, source_ids
 
     def _get_embedding_meta(self, embedding_ids: List[int]):
-        return self._emb_repo.get_by_ids(list(embedding_ids))
+        return self._emb_provider.get_by_ids(list(embedding_ids))
 
 
     # ============================================================

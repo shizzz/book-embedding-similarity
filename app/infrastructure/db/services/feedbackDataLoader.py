@@ -1,16 +1,15 @@
 import numpy as np
 from app.infrastructure.models import Feedbacks, Book
-from app.infrastructure.db.repositories import BookRepository
-from app.infrastructure.providers import EmbeddingProvider
+from app.infrastructure.providers import EmbeddingProvider, BookProvider
 from .bookEmbeddingService import BookEmbeddingService
 
 class PairDataLoader:
     def __init__(
             self, 
-            book_repo: BookRepository, 
+            book_provider: BookProvider, 
             emb_provider: EmbeddingProvider
         ):
-        self._book_repo = book_repo
+        self._book_provider = book_provider
         self._emb_service = BookEmbeddingService(emb_provider)
     
     def _load(
@@ -18,7 +17,7 @@ class PairDataLoader:
             book_ids: list[int],
         ) -> tuple[dict[int, Book], dict[int, np.ndarray]]:
         embeddings = self._emb_service.get_mean_embeddings(list(book_ids))
-        books = self._book_repo.get_many(list(book_ids))
+        books = self._book_provider.get_many(list(book_ids))
 
         return books, embeddings
 

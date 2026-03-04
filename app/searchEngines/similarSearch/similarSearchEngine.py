@@ -4,11 +4,10 @@ from typing import List, Tuple, Dict, Any
 from app.hnsw.rerankers import Reranker
 from app.hnsw.services import RerankerFeatureExtractor
 from app.infrastructure.db import DBRouter
-from app.infrastructure.db.repositories import EmbeddingsRepository, BookRepository
 from app.infrastructure.db.services import PairDataLoader
 from app.infrastructure.models import BookPair
-from app.infrastructure.providers import EmbeddingProvider
-from app.infrastructure.embeddings import CacheEmbeddingProvider
+from app.infrastructure.embeddings import HybridEmbeddingProvider
+from app.infrastructure.books import HybridBookProvider
 from app.settings.config import CHUNKS_PER_BOOK, OVERFETCH_FACTOR
 
 
@@ -19,7 +18,6 @@ class SimilarSearchEngine:
         exclude_same_authors: bool,
         router: DBRouter,
         step_percent: int = 1,
-        embeddings: EmbeddingProvider = None,
         reranker: Reranker = None,
         logger: logging.Logger = None
     ):
@@ -34,14 +32,9 @@ class SimilarSearchEngine:
         self.avg_chunks_per_book: int = CHUNKS_PER_BOOK
         self.overfetch_factor: float = OVERFETCH_FACTOR
 
-        if embeddings:
-            self._emb_provider = embeddings
-        else:            
-            self._emb_provider = CacheEmbeddingProvider(EmbeddingsRepository(router).get_by_ids())
-        self._data_loader = PairDataLoader(
-            book_repo=BookRepository(router),
-            emb_provider=self._emb_provider
-        )
+        self._book_provider = HybridBookProvider(router)
+        self._emb_provider = HybridEmbeddingProvider(router)
+        self._data_loader = PairDataLoader(self._book_provider, self._emb_provider)
 
     def find_similar_books(
         self,
