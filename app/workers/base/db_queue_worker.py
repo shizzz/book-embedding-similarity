@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from app.common.types import TEntity
-from app.models import Task, TaskResult
+from app.infrastructure.models import Task, TaskResult
 from .queue_worker import BaseQueueWorker
 from app.workers.sources import DbQueue
 

@@ -3,8 +3,8 @@ import logging
 from typing import List, Tuple
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
-from app.db import DBRouter
-from app.db.repositories import BookRepository, SimilarRepository
+from app.infrastructure.db import DBRouter
+from app.infrastructure.db.repositories import BookRepository, SimilarRepository
 from app.settings.config import LIB_URL
 from app.utils import to_similar_list
 

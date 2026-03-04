@@ -1,4 +1,4 @@
-from app.db.repositories import EmbeddingsRepository
+from app.infrastructure.db.repositories import EmbeddingsRepository
 
 class EmbeddingsBatchIterable:
     def __init__(self, repo: EmbeddingsRepository, batch_size: int = 1):

@@ -2,9 +2,9 @@ import asyncio
 from app.workers.base import BaseDbQueueWorker
 from app.hnsw.services import BookEmbeddingIndexer
 from app.model import Model, generate_embeddings
-from app.db import DBRouter, Migrator
-from app.db.repositories import BookRepository, EmbeddingsRepository, AuthorRepository, ModelRepository, ChunkRepository
-from app.models import Book, BookRegistry, Task, TaskResult, Action, Dataset
+from app.infrastructure.db import DBRouter, Migrator
+from app.infrastructure.db.repositories import BookRepository, EmbeddingsRepository, AuthorRepository, ModelRepository, ChunkRepository
+from app.infrastructure.models import Book, BookRegistry, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from .sources.databaseReporter import DatabaseReporter
 

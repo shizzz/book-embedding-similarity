@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from app.db import Migrator
+from app.infrastructure.db import Migrator
 from app.api.routers import similar_router, feedback_router
 from app.settings.config import SITE_BASE_PATH, BASE_DIR
 from .dependencies import router

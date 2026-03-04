@@ -4,7 +4,7 @@ import gc
 from abc import ABC, abstractmethod
 from typing import Generic
 from app.common.types import TEntity
-from app.models import Task, TaskResult
+from app.infrastructure.models import Task, TaskResult
 from .base import BaseWorker
 
 class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):

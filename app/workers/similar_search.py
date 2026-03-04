@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 from typing import List, Tuple
 from app.workers.base import BaseWorker
-from app.models import Book, Task
+from app.infrastructure.models import Book, Task
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     a_norm = a / np.linalg.norm(a)

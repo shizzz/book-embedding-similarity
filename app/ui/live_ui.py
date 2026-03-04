@@ -18,7 +18,7 @@ from time import perf_counter
 from .ui import BaseUI
 from .tqdmLike import TqdmLike, TqdmIterable
 
-from app.models import Report
+from app.infrastructure.models import Report
 from app.settings.config import MAX_WORKERS
 
 class LiveUI(BaseUI):

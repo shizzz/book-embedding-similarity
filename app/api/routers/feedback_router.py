@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from app.models import Book, FeedbackReq, Feedbacks
-from app.db.repositories import BookRepository, FeedbackRepository, SimilarRepository
+from app.infrastructure.models import Book, FeedbackReq, Feedbacks
+from app.infrastructure.db.repositories import BookRepository, FeedbackRepository, SimilarRepository
 from ..dependencies import router as dbrouter
 
 router = APIRouter()

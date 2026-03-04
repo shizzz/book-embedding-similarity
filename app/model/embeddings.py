@@ -1,5 +1,5 @@
 from collections import defaultdict
-from app.models import Embedding, BookRegistry
+from app.infrastructure.models import Embedding, BookRegistry
 from app.model import Model
 import numpy as np
 import torch

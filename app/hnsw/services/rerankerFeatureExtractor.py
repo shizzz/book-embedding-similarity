@@ -1,5 +1,5 @@
 import numpy as np
-from app.models import BookPair
+from app.infrastructure.models import BookPair
 
 class RerankerFeatureExtractor:
     def extract(self, pair: BookPair) -> list[float]:

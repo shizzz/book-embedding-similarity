@@ -1,6 +1,6 @@
 from app.ui import LiveUI
 from app.hnsw.services import BookEmbeddingIndexer
-from app.db.router import DBRouter
+from app.infrastructure.db.router import DBRouter
 
 def run(args):
     router = DBRouter()

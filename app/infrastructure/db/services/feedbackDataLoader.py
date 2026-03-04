@@ -1,15 +1,22 @@
 import numpy as np
-from app.db import DBRouter
-from app.db.repositories import BookRepository
-from app.models import Feedbacks, Book
+from app.infrastructure.models import Feedbacks, Book
+from app.infrastructure.db.repositories import BookRepository
+from app.infrastructure.providers import EmbeddingProvider
 from .bookEmbeddingService import BookEmbeddingService
 
 class PairDataLoader:
-    def __init__(self, router: DBRouter):
-        self._book_repo = BookRepository(router)
-        self._emb_service = BookEmbeddingService(router)
-
-    def _load(self, book_ids: list[int]) -> tuple[dict[int, Book], dict[int, np.ndarray]]:
+    def __init__(
+            self, 
+            book_repo: BookRepository, 
+            emb_provider: EmbeddingProvider
+        ):
+        self._book_repo = book_repo
+        self._emb_service = BookEmbeddingService(emb_provider)
+    
+    def _load(
+            self, 
+            book_ids: list[int],
+        ) -> tuple[dict[int, Book], dict[int, np.ndarray]]:
         embeddings = self._emb_service.get_mean_embeddings(list(book_ids))
         books = self._book_repo.get_many(list(book_ids))
 

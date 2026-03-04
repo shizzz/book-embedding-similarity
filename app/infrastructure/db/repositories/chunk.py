@@ -1,4 +1,4 @@
-from app.db import DBRouter, SQLiteAdapters
+from app.infrastructure.db import DBRouter, SQLiteAdapters
 from ...models.chunk import Chunk
 
 class ChunkRepository:

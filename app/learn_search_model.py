@@ -5,9 +5,9 @@ import numpy as np
 from typing import Tuple
 from app.hnsw import IndexManager
 from app.model import Model
-from app.models import Book, Feedbacks, BookRegistry
+from app.infrastructure.models import Book, Feedbacks, BookRegistry
 from app.hnsw.trainers import LightGBMRerankerTrainer
-from app.db.repositories import FeedbackRepository, EmbeddingsRepository, BookRepository
+from app.infrastructure.db.repositories import FeedbackRepository, EmbeddingsRepository, BookRepository
 from app.settings.config import LIB_URL, MODEL_NAME
 
 def sync_feedbacks(conn):

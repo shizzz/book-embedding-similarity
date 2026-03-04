@@ -4,7 +4,7 @@ from contextlib import contextmanager, redirect_stdout
 from io import StringIO
 from unittest.mock import patch
 
-from app.models import Book
+from app.infrastructure.models import Book
 from app.cli.get.main import get_similar
 
 

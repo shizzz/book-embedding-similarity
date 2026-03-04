@@ -3,7 +3,7 @@ import os
 import zipfile
 from datetime import datetime
 from typing import AsyncGenerator, Any
-from app.models import Book
+from app.infrastructure.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
 from app.searchEngines.sources import BookSourceManager

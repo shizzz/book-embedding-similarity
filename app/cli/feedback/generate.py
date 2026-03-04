@@ -1,8 +1,8 @@
 from typing import Optional, List
 import openai
-from app.db import DBRouter
-from app.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
-from app.models import Book
+from app.infrastructure.db import DBRouter
+from app.infrastructure.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
+from app.infrastructure.models import Book
 from app.settings.config import DEEPSEEK_API_KEY, OPENAI_API_KEY, LM_STUDIO_BASE_URL
 
 router = DBRouter()

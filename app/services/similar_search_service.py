@@ -1,7 +1,7 @@
 import time
 from typing import List, Tuple
-from app.db import DBRouter
-from app.db.repositories import EmbeddingsRepository, ModelRepository
+from app.infrastructure.db import DBRouter
+from app.infrastructure.db.repositories import EmbeddingsRepository, ModelRepository
 from app.searchEngines.similarSearch import SimilarSearchEngine
 from app.settings.config import MODEL_NAME
 

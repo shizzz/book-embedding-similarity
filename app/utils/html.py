@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from typing import Literal
 
 from app.settings.config import BASE_DIR
-from app.models import Book, Feedbacks
+from app.infrastructure.models import Book, Feedbacks
 from .toSimilarBooks import to_similar_list
 
 class Html:

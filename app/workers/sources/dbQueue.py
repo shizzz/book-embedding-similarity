@@ -3,8 +3,8 @@ import traceback
 import gc
 from app.common.types import TEntity
 from typing import Generic, List
-from app.models import Task
-from app.db import DBRouter
+from app.infrastructure.models import Task
+from app.infrastructure.db import DBRouter
 from app.ui import BaseUI
 
 class DbQueue(Generic[TEntity]):

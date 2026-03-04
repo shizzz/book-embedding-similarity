@@ -5,7 +5,7 @@ from app.settings.config import BASE_DIR
 class Migrator:
     def __init__(self, router: DBRouter):
         self.router = router
-        self.base_path = BASE_DIR / "db" / "migrations"
+        self.base_path = BASE_DIR / "infrastructure" / "db" / "migrations"
 
     # ---------- public ----------
     def migrate_all(self, model_uids: list[str]):

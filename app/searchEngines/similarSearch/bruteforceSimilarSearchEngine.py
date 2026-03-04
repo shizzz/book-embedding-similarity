@@ -1,7 +1,7 @@
 import heapq
 import numpy as np
 from typing import List, Dict, Any
-from app.db.repositories import EmbeddingsRepository
+from app.infrastructure.db.repositories import EmbeddingsRepository
 from app.utils import EmbeddingsBatchIterable
 from .similarSearchEngine import SimilarSearchEngine
 
@@ -23,7 +23,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
             return []
 
         repo = EmbeddingsRepository(self._router, self._model_uid)
-        source_embeddings = repo.get_embeddings_by_book_ids(book_ids)
+        source_embeddings = repo.get_by_book_ids(book_ids)
         if not source_embeddings:
             return []
 

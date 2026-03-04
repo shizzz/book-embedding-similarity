@@ -6,9 +6,9 @@ import torch
 from typing import Dict, Tuple
 from sentence_transformers import SentenceTransformer, InputExample, losses
 from torch.utils.data import DataLoader
-from app.db import DBRouter
-from app.db.repositories import FeedbackRepository, BookRepository, SimilarRepository, EmbeddingsRepository
-from app.models import Feedbacks, Book
+from app.infrastructure.db import DBRouter
+from app.infrastructure.db.repositories import FeedbackRepository, BookRepository, SimilarRepository, EmbeddingsRepository
+from app.infrastructure.models import Feedbacks, Book
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.utils import FB2Book
 from app.settings.config import MODEL_NAME, DATA_DIR, TRANSFORM_FILE

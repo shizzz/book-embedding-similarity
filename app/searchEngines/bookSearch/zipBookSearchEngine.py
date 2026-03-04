@@ -1,6 +1,6 @@
 import asyncio
 from typing import AsyncGenerator, Any
-from app.models import Book
+from app.infrastructure.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
 

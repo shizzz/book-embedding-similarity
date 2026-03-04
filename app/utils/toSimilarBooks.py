@@ -1,7 +1,7 @@
 from typing import Tuple, List
-from app.db import DBRouter
-from app.db.repositories import BookRepository
-from app.models import Book, Similar
+from app.infrastructure.db import DBRouter
+from app.infrastructure.db.repositories import BookRepository
+from app.infrastructure.models import Book, Similar
 
 def to_similar_list(
     rows: List[Tuple[float, int, int]]

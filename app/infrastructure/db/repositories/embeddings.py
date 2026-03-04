@@ -4,9 +4,9 @@ from ..router import DBRouter
 from .model import ModelRepository
 from app.settings.config import MODEL_NAME
 
-class EmbeddingsRepository:
-    GET_QUERY: str = "SELECT book_id, embedding FROM embeddings"
+GET_QUERY: str = "SELECT id, book_id, data, shape FROM embeddings"
 
+class EmbeddingsRepository:
     def __init__(self, router: DBRouter, model_uid: str = None):
         self.router = router
         self.model_uid = model_uid or ModelRepository(router).get_latest_uid(MODEL_NAME)
@@ -36,54 +36,42 @@ class EmbeddingsRepository:
                     break
                 yield [Embedding.from_row(r) for r in rows]
 
-    def get_embeddings_by_ids(
+    def get_by_ids(
         self,
-        embedding_ids: list[int]
+        embedding_ids: list[int] = None
+    ) -> dict[int, tuple[np.ndarray, int]]:
+        if embedding_ids == []:
+            return {}
+
+        with self.router.embeddings(self.model_uid) as conn:
+            if embedding_ids is None:
+                query = GET_QUERY
+                params = ()
+            else:
+                placeholders = ",".join("?" for _ in embedding_ids)
+                query = f"{GET_QUERY} WHERE id IN ({placeholders}) "
+                params = embedding_ids
+
+            rows = conn.execute(query, params).fetchall()
+
+        return {
+            embedding_id: (
+                data.reshape((shape,)) if shape else data,
+                book_id
+            )
+            for embedding_id, book_id, data, shape in rows
+        }
+
+    def get_by_book_ids(
+        self,
+        book_ids: list[int]
     ) -> dict[int, tuple[np.ndarray, int]]:
         """
         Возвращает:
-            embedding_id -> (vector: np.ndarray, book_id: int)
-
-        Батчевый SELECT.
-        """
-        if not embedding_ids:
-            return {}
-
-        placeholders = ",".join("?" for _ in embedding_ids)
-
-        with self.router.embeddings(self.model_uid) as conn:
-            cursor = conn.execute(
-                f"""
-                SELECT id, book_id, data, shape
-                FROM embeddings
-                WHERE id IN ({placeholders})
-                """,
-                embedding_ids
-            )
-            rows = cursor.fetchall()
-
-        result = {}
-
-        for embedding_id, book_id, data, shape in rows:
-            vec = data
-            if shape:
-                vec = vec.reshape((shape,))
-            result[embedding_id] = (vec, book_id)
-
-        return result
-
-    def get_embeddings_by_book_ids(
-        self,
-        book_ids: list[int]
-    ) -> list:
-        """
-        Возвращает список объектов:
-            r.id
-            r.book_id
-            r.data (np.ndarray)
+            embedding_id -> (vector, book_id)
         """
         if not book_ids:
-            return []
+            return {}
 
         placeholders = ",".join("?" for _ in book_ids)
 
@@ -98,20 +86,14 @@ class EmbeddingsRepository:
             )
             rows = cursor.fetchall()
 
-        result = []
+        result: dict[int, tuple[np.ndarray, int]] = {}
 
         for embedding_id, book_id, data, shape in rows:
             vec = data
             if shape:
                 vec = vec.reshape((shape,))
 
-            result.append(
-                type("EmbeddingRow", (), {
-                    "id": embedding_id,
-                    "book_id": book_id,
-                    "data": vec
-                })
-            )
+            result[embedding_id] = (vec, book_id)
 
         return result
 

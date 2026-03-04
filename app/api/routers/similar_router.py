@@ -5,8 +5,8 @@ import time
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from app.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
-from app.models import Feedbacks
+from app.infrastructure.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
+from app.infrastructure.models import Feedbacks
 from app.utils import Html
 from app.services import TaskState, Similarity
 from ..dependencies import executor, router as dbrouter

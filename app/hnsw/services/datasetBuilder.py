@@ -1,4 +1,4 @@
-from app.models import BookPair
+from app.infrastructure.models import BookPair
 
 class LTRDatasetAssembler:
     def __init__(

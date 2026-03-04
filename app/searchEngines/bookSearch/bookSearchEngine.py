@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Any
-from app.models import Book
+from app.infrastructure.models import Book
 from app.searchEngines.sources import BookSourceManager
 
 class BaseBookSearchEngine(ABC):

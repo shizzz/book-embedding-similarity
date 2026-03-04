@@ -3,16 +3,23 @@ from collections import defaultdict
 from faiss import IndexIDMap
 from typing import List, Dict
 from .similarSearchEngine import SimilarSearchEngine
-from app.db.repositories import EmbeddingsRepository
+from app.infrastructure.db.repositories import EmbeddingsRepository
 from app.settings.config import IndexLevel
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
-    def __init__(self, document_index: IndexIDMap, chunk_index: IndexIDMap, level: IndexLevel, *args, **kwargs):
+    def __init__(
+            self, 
+            document_index: IndexIDMap, 
+            chunk_index: IndexIDMap, 
+            level: IndexLevel, 
+            *args, 
+            **kwargs
+        ):
         super().__init__(*args, **kwargs)
         self._document_index = document_index
         self._chunk_index = chunk_index
         self._level = level
-        self._emb_repo = EmbeddingsRepository(self._router, self._model_uid)
+        self._emb_repo = self._emb_provider if self._emb_provider else EmbeddingsRepository(self._router)
         
         self._level_search_map = {
             IndexLevel.DOCUMENT: self._search_document_level,
@@ -24,17 +31,18 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
     # EMBEDDINGS
     # ============================================================
     def _get_embeddings_by_book_ids(self, book_ids: List[int]):
-        """Возвращает embeddings, их ID и source book IDs"""
-        rows = self._emb_repo.get_embeddings_by_book_ids(book_ids)
+        data = self._emb_repo.get_by_book_ids(book_ids)
         embeddings, embedding_ids, source_ids = [], [], []
-        for r in rows:
-            embeddings.append(r.data)
-            embedding_ids.append(r.id)
-            source_ids.append(r.book_id)
+
+        for emb_id, (vec, book_id) in data.items():
+            embeddings.append(vec)
+            embedding_ids.append(emb_id)
+            source_ids.append(book_id)
+
         return embeddings, embedding_ids, source_ids
 
     def _get_embedding_meta(self, embedding_ids: List[int]):
-        return self._emb_repo.get_embeddings_by_ids(list(embedding_ids))
+        return self._emb_repo.get_by_ids(list(embedding_ids))
 
 
     # ============================================================

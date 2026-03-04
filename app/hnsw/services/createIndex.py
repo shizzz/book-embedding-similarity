@@ -1,10 +1,10 @@
 import faiss
 import numpy as np
 from typing import Optional, Dict
-from app.db import DBRouter
+from app.infrastructure.db import DBRouter
 from app.ui import BaseUI
 from app.utils import EmbeddingsBatchIterable
-from app.db.repositories import EmbeddingsRepository, ModelRepository
+from app.infrastructure.db.repositories import EmbeddingsRepository, ModelRepository
 from app.settings.config import (
     HNSW_M,
     HNSW_EF_CONSTRUCTION,

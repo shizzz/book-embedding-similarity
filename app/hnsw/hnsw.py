@@ -1,7 +1,7 @@
 import os
 import faiss
 from typing import List
-from app.models import BookRegistry, Book
+from app.infrastructure.models import BookRegistry, Book
 from app.settings.config import DATA_DIR, HNSW_EF_SEARCH, MODEL_NAME, HNSW_MMAP, IndexLevel
 from .trainers.rerankerTrainer import RerankerTrainer
 try:

@@ -1,4 +1,4 @@
-from app.models.report import Report
+from app.infrastructure.models.report import Report
 
 class DatabaseReporter:
     def __init__(self, router, model_uid: str):

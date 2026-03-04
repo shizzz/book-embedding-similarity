@@ -1,7 +1,7 @@
 from lxml import etree
 import re
 from typing import List, Optional
-from app.models import Book, Chunk
+from app.infrastructure.models import Book, Chunk
 from app.settings.config import ST_MIN_CHARS, ST_TARGET_CHARS, ST_MAX_DESCRIPTION_CHARS, CHUNKS_PER_BOOK
 
 class FB2Book:

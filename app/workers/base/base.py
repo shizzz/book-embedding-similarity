@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from app.ui import LiveUI
 from app.workers.sources import ConsoleHandler
-from app.db import Migrator, DBRouter
+from app.infrastructure.db import Migrator, DBRouter
 from app.settings.config import MAX_WORKERS
 
 class BaseWorker(ABC):
