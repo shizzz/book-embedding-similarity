@@ -102,7 +102,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
                 candidate_embedding_id = int(candidate_embedding_id)
                 if candidate_embedding_id not in embedding_meta:
                     continue
-                candidate_vec, candidate_book_id = embedding_meta[candidate_embedding_id]
+                _, candidate_book_id = embedding_meta[candidate_embedding_id]
                 score = float(distances[q_idx, match_idx])
                 pair_matches[(source_id, candidate_book_id)][(query_embedding_id, candidate_embedding_id)] = score
 
@@ -110,7 +110,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         candidates = []
         for (source_id, candidate_id), matches in pair_matches.items():
             scores = sorted(matches.values(), reverse=True)[:top_k_agg]
-            agg_score = float(np.mean(scores))
+            agg_score = float(np.mean(scores)) * (len(scores) / top_k_agg)
             matched_chunks = [
                 {
                     "query_embedding_id": qid,
@@ -162,7 +162,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
                 candidate_embedding_id = int(candidate_embedding_id)
                 if candidate_embedding_id not in embedding_meta:
                     continue
-                candidate_vec, candidate_book_id = embedding_meta[candidate_embedding_id]
+                _, candidate_book_id = embedding_meta[candidate_embedding_id]
                 if candidate_book_id not in candidate_book_ids:
                     continue
                 score = float(distances[q_idx, match_idx])
@@ -170,18 +170,19 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
         # Final aggregation
         candidates = []
+        qid_to_embedding = dict(zip(query_embedding_ids, query_embeddings_np))
         for (source_id, candidate_id), matches in pair_matches.items():
             scores = sorted(matches.values(), reverse=True)[:top_k_agg]
-            agg_score = float(np.mean(scores))
+            agg_score = float(np.mean(scores)) * (len(scores) / top_k_agg)
             matched_chunks = [
                 {
                     "query_embedding_id": qid,
-                    "query_embedding": embedding_meta[qid][0],
+                    "query_embedding": qid_to_embedding[qid].tolist(),
                     "embedding_id": cid,
                     "embedding": embedding_meta[cid][0],
                     "score": score
                 }
-                for (qid, cid), score in matches.items() if qid in embedding_meta and cid in embedding_meta
+                for (qid, cid), score in matches.items() if cid in embedding_meta
             ]
             candidates.append({
                 "source_id": source_id,
