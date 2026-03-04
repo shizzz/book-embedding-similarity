@@ -1,6 +1,7 @@
 from app.ui import LiveUI
 from app.hnsw.trainers import LightGBMRerankerTrainer 
-from app.db.router import DBRouter
+from app.services import TrainRerankerService
+from app.db import DBRouter
 
 def run(args):
     router = DBRouter()
@@ -11,7 +12,8 @@ def run(args):
     )
     ui.init()
 
-    LightGBMRerankerTrainer(
-        router=router,
-        ui=ui
-    ).train()
+    TrainRerankerService(
+        router, 
+        ui,
+        LightGBMRerankerTrainer()
+    ).execute()

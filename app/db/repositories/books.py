@@ -118,7 +118,7 @@ class BookRepository:
             rows = conn.execute(f"{GET_QUERY} WHERE id IN ({placeholders})",book_ids).fetchall()
 
             return {
-                row["id"]: row
+                row["id"]: Book.from_row(row)
                 for row in rows
             }
 
