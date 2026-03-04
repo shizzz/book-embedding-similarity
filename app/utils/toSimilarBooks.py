@@ -15,8 +15,7 @@ def to_similar_list(
         book_ids.add(candidate_id)
 
     router = DBRouter()
-    raw_books = BookRepository(router).get_many(list[int](book_ids))
-    books_by_id = Book.map_by_id(raw_books, Book.from_row)
+    books_by_id = BookRepository(router).get_many(list[int](book_ids))
 
     result: List[Similar] = []
     for score, source_id, candidate_id in rows:
