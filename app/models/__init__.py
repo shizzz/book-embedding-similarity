@@ -1,4 +1,5 @@
-from .book import Book, BookRegistry, BookPair
+from .book import Book, BookRegistry
+from .bookPair import BookPair
 from .task import Task, TaskResult, Action, Dataset
 from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar

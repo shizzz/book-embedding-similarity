@@ -40,7 +40,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
 
                     score = float(np.dot(source_vec, r.data))
                     # используем (score, r.id, r) чтобы heapq не сравнивал объекты Embedding
-                    heap_item = (score, r.emb_id, r)
+                    heap_item = (score, r.id, r)
 
                     if len(heap) < desired_books:
                         heapq.heappush(heap, heap_item)

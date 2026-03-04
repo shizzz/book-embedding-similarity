@@ -2,7 +2,7 @@ from lxml import etree
 import re
 from typing import List, Optional
 from app.models import Book, Chunk
-from app.settings.config import ST_MIN_CHARS, ST_TARGET_CHARS, ST_MAX_DESCRIPTION_CHARS
+from app.settings.config import ST_MIN_CHARS, ST_TARGET_CHARS, ST_MAX_DESCRIPTION_CHARS, CHUNKS_PER_BOOK
 
 class FB2Book:
     NS = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
@@ -42,7 +42,7 @@ class FB2Book:
         target_chars: int = ST_TARGET_CHARS,
         min_chars: int = ST_MIN_CHARS,
         max_description_chars: int = ST_MAX_DESCRIPTION_CHARS,
-        sections: int = 7,
+        sections: int = CHUNKS_PER_BOOK,
     ) -> list[str]:
         """
         Возвращает список текстовых чанков книги без разрыва слов.

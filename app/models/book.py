@@ -176,11 +176,3 @@ class BookRegistry:
 
     def get(self, book_id: int) -> Optional["Book"]:
         return self._book_map.get(book_id)
-    
-@dataclass
-class BookPair:
-    source: Book
-    candidate: Book
-    source_emb: np.ndarray
-    candidate_emb: np.ndarray
-    raw_label: float

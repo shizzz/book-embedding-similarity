@@ -1,4 +1,3 @@
-from .bookPairFactory import BookPairFactory
 from .datasetBuilder import LTRDatasetAssembler
 from .createIndex import BookEmbeddingIndexer
 from .relevanceEncoder import RelevanceEncoder

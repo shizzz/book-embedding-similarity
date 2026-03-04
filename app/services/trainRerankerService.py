@@ -1,9 +1,9 @@
 from app.hnsw.trainers import RerankerTrainer
-from app.hnsw.services import LTRDatasetAssembler, RerankerFeatureExtractor, BookPairFactory, RelevanceEncoder
+from app.hnsw.services import LTRDatasetAssembler, RerankerFeatureExtractor, RelevanceEncoder
 from app.db import DBRouter
 from app.db.repositories import BookRepository, FeedbackRepository, EmbeddingsRepository
-from app.db.services import BookEmbeddingService, FeedbackDataLoader
-from app.models import Feedbacks
+from app.db.services import BookEmbeddingService, PairDataLoader
+from app.models import Feedbacks, BookPair
 
 class TrainRerankerService:
     def __init__(
@@ -16,7 +16,7 @@ class TrainRerankerService:
         self._book_repo = BookRepository(router)
         self._embedding_repo = EmbeddingsRepository(router)
         self._embedding_service = BookEmbeddingService(router)
-        self._feedbackDataLoader = FeedbackDataLoader(router)
+        self._feedbackDataLoader = PairDataLoader(router)
         self._ui = ui
 
         self._dataset_builder = LTRDatasetAssembler(
@@ -33,26 +33,11 @@ class TrainRerankerService:
 
         books, embeddings = self._feedbackDataLoader.load(feedbacks)
 
-        feature_rows = []
-
-        for fb in self._ui.tqdm(feedbacks, desc="Building dataset"):
-            src = books.get(fb.source_id)
-            cand = books.get(fb.candidate_id)
-
-            src_emb = embeddings.get(fb.source_id)
-            cand_emb = embeddings.get(fb.candidate_id)
-
-            if not src or not cand:
-                continue
-
-            if src_emb is None or cand_emb is None:
-                continue
-
-            pairs = BookPairFactory().create_pairs(
-                feedbacks=feedbacks,
-                books=books,
-                embeddings=embeddings
-            )
+        pairs = [
+            BookPair.fromFeedback(fb, books, embeddings)
+            for fb in feedbacks
+            if BookPair.fromFeedback(fb, books, embeddings) is not None
+        ]
 
         X, y, groups = self._dataset_builder.build(pairs)
 

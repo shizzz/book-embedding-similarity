@@ -211,7 +211,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
             if book.embedding:
                 for emb in book.embedding:
                     emb.book_id = book.id
-                    emb.emb_id = self._emb_id
+                    emb.id = self._emb_id
                     self._emb_id += 1
         return result
 

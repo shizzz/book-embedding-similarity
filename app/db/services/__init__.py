@@ -1,7 +1,7 @@
 from .bookEmbeddingService import BookEmbeddingService
-from .feedbackDataLoader import FeedbackDataLoader
+from .feedbackDataLoader import PairDataLoader
 
 __all__ = [
     "BookEmbeddingService",
-    "FeedbackDataLoader"
+    "PairDataLoader"
 ]

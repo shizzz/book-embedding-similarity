@@ -14,7 +14,7 @@ class LTRDatasetAssembler:
 
         for pair in pairs:
             X.append(self._features.extract(pair))
-            y.append(self._labels.encode(pair.raw_label))
+            y.append(self._labels.encode(pair.label))
             groups.append(pair.source.id)
 
         return X, y, groups

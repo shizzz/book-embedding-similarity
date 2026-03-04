@@ -5,7 +5,7 @@ import numpy as np
 
 @dataclass
 class Embedding:
-    emb_id: Optional[int] = None
+    id: Optional[int] = None
     book_id: Optional[int] = None
     chunk_id: Optional[int] = None
     seq: Optional[int] = None
@@ -13,12 +13,12 @@ class Embedding:
     shape: Optional[int] = None
 
     def to_tuple(self) -> Tuple[int, int, int, int, np.ndarray, int]:
-        return (self.emb_id, self.book_id, self.chunk_id, self.seq, self.data, self.shape)
+        return (self.id, self.book_id, self.chunk_id, self.seq, self.data, self.shape)
 
     @staticmethod
     def from_row(row) -> "Embedding":
         return Embedding(
-            emb_id=row["id"],
+            id=row["id"],
             book_id=row["book_id"],
             chunk_id=row["chunk_id"],
             seq=row["seq"],

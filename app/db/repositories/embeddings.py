@@ -65,7 +65,7 @@ class EmbeddingsRepository:
         result = {}
 
         for embedding_id, book_id, data, shape in rows:
-            vec = np.frombuffer(data, dtype=np.float32)
+            vec = data
             if shape:
                 vec = vec.reshape((shape,))
             result[embedding_id] = (vec, book_id)
@@ -101,7 +101,7 @@ class EmbeddingsRepository:
         result = []
 
         for embedding_id, book_id, data, shape in rows:
-            vec = np.frombuffer(data, dtype=np.float32)
+            vec = data
             if shape:
                 vec = vec.reshape((shape,))
 
