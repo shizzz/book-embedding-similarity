@@ -1,12 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
-from enum import IntEnum
 import zlib
-
-class Type(IntEnum):
-    TITLE = 0
-    DESCRIPTION = 1
-    TEXT = 2
+from .constants import ChunkType
 
 @dataclass
 class Chunk:
@@ -14,7 +9,7 @@ class Chunk:
     book_id: int = None
     chunk_id: Optional[int] = None
     length: int = field(init=False)
-    type: int = None
+    type: ChunkType = None
 
     def __post_init__(self):
         self.length = len(self.text)

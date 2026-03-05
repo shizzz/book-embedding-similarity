@@ -2,7 +2,7 @@ from lxml import etree
 import re
 from math import ceil
 from typing import List, Optional
-from app.infrastructure.models import Book, Chunk, Type
+from app.infrastructure.models import Book, Chunk, ChunkType
 from app.settings.config import (
     ST_MIN_CHARS, 
     ST_TARGET_CHARS, 
@@ -71,7 +71,7 @@ class FB2Book:
                 cutoff = max_description_chars
             description = description[:cutoff].strip()
         if description:
-            return Chunk(text=description, type=Type.DESCRIPTION)
+            return Chunk(text=description, type=ChunkType.DESCRIPTION)
         return None
 
     def _compute_chunks_targets(self, paragraphs: list[str], desired_chars: int, sections: int) -> tuple[int,list[int]]:
@@ -141,7 +141,7 @@ class FB2Book:
 
         chunk_text = "\n\n".join(current_chunk).strip()
         if len(chunk_text) >= ST_MIN_CHARS:
-            return Chunk(text=chunk_text, type=Type.TEXT)
+            return Chunk(text=chunk_text, type=ChunkType.TEXT)
         return None
 
     def extract_chunks(
@@ -155,13 +155,13 @@ class FB2Book:
     ) -> tuple[list[Chunk], int]:
         paragraphs = self._extract_paragraphs()
         if not paragraphs:
-            return []
+            return [], 0
 
         chunks: list[Chunk] = []
 
         title_chunk = self.get_title()
         if title_chunk:
-            chunks.append(Chunk(text=title_chunk, type=Type.TITLE))
+            chunks.append(Chunk(text=title_chunk, type=ChunkType.TITLE))
         desc_chunk = self._get_description_chunk(max_description_chars)
         if desc_chunk:
             chunks.append(desc_chunk)
@@ -178,11 +178,11 @@ class FB2Book:
                 chunks.append(chunk)
 
         # fallback для оставшихся параграфов
-        combined_len = sum(c.length for c in chunks if c.type==Type.TEXT)
+        combined_len = sum(c.length for c in chunks if c.type==ChunkType.TEXT)
         i = 0
         while combined_len < min_chars and i < len(paragraphs):
             if i not in used:
-                chunks.append(Chunk(text=paragraphs[i],type=Type.TEXT))
+                chunks.append(Chunk(text=paragraphs[i],type=ChunkType.TEXT))
                 combined_len += len(paragraphs[i]) + 2
                 used.add(i)
             i += 1

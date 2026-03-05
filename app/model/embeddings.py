@@ -4,90 +4,131 @@ from app.model import Model
 import numpy as np
 import torch
 
-
 def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
-    """
-    Generate embeddings for books and their chunks.
-
-    Key behavior:
-    ------------
-
-    1. Multi-embedding per chunk
-       If chunk.text exceeds model.st_chunk_size, it is split into subchunks.
-       Each subchunk produces its own embedding.
-
-    2. No overlap
-       Chunks are already semantically meaningful.
-       Overlap would create duplicate semantic vectors and hurt retrieval quality.
-
-    3. Small subchunks are skipped
-       Subchunks smaller than 15% of model.st_chunk_size (min 100 chars) are ignored,
-       because very small text produces noisy embeddings.
-
-    Result:
-    -------
-    Populates book.embedding: List[Embedding]
-    """
 
     max_chars = model.st_chunk_size
     min_chars = max(100, int(max_chars * 0.15))
+    overlap = int(max_chars * 0.2)
     batch_size = model.st_batch_size
 
-    all_subchunks: list[str] = []
-    subchunk_meta: list[tuple] = []
+    texts, meta = collect_chunks(
+        registry,
+        max_chars,
+        min_chars,
+        overlap
+    )
 
-    # -------- collect subchunks --------
-    for book in registry:
-        single_chunk_mode = len(book.chunks) == 1
-        if not getattr(book, "chunks", None):
-            continue
-
-        for chunk in book.chunks:
-            text = chunk.text
-            if not text:
-                continue
-
-            text_len = len(text)
-
-            # skip extremely small original chunks
-            if text_len < min_chars:
-                if single_chunk_mode:
-                    all_subchunks.append(text)
-                    subchunk_meta.append((book, chunk, 0))          
-                continue
-
-            # split WITHOUT overlap
-            for sub_idx, start in enumerate(range(0, text_len, max_chars)):
-                sub_text = text[start:start + max_chars]
-                if len(sub_text) < min_chars:
-                    continue
-
-                all_subchunks.append(sub_text)
-                subchunk_meta.append((book, chunk, sub_idx))
-
-    # -------- generate embeddings --------
-    if not all_subchunks:
+    if not texts:
         return registry
 
-    embeddings_np = model.transformer.encode(
-        all_subchunks,
+    embeddings = model.transformer.encode(
+        texts,
         batch_size=batch_size,
         convert_to_numpy=True,
         normalize_embeddings=True,
         show_progress_bar=False
     )
 
-    # free GPU memory immediately
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    embeddings_np = embeddings_np.astype(np.float32, copy=False)
+    embeddings = embeddings.astype(np.float32, copy=False)
 
-    # -------- assign embeddings --------
+    assign_embeddings(embeddings, meta)
+
+    return registry
+
+class ChunkStrategy:
+    prefix = ""
+
+    def prepare(self, text: str) -> str:
+        return self.prefix + text
+    def split(self, text, max_chars, min_chars, overlap, single_chunk_mode):
+        raise NotImplementedError
+
+class TitleStrategy(ChunkStrategy):
+    prefix = "title: "
+    def split(self, text, max_chars, min_chars, overlap, single_chunk_mode):
+        return [text]
+    
+class DescriptionStrategy(ChunkStrategy):
+    prefix = "description: "
+    def split(self, text, max_chars, min_chars, overlap, single_chunk_mode):
+        if len(text) <= max_chars:
+            return [text]
+
+        step = max_chars - overlap
+        parts = []
+
+        for start in range(0, len(text), step):
+            sub = text[start:start + max_chars]
+            if not sub:
+                break
+            parts.append(sub)
+
+        return parts
+    
+class PassageStrategy(ChunkStrategy):
+    prefix = "passage: "
+    def split(self, text, max_chars, min_chars, overlap, single_chunk_mode):
+        text_len = len(text)
+
+        if text_len <= max_chars:
+            if text_len < min_chars and not single_chunk_mode:
+                return []
+            return [text]
+
+        parts = []
+        for start in range(0, text_len, max_chars):
+            sub = text[start:start + max_chars]
+            if len(sub) < min_chars:
+                continue
+
+            parts.append(sub)
+
+        if not parts:
+            return [text]
+
+        return parts
+
+STRATEGIES = {
+    0: TitleStrategy(),
+    1: DescriptionStrategy(),
+    2: PassageStrategy(),
+}
+    
+def collect_chunks(registry, max_chars, min_chars, overlap):
+    texts = []
+    meta = []
+
+    for book in registry:
+        if not getattr(book, "chunks", None):
+            continue
+
+        single_chunk_mode = len(book.chunks) == 1
+        for chunk in book.chunks:
+            if not chunk.text:
+                continue
+
+            strategy = STRATEGIES.get(chunk.type, PassageStrategy())
+            prepared = strategy.prepare(chunk.text)
+            parts = strategy.split(
+                prepared,
+                max_chars,
+                min_chars,
+                overlap,
+                single_chunk_mode
+            )
+
+            for idx, part in enumerate(parts):
+                texts.append(part)
+                meta.append((book, chunk, idx))
+
+    return texts, meta
+
+def assign_embeddings(embeddings, meta):
     chunk_seq_counter = defaultdict(int)
-
-    for emb_vector, (book, chunk, _) in zip(embeddings_np, subchunk_meta):
-
+    for emb_vector, (book, chunk, _) in zip(embeddings, meta):
         if not getattr(book, "embedding", None):
             book.embedding = []
 
@@ -99,9 +140,7 @@ def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
             chunk_id=chunk.chunk_id,
             data=emb_vector,
             shape=emb_vector.shape[0],
-            seq=seq  # important for uniqueness
+            seq=seq
         )
 
         book.embedding.append(emb)
-
-    return registry
