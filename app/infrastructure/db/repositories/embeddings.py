@@ -16,6 +16,11 @@ class EmbeddingsRepository:
             rows = conn.execute("SELECT * FROM embeddings WHERE book_id = ?", (book_id,)).fetchall()
             return [Embedding.from_row(r) for r in rows]
 
+    def get_ids(self) -> set[int]:
+        with self.router.embeddings(self.model_uid) as conn:
+            rows = conn.execute("SELECT DISTINCT book_id FROM embeddings").fetchall()
+            return [r[0] for r in rows]
+
     def get_all_batch(self, batch_size: int = 1):
         with self.router.embeddings(self.model_uid) as conn:
             cursor = conn.cursor()

@@ -1,31 +1,28 @@
+import lazy_loader as lazy
+from typing import TYPE_CHECKING
+
 __all__ = [
     "GenerateEmbeddingsWorker",
     "GenerateSimilarWorker",
     "SimilarSearchWorker",
 ]
 
-_lazy_mapping = {
-    "GenerateEmbeddingsWorker": "generate_embeddings",
-    "GenerateSimilarWorker": "generate_similar",
-    "SimilarSearchWorker": "similar_search",
-}
-
-import importlib
-
-def __getattr__(name):
-    if name in _lazy_mapping:
-        module_name = f".{_lazy_mapping[name]}"
-        module = importlib.import_module(module_name, __name__)
-        value = getattr(module, name)
-        globals()[name] = value
-        return value
-    raise AttributeError(f"{__name__} has no attribute {name}")
-
-def __dir__():
-    return sorted(__all__)
+__getattr__, __dir__, __all__ = lazy.attach(
+    __name__,
+    submodules=[
+        "generate_embeddings",
+        "generate_similar",
+        "similar_search",
+    ],
+    submod_attrs={
+        "generate_embeddings": ["GenerateEmbeddingsWorker"],
+        "generate_similar": ["GenerateSimilarWorker"],
+        "similar_search": ["SimilarSearchWorker"],
+    }
+)
 
 # --- для IDE подсветки и автокомплита ---
-if False:
+if TYPE_CHECKING:
     from .generate_embeddings import GenerateEmbeddingsWorker
     from .generate_similar import GenerateSimilarWorker
     from .similar_search import SimilarSearchWorker

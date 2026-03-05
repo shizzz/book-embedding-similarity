@@ -107,10 +107,10 @@ class BookRepository:
                 for row in rows
             }
 
-    def get_names(self) -> list[str]:
+    def get_file_to_id(self) -> dict[str, int]:
         with self.router.meta() as conn:
-            rows = conn.execute("SELECT book FROM books").fetchall()
-            return [row[0] for row in rows]
+            rows = conn.execute("SELECT id, book FROM books").fetchall()
+            return {row[1]: row[0] for row in rows}
         
     def save_bulk(self, books: BookRegistry, conn=None):
         if conn is None:

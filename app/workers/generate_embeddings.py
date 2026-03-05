@@ -59,7 +59,9 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         return total
 
     async def pull_queue(self) -> None:
-        existed_books = set(BookRepository(self._router).get_names())
+        file_to_id = BookRepository(self._router).get_file_to_id()
+        chunk_to_book_id = ChunkRepository(self._router).get_ids()
+        emb_to_book_id = EmbeddingsRepository(self._router).get_ids()
 
         registries: dict[
             tuple[Action, frozenset[Dataset]],
@@ -71,30 +73,28 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
             self._searched_books.add(book.file_name)
 
             # Определяем action и datasets
-            if book.file_name in existed_books:
-                action = Action.UPDATE
-                book = await self._enrich_from_db(book)
+            if book.file_name in file_to_id:
+                book_id = file_to_id.get(book.file_name)
 
-                if len(book.chunks or []) == 0 and not book.empty:
-                    datasets.append(Dataset.CHUNK)
+                already_done = book_id is not None and (book_id in chunk_to_book_id and book_id in emb_to_book_id)
 
-                if len(book.embedding or []) == 0 and not book.empty:
-                    datasets.append(Dataset.EMBEDDING)
+                if not already_done:
+                    action = Action.UPDATE
+                    book = await self._enrich_from_db(book)
 
-                if len(datasets) == 0 or book.empty:
-                    await self.ui.done_async(self._get_book_idx)
-                    await self.ui.decrease_total_async()
+                    if not book.empty:
+                        if len(book.chunks or []) == 0:
+                            datasets.append(Dataset.CHUNK)
+                        if len(book.embedding or []) == 0:
+                            datasets.append(Dataset.EMBEDDING)
+
+                if len(datasets) == 0 or book.empty or already_done:
+                    await self._already_done()
                     del book
                     continue
             else:
                 action = Action.INSERT
-
-                datasets.extend([
-                    Dataset.BOOK,
-                    Dataset.CHUNK,
-                    Dataset.EMBEDDING,
-                    Dataset.AUTHOR
-                ])
+                datasets.extend([Dataset.BOOK, Dataset.CHUNK, Dataset.EMBEDDING, Dataset.AUTHOR])
 
             if len(book.chunks or []) == 0:
                 await self.engine.enrich_book_data(book)
@@ -113,55 +113,20 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
             # Получаем registry по ключу
             key = (action, frozenset(datasets))
-
-            registry = registries.get(key)
-
-            if registry is None:
-                registry = BookRegistry()
-                registries[key] = registry
-
-            book.model_id = self._model_id
+            registry = registries.setdefault(key, BookRegistry())
             registry.append(book)
 
             await self.ui.done_async(self._get_book_idx)
 
-            # Проверяем batch size именно этого registry
-            # batch_size = self._adaptive_batch_size(
-            #     self.queue.qsize() + len(registry)
-            # )
-
             if len(registry) >= self._max_batch_size:
-                first_book_name = getattr(registry.books[0], "file_name", "unknown")
-                dataset_str = ":".join(ds.name for ds in key[1])
-
-                await self.queue.put(
-                    Task(
-                        name=f"{first_book_name} {action.name} {dataset_str} ({len(registry)})",
-                        entity=registry,
-                        action=action,
-                        dataset=list(key[1])
-                    )
-                )
-
+                await self._queue_put(registry, key[1], action)
                 # создаём новый registry для этого ключа
                 registries[key] = BookRegistry()
 
         # Финальный flush всех registry
         for (action, datasets), registry in registries.items():
-            if len(registry) == 0:
-                continue
-
-            first_book_name = getattr(registry.books[0], "file_name", "unknown")
-            dataset_str = ":".join(ds.name for ds in key[1])
-
-            await self.queue.put(
-                Task(
-                    name=f"{first_book_name} {action.name} {dataset_str} ({len(registry)})",
-                    entity=registry,
-                    action=action,
-                    dataset=list(datasets)
-                )
-            )
+            if len(registry) > 0:
+                await self._queue_put(registry, datasets, action)
 
         # shutdown workers
         await self.enqueue_shutdown_signals_async()
@@ -223,22 +188,27 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                     self._emb_id += 1
         return result
 
-    def _adaptive_batch_size(self, queue_size: int,) -> int:
-        """
-        Вычисляет адаптивный размер пакета для очереди.
-        - queue_size: текущее количество элементов в очереди
-        - max_batch: максимальный размер пакета
-        """
-        if queue_size < 10:
-            # Если мало элементов, возвращаем число меньше 10
-            return 5
-        
-        # Для больших чисел: округляем до ближайшего "красивого" числа
-        # Красивое число — кратное 10, не больше max_batch
-        batch = min(queue_size, self._max_batch_size)
-        # Округление вниз до ближайшего кратного 10
-        batch = (batch // 10) * 10
-        return max(10, batch)
+    async def _already_done(self): 
+        await self.ui.done_async(self._get_book_idx)
+        await self.ui.decrease_total_async()
+
+    async def _queue_put(
+            self, 
+            registry: BookRegistry,
+            datasets: list[Dataset],
+            action: Action 
+        ):
+        first_book_name = getattr(registry.books[0], "file_name", "unknown")
+        dataset_str = ":".join(ds.name for ds in datasets)
+
+        await self.queue.put(
+            Task(
+                name=f"{first_book_name} {action.name} {dataset_str} ({len(registry)})",
+                entity=registry,
+                action=action,
+                dataset=list(datasets)
+            )
+        )
     
     async def _enrich_from_db(self, book: Book) -> Book:
         def _sync(file_name: str):

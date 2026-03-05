@@ -1,10 +1,15 @@
-from app.infrastructure.db import DBRouter, SQLiteAdapters
+from app.infrastructure.db import DBRouter
 from ...models.chunk import Chunk
 
 class ChunkRepository:
     def __init__(self, router: DBRouter):
         self.router = router
 
+    def get_ids(self) -> set[int]:
+        with self.router.meta() as conn:
+            rows = conn.execute("SELECT DISTINCT book_id FROM chunks").fetchall()
+            return [r[0] for r in rows]
+        
     def _create_many_meta(self, conn, chunks: list[Chunk]):
         conn.executemany(
             """
@@ -63,7 +68,6 @@ class ChunkRepository:
             ).fetchall()
 
             return [Chunk.from_chunks_row(r) for r in rows]
-
 
     def get_text(self, chunk_id: int) -> str | None:
         with self.router.chunks() as conn:
