@@ -11,7 +11,8 @@ from app.settings import ChunkingConfig
 class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     def __init__(
             self, 
-            max_batch_size: int = 50,
+            max_batch_size: int = None,
+            skip_embeddings: bool = False,
             **kwargs
         ):
         super().__init__(**kwargs)
@@ -22,13 +23,16 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         self._emb_id: int = 1
 
         self._model = Model(self.max_workers)
-        self._max_batch_size: int = int(self._model.st_batch_size // (ChunkingConfig.CHUNKS_PER_BOOK + 2))
+        self._skip_embeddings = skip_embeddings
+        self._max_batch_size: int = max_batch_size or int(self._model.st_batch_size // (ChunkingConfig.CHUNKS_PER_BOOK + 2))
         self._searched_books = set()
         self._parsed = 0
 
     async def process(self, task: Task, _thread_id: int) -> TaskResult:
-        result = task.entity
-        #result = await asyncio.to_thread(self._process_book, task.entity)
+        if self._skip_embeddings:
+            result = task.entity
+        else:
+            result = await asyncio.to_thread(self._process_book, task.entity)
         done = len(task.entity)
         return task.to_result(
             done=done,

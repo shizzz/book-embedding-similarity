@@ -67,10 +67,17 @@ class FB2Book:
             return Chunk(text=description, type=ChunkType.DESCRIPTION)
         return None
 
-    def _compute_chunks_targets(self, paragraphs: list[str], desired_chars: int, sections: int) -> tuple[int,list[int]]:
-        chunk_size = max(ChunkingConfig.ST_MIN_CHARS, desired_chars // sections)
-        num_chunks = min(sections, ceil(desired_chars / (chunk_size * 1.1)))
-        num_chunks = min(num_chunks, len(paragraphs))
+    def _compute_chunks_targets(
+            self, paragraphs: list[str], 
+            sections_ratio: float, 
+            total_chars: int, 
+            target_chars: int, 
+            sections: int
+        ) -> tuple[int,list[int]]:
+        desired_chunk_size = target_chars // sections
+        desired_chars = min(int(total_chars * sections_ratio), target_chars)
+        num_chunks = min(sections, ceil(desired_chars / (desired_chunk_size * 1.1)))
+        chunk_size = min(desired_chunk_size, total_chars // num_chunks)
         chunk_targets = [int(i * len(paragraphs) / num_chunks) for i in range(num_chunks)]
         return chunk_size, chunk_targets
 
@@ -84,6 +91,7 @@ class FB2Book:
         ) -> Chunk|None:
         total_paragraphs = len(paragraphs)
         left = right = target_idx
+        right += 1
         current_chunk = []
         current_len = 0
 
@@ -93,6 +101,8 @@ class FB2Book:
             if left >= 0 and left not in used:
                 p = paragraphs[left]
                 space_left = chunk_size - current_len - prefix_buffer
+                if space_left <= 0:
+                    break
                 if len(p) > space_left:
                     cutoff = p.rfind(" ", 0, space_left)
                     if cutoff > 0:
@@ -113,6 +123,8 @@ class FB2Book:
             if right < total_paragraphs and right not in used:
                 p = paragraphs[right]
                 space_left = chunk_size - current_len - prefix_buffer
+                if space_left <= 0:
+                    break
                 if len(p) > space_left:
                     cutoff = p.rfind(" ", 0, space_left)
                     if cutoff > 0:
@@ -160,25 +172,14 @@ class FB2Book:
             chunks.append(desc_chunk)
 
         total_chars = sum(len(p)+2 for p in paragraphs)
-        desired_chars = min(int(total_chars * sections_ratio), target_chars)
 
-        chunk_size, chunk_targets = self._compute_chunks_targets(paragraphs, desired_chars, sections)
+        chunk_size, chunk_targets = self._compute_chunks_targets(paragraphs, sections_ratio, total_chars, target_chars, sections)
         used = set()
 
         for idx in chunk_targets:
             chunk = self._build_chunk_around_target(paragraphs, idx, used, chunk_size, prefix_buffer)
             if chunk:
                 chunks.append(chunk)
-
-        # fallback для оставшихся параграфов
-        combined_len = sum(c.length for c in chunks if c.type==ChunkType.TEXT)
-        i = 0
-        while combined_len < min_chars and i < len(paragraphs):
-            if i not in used:
-                chunks.append(Chunk(text=paragraphs[i],type=ChunkType.TEXT))
-                combined_len += len(paragraphs[i]) + 2
-                used.add(i)
-            i += 1
 
         return chunks, total_chars
 

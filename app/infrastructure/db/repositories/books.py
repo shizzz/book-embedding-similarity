@@ -1,6 +1,5 @@
 from datetime import datetime
-from typing import Any, Generator, Tuple
-import numpy as np
+from typing import Any
 from ..router import DBRouter
 from ...models.book import BookRegistry, Book
 
@@ -28,6 +27,7 @@ GET_FULL_QUERY = """
         b.source_type,
         b.source_link,
         b.source_length,
+        b.text_length,
         b.empty
     FROM books b
     """
@@ -61,7 +61,7 @@ class BookRepository:
             cursor = conn.execute(query, ids)
             for row in cursor:
                 (
-                    id_, book, title, author, serie, generes, year, source_type, source_link, source_length, empty
+                    id_, book, title, author, serie, generes, year, source_type, source_link, source_length, text_length, empty
                 ) = row
                 result[id_] = {
                     "id": id_,
@@ -74,30 +74,15 @@ class BookRepository:
                     "source_type": source_type,
                     "source_link": source_link,
                     "source_length": source_length,
+                    "text_length": text_length,
                     "empty": empty,
                 }
         return result
 
-    def get_all_with_embeddings(self) -> Generator[Tuple[int, str, str, str, str, str, np.ndarray]]:
-        with self.router.meta() as conn:
-            cursor = conn.execute("""
-            SELECT
-                b.id,
-                b.book,
-                b.title,
-                b.author,
-                b.source_type,
-                b.source_link
-            FROM books b
-            ORDER BY b.id ASC
-            """)
-            for row in cursor:
-                yield (tuple[Any, ...](row))
-
-    def get_by_file(self, book: str) -> Any:
+    def get_by_file(self, book: str) -> Book:
         with self.router.meta() as conn:
             row = conn.execute(f"{GET_QUERY} WHERE b.book = ?",(book,)).fetchone()
-            return row if row else None
+            return Book.from_row(row) if row else None
 
     def get_full_by_file(self, book: str) -> Book:
         with self.router.meta() as conn:
@@ -109,7 +94,7 @@ class BookRepository:
             row = conn.execute(f"{GET_QUERY} WHERE b.id = ?",(book_id,)).fetchone()
             return Book.from_row(row) if row else None
     
-    def get_many(self, book_ids: list[int]) -> dict[int, Any]:
+    def get_many(self, book_ids: list[int]) -> dict[int, Book]:
         with self.router.meta() as conn:
             if not book_ids:
                 return {}
@@ -126,40 +111,6 @@ class BookRepository:
         with self.router.meta() as conn:
             rows = conn.execute("SELECT book FROM books").fetchall()
             return [row[0] for row in rows]
-    
-    def embeddings_cursor(self):
-        with self.router.meta() as conn:
-            embeddings_cursor = conn.cursor()
-            embeddings_cursor.execute(GET_QUERY + " GROUP BY b.book")
-            return embeddings_cursor
-
-    def save(
-            self,
-            book: str,
-            uid: str,
-            title: str,
-            author: str,
-            source_type: str,
-            source_link: str
-        ) -> int | None:
-        with self.router.meta() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO books (book, uid, title, author, added_at, source_type, source_link)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    book,
-                    uid,
-                    title,
-                    author,
-                    datetime.now().isoformat(),
-                    source_type,
-                    source_link,
-                )
-            )
-
-            return cursor.lastrowid
         
     def save_bulk(self, books: BookRegistry, conn=None):
         if conn is None:
@@ -177,8 +128,8 @@ class BookRepository:
 
         cursor.executemany(
             """
-            INSERT OR REPLACE INTO books (id, book, uid, title, author, serie, generes, year, added_at, source_type, source_link, source_length, empty)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO books (id, book, uid, title, author, serie, generes, year, added_at, source_type, source_link, source_length, text_length, empty)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -194,6 +145,7 @@ class BookRepository:
                     book.source_type,
                     book.source_link,
                     book.source_length,
+                    book.text_length,
                     book.empty,
                 )
                 for book in books
@@ -209,7 +161,3 @@ class BookRepository:
             else:
                 start_id = row["seq"] + 1
             return start_id
-
-    def count_embeddings(self) -> int:
-        with self.router.meta() as conn:
-            return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]

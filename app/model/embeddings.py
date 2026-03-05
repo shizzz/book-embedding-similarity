@@ -7,9 +7,9 @@ import torch
 def generate_embeddings(model: Model, registry: BookRegistry) -> BookRegistry:
 
     max_chars = model.st_chunk_size
-    min_chars = max(100, int(max_chars * 0.15))
-    overlap = int(max_chars * 0.2)
+    overlap = model.st_overlap
     batch_size = model.st_batch_size
+    min_chars = max(100, int(max_chars * 0.15))
 
     texts, meta = collect_chunks(
         registry,

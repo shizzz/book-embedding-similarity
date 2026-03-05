@@ -21,10 +21,17 @@ def get_args() -> argparse.Namespace:
         help="Генерация эмбеддингов"
     )
     emb_generate_parser.add_argument(
+        "-b", 
         "--batch", 
-        type=str, 
-        help="Количество одновременно обрабатываемых книг",
-        required=True
+        type=int, 
+        help="Количество одновременно обрабатываемых книг. Воркер сам определяет оптимальное количество",
+        required=False
+    )
+    emb_generate_parser.add_argument(
+        "-s",
+        "--skip-embeddings",
+        help="Пропустить генерацию самих ембеддингов, просто загрузить книги в базу",
+        action="store_true"
     )
 
     # -----------------------
