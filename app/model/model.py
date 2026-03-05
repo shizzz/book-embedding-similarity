@@ -204,11 +204,11 @@ class Model:
             # безопасное эмпирическое потребление на один chunk
             mem_per_chunk_mb = self._estimate_mem_per_chunk_mb(self.transformer.max_seq_length)
 
-            batch_size = max(1, int(free_vram_mb * 0.9 / mem_per_chunk_mb))  # margin 10%
+            batch_size = max(1, int(free_vram_mb * 0.8 / mem_per_chunk_mb))  # margin 10%
             
             # если используем многопоточность, делим batch на количество потоков
-            if hasattr(self, "_threads") and self._threads > 1:
-                batch_size = max(1, batch_size // self._threads)
+            # if hasattr(self, "_threads") and self._threads > 1:
+            #     batch_size = max(1, batch_size // self._threads)
         else:
             batch_size = 8
 
