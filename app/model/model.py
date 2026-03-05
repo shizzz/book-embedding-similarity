@@ -1,29 +1,26 @@
 import os
-import asyncio
 import numpy as np
 import hashlib
 import torch
 from sentence_transformers import SentenceTransformer
-from app.infrastructure.models import Book
-from app.searchEngines.bookSearch import BookSearchEngineFactory
-from app.utils import FB2Book
 from app.settings import PathsConfig, ProcessConfig
 
 class Model:
     MODEL_DIR = "models"
-    BATCH_SIZE = 16
-    EPOCHS = 3
+    TOKEN_TO_CHAR = 5 #: ~token count for one char
+    OVERLAP_RATIO = 0.12 #: How much text to connect embeddings
+    VRAM_USAGE_RATIO = 0.85 #: Max memory to fill with chunks
+    DEFAULT_BATCH = 8 #: CPU Batch Size 
+
     transformer: SentenceTransformer
-    uid: str
 
     def __init__(self, threads):
         self.name = ProcessConfig.MODEL_NAME
-        print("Model:", self.name)
         self._threads = threads
         model_dir = PathsConfig.DATA_DIR / Model.MODEL_DIR
         model_path = Model.get_model_dir()
-
         model_dir.mkdir(parents=True, exist_ok=True)
+
         if os.path.exists(model_path):
             self.load_local_model(model_path)
         else:
@@ -31,19 +28,8 @@ class Model:
             transformer.save(str(model_path))
             del transformer
             self.load_local_model(model_path)
-            
-        self.uid = self.get_model_uid()
-        self._auto_st_params()
 
-        print("CUDA available:", torch.cuda.is_available())
-        if torch.cuda.is_available():
-            print("CUDA version:", torch.version.cuda)
-            print("GPU count:", torch.cuda.device_count())
-            print("GPU name:", torch.cuda.get_device_name(0))
-        print("Chunk size:", self.st_chunk_size)
-        print("Chunk overlap:", self.st_overlap)
-        print("Batch size:", self.st_batch_size)
-
+        self._calc_info()
     
     def load_local_model(self, model_path: str):
         self.transformer = SentenceTransformer(
@@ -52,56 +38,48 @@ class Model:
         )
 
     @staticmethod
-    def get_book_text(book: Book) -> str:
-        engine = BookSearchEngineFactory.create(book.source_type)
-        asyncio.run(engine.enrich_book_data(book))
-        fb2Book = FB2Book(book.data)
-        return fb2Book.extract_text()
-
-    @staticmethod
     def get_model_dir():
         model_dir = PathsConfig.DATA_DIR / Model.MODEL_DIR
         return model_dir / ProcessConfig.MODEL_NAME
 
-    def get_model_uid(self) -> str:
+    def get_embedding_transformator():    
+        return np.load(str(PathsConfig.TRANSFORM_FILE))
+
+    def _calc_info(self):
+        self.info = ModelInfo()
+
+        max_seq = self.transformer.max_seq_length
+
+        self.info.uid = self._get_model_uid()
+        self.info.model_name = self.name
+        self.info.estimate_mem_per_chunk_mb = self._estimate_mem_per_chunk_mb(max_seq)
+        self.info.st_chunk_size = max_seq * self.TOKEN_TO_CHAR
+        self.info.st_overlap = int(self.info.st_chunk_size * self.OVERLAP_RATIO)
+        self.info.cuda_available = torch.cuda.is_available()
+
+        batch_size = None
+
+        if self.info.cuda_available:
+            cuda_version = torch.version.cuda
+            gpu_count = torch.cuda.device_count()
+            gpu_name = torch.cuda.get_device_name(0)
+            self.info.cuda_version = cuda_version
+            self.info.gpu_count = gpu_count
+            self.info.gpu_name = gpu_name
+            self.info.measure_mem_per_chunk_mb = self._measure_mem_per_chunk()
+
+            mem_per_chunk = self.info.measure_mem_per_chunk_mb or self.info.estimate_mem_per_chunk_mb
+            batch_size = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / mem_per_chunk))
+
+        self.info.st_batch_size = batch_size or self.DEFAULT_BATCH
+
+    def _get_model_uid(self) -> str:
         """Возвращает хеш модели (будет меняться при дообучении)"""
         state_dict = self.transformer.state_dict()
         
         data = b"".join([v.cpu().numpy().tobytes() for v in state_dict.values()])
         return hashlib.md5(data).hexdigest()
-
-    def get_embedding_transformator():    
-        return np.load(str(PathsConfig.TRANSFORM_FILE))
-
-    def _auto_st_params(self, overlap_ratio=0.12) -> None:
-        # Chunk size и overlap
-        chunk_size = self.transformer.max_seq_length * 5  # 1 токен ~ 5 символов
-        overlap = int(chunk_size * overlap_ratio)
-
-        # Batch size
-        if torch.cuda.is_available():
-            free_vram = (
-                torch.cuda.get_device_properties(0).total_memory
-                - torch.cuda.memory_reserved()
-                - torch.cuda.memory_allocated()
-            )
-            free_vram_mb = free_vram / (1024 ** 2)
-
-            # безопасное эмпирическое потребление на один chunk
-            mem_per_chunk_mb = self._estimate_mem_per_chunk_mb(self.transformer.max_seq_length)
-
-            batch_size = max(1, int(free_vram_mb * 0.8 / mem_per_chunk_mb))  # margin 10%
-            
-            # если используем многопоточность, делим batch на количество потоков
-            # if hasattr(self, "_threads") and self._threads > 1:
-            #     batch_size = max(1, batch_size // self._threads)
-        else:
-            batch_size = 8
-
-        self.st_chunk_size = chunk_size
-        self.st_overlap = overlap
-        self.st_batch_size = batch_size
-
+    
     def _estimate_mem_per_chunk_mb(self, seq_len_tokens: int) -> float:
         """
         Универсальная оценка памяти на chunk на GPU.
@@ -133,3 +111,32 @@ class Model:
         peak = torch.cuda.max_memory_allocated()
 
         return peak / 32 / (1024**2)
+    
+class ModelInfo:
+    model_name: str = None
+    uid: str = None
+    cuda_available: bool = None
+    cuda_version: str = None
+    gpu_count: int = None
+    gpu_name: str = None
+    st_chunk_size: int = None
+    st_overlap: int = None
+    st_batch_size: int = None
+    estimate_mem_per_chunk_mb: int = None
+    measure_mem_per_chunk_mb: int = None
+    _free_vram_cache: int = None
+    _total_vram_mb: int = None
+
+    @property
+    def free_vram_mb(self) -> int:
+        if self.cuda_available:
+            free, total = torch.cuda.mem_get_info()
+            return free // 1024 // 1024
+
+    @property
+    def total_vram_mb(self) -> int:
+        if self._total_vram_mb is None and self.cuda_available:
+            self._total_vram_mb = (
+                torch.cuda.get_device_properties(0).total_memory // 1024 // 1024
+            )
+        return self._total_vram_mb

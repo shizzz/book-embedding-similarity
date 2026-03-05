@@ -100,17 +100,17 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     async def search_books(self) -> AsyncGenerator[Book, None]:
         zipf = await self._manager.open_zip(PathsConfig.INPX_FOLDER)
 
-        if self._manager.is_remote:
-            for info in zipf.infolist():
-                if info.is_dir():
-                    continue
+        # if self._manager.is_remote:
+        #     for info in zipf.infolist():
+        #         if info.is_dir():
+        #             continue
 
-                archive_name = os.path.splitext(info.filename)[0] + ".zip"     
-                if self._should_skip_archive(archive_name):
-                    continue
+        #         archive_name = os.path.splitext(info.filename)[0] + ".zip"     
+        #         if self._should_skip_archive(archive_name):
+        #             continue
 
-                task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
-                self._tasks.append(task)
+        #         task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
+        #         self._tasks.append(task)
 
         for info in zipf.infolist():
             if info.is_dir():

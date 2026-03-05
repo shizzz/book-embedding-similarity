@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
+from rich.progress_bar import ProgressBar
 from rich.progress import (
     Progress,
     BarColumn,
@@ -27,6 +28,7 @@ class LiveUI(BaseUI):
             show_table: bool = True
         ):
         self.live: Live = None
+        self.model_info = None
         self._max_workers = max_workers
         self._show_table = show_table
         
@@ -47,15 +49,22 @@ class LiveUI(BaseUI):
         self.lock = asyncio.Lock()
         self.console = Console()
 
-    def _make_table(self) -> Table:
-        table = Table(title=self._label, expand=True)
-        table.add_column("Metric")
-        table.add_column("Value")
-        table.add_row("Total", str(self.stats["Total"]))
-        table.add_row("Remaining", str(self.stats["Remaining"]))
-        table.add_row("Done", str(self.stats["Done"]))
-        table.add_row("Errors", str(self.stats["Errors"]))
-        return table
+    def _make_table(self) -> Panel:
+        table = Table.grid(padding=(0, 1))
+        table.add_column(style="cyan", no_wrap=True)
+        table.add_column(justify="right")
+
+        table.add_row("Total", str(self.stats.get("Total", 0)))
+        table.add_row("Remaining", str(self.stats.get("Remaining", 0)))
+        table.add_row("Done", str(self.stats.get("Done", 0)))
+        table.add_row("Errors", str(self.stats.get("Errors", 0)))
+
+        return Panel(
+            table,
+            title=self._label,
+            border_style="blue",
+            expand=True
+        )
 
     def _make_info(self) -> Text:
         info = Text()
@@ -109,6 +118,8 @@ class LiveUI(BaseUI):
         grid = Table.grid(expand=True)
         if self._show_table:
             grid.add_row(self._make_table())
+            if self.model_info:
+                grid.add_row(self._make_model_info())
             grid.add_row(self._make_info())
 
         for idx in self._bars:
@@ -239,6 +250,82 @@ class LiveUI(BaseUI):
             del self._tasks[idx]
         self.live.update(self.layout())
 
+    def _make_model_info(self):
+        left = Table.grid(padding=(0, 1))
+        left.add_column(style="cyan")
+        left.add_column()
+
+        left.add_row("Model", self.model_info.model_name or "-")
+        left.add_row("UID", self.model_info.uid or "-")
+
+        overlap_pct = int(self.model_info.st_overlap / self.model_info.st_chunk_size * 100)
+
+        left.add_row("Chunk size", f"{self.model_info.st_chunk_size}")
+        left.add_row("Overlap", f"{self.model_info.st_overlap} ({overlap_pct}%)")
+
+        batch_style = "green"
+        if self.model_info.st_batch_size > 128:
+            batch_style = "yellow"
+        if self.model_info.st_batch_size > 256:
+            batch_style = "red"
+
+        left.add_row(
+            "Batch size",
+            Text(str(self.model_info.st_batch_size), style=batch_style)
+        )
+
+        left.add_row(
+            "Mem/chunk est",
+            self._fmt_mb(self.model_info.estimate_mem_per_chunk_mb)
+        )
+
+        if self.model_info.measure_mem_per_chunk_mb:
+            left.add_row(
+                "Mem/chunk real",
+                self._fmt_mb(self.model_info.measure_mem_per_chunk_mb)
+            )
+
+        # GPU часть
+        right = Table.grid(padding=(0, 1))
+        right.add_column(style="cyan")
+        right.add_column()
+
+        cuda_text = Text("YES", style="green") if self.model_info.cuda_available else Text("NO", style="red")
+        right.add_row("CUDA", cuda_text)
+
+        if self.model_info.cuda_available:
+
+            right.add_row("CUDA ver", self.model_info.cuda_version)
+            right.add_row("GPU", self.model_info.gpu_name)
+            right.add_row("GPU count", str(self.model_info.gpu_count))
+
+            free = self.model_info.free_vram_mb
+            total = self.model_info.total_vram_mb
+
+            if free and total:
+
+                used = total - free
+
+                bar = ProgressBar(
+                    total=total,
+                    completed=used,
+                    width=28
+                )
+
+                right.add_row(
+                    "VRAM",
+                    f"{self._fmt_mb(used)} / {self._fmt_mb(total)}"
+                )
+                right.add_row("", bar)
+
+        grid = Table.grid(expand=True)
+        grid.add_column()
+        grid.add_column()
+
+        grid.add_row(left, right)
+
+        return Panel(grid, title="Embedding Model", border_style="blue")
+
     def tqdm(self, obj=None, desc: str = "", total: int = 0, unit: str = "", show_elapsed: bool = False):
         if hasattr(obj, "__iter__") and obj is not None:
             return TqdmIterable(self, obj, desc, unit, show_elapsed)
@@ -265,3 +352,8 @@ class LiveUI(BaseUI):
             grid.add_row(Panel(block_table, title=block.title, expand=True))
         
         self.console.print(grid)
+
+    def _fmt_mb(self, mb: int) -> str:
+        if mb > 1024:
+            return f"{mb/1024:.1f} GB"
+        return f"{mb} MB"

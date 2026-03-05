@@ -16,15 +16,15 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
             **kwargs
         ):
         super().__init__(**kwargs)
+        self._model = Model(self.max_workers)      
+        self.ui.model_info = self._model.info
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, self.ui)
         self._get_book_idx: int = None
         self._book_id: int = 1
         self._chunk_id: int = 1
         self._emb_id: int = 1
-
-        self._model = Model(self.max_workers)
         self._skip_embeddings = skip_embeddings
-        self._max_batch_size: int = max_batch_size or int(self._model.st_batch_size // (ChunkingConfig.CHUNKS_PER_BOOK + 2))
+        self._max_batch_size: int = max_batch_size or int(self._model.info.st_batch_size // (ChunkingConfig.CHUNKS_PER_BOOK + 2))
         self._searched_books = set()
         self._parsed = 0
 
@@ -45,13 +45,13 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         
         self._model_id = ModelRepository(self._router).get_or_create(
             name=self._model.name,
-            uid=self._model.uid
+            uid=self._model.info.uid
         )
-        Migrator(self._router).migrate_embeddings(self._model.uid)
+        Migrator(self._router).migrate_embeddings(self._model.info.uid)
         
         self._book_id = BookRepository(self._router).get_max_id()
         self._chunk_id = ChunkRepository(self._router).get_max_id()
-        self._emb_id = EmbeddingsRepository(self._router, self._model.uid).get_max_id()
+        self._emb_id = EmbeddingsRepository(self._router, self._model.info.uid).get_max_id()
     
     async def get_total(self) -> int:
         total = await self.engine.get_total()
@@ -61,7 +61,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     async def pull_queue(self) -> None:
         file_to_id = BookRepository(self._router).get_file_to_id()
         chunk_to_book_id = ChunkRepository(self._router).get_ids()
-        emb_to_book_id = EmbeddingsRepository(self._router).get_ids()
+        emb_to_book_id = EmbeddingsRepository(self._router, self._model.info.uid).get_ids()
 
         registries: dict[
             tuple[Action, frozenset[Dataset]],
@@ -157,9 +157,9 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 )
 
             if Dataset.EMBEDDING in task.dataset and len(embeddings) > 0:
-                EmbeddingsRepository(router, self._model.uid).save_bulk(
+                EmbeddingsRepository(router, self._model.info.uid).save_bulk(
                     embeddings,
-                    conn=tx.embeddings(self._model.uid)
+                    conn=tx.embeddings(self._model.info.uid)
                 )
 
             if Dataset.AUTHOR in task.dataset and task.action == Action.INSERT:
@@ -175,7 +175,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
 
     async def fin(self) -> None: 
         self.logger.info("Generate report")
-        report = DatabaseReporter(self._router, self._model.uid).generate(self._model.st_chunk_size, self._searched_books)
+        report = DatabaseReporter(self._router, self._model.info.uid).generate(self._model.info.st_chunk_size, self._searched_books)
         self.ui.report(report)
 
     def _process_book(self, registry: BookRegistry) -> BookRegistry:
@@ -217,7 +217,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
                 return None
 
             db_book.chunks = ChunkRepository(self._router).get_by_book(db_book.id)
-            db_book.embedding = EmbeddingsRepository(self._router, self._model.uid).meta_only(db_book.id)
+            db_book.embedding = EmbeddingsRepository(self._router, self._model.info.uid).meta_only(db_book.id)
 
             return db_book
 
