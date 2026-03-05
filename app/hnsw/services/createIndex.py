@@ -5,15 +5,7 @@ from app.infrastructure.db import DBRouter
 from app.ui import BaseUI
 from app.utils import EmbeddingsBatchIterable
 from app.infrastructure.db.repositories import EmbeddingsRepository, ModelRepository
-from app.settings.config import (
-    HNSW_M,
-    HNSW_EF_CONSTRUCTION,
-    HNSW_EF_SEARCH,
-    MODEL_NAME,
-    BUILD_INDEX_LEVEL,
-    IndexLevel,
-    DATA_DIR
-)
+from app.settings import PathsConfig, ProcessConfig, IndexConfig, IndexLevel
 
 class BookEmbeddingIndexer:
     def __init__(
@@ -31,13 +23,13 @@ class BookEmbeddingIndexer:
         self.embedding_dim: Optional[int] = None
 
     def build_index(self):
-        if BUILD_INDEX_LEVEL in (IndexLevel.DOCUMENT, IndexLevel.BOTH):
+        if IndexConfig.BUILD_INDEX_LEVEL in (IndexLevel.DOCUMENT, IndexLevel.BOTH):
             self._build_index_document()
-        if BUILD_INDEX_LEVEL in (IndexLevel.CHUNK, IndexLevel.BOTH):
+        if IndexConfig.BUILD_INDEX_LEVEL in (IndexLevel.CHUNK, IndexLevel.BOTH):
             self._build_index_chunk()
 
     def _build_index_document(self):
-        model_uid = ModelRepository(self.db_router).get_latest_uid(MODEL_NAME)
+        model_uid = ModelRepository(self.db_router).get_latest_uid(ProcessConfig.MODEL_NAME)
         repo = EmbeddingsRepository(self.db_router, model_uid)
 
         book_sums: Dict[int, np.ndarray] = {}
@@ -67,11 +59,11 @@ class BookEmbeddingIndexer:
 
         base_index = faiss.IndexHNSWFlat(
             self.embedding_dim,
-            HNSW_M,
+            IndexConfig.HNSW_M,
             faiss.METRIC_INNER_PRODUCT
         )
-        base_index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
-        base_index.hnsw.efSearch = HNSW_EF_SEARCH
+        base_index.hnsw.efConstruction = IndexConfig.HNSW_EF_CONSTRUCTION
+        base_index.hnsw.efSearch = IndexConfig.HNSW_EF_SEARCH
         index = faiss.IndexIDMap(base_index)
 
         book_ids = []
@@ -89,7 +81,7 @@ class BookEmbeddingIndexer:
         ids_np = np.array(book_ids, dtype=np.int64)
         index.add_with_ids(vectors_np, ids_np)
 
-        faiss.write_index(index, str(DATA_DIR / f"{MODEL_NAME}.{IndexLevel.DOCUMENT.value}.faiss"))
+        faiss.write_index(index, str(PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{IndexLevel.DOCUMENT.value}.faiss"))
         self._index = index
         if self.logger:
             self.logger.info(f"DOCUMENT индекс построен: {len(book_ids)} книг, dim={self.embedding_dim}")
@@ -97,7 +89,7 @@ class BookEmbeddingIndexer:
         return index
 
     def _build_index_chunk(self):
-        model_uid = ModelRepository(self.db_router).get_latest_uid(MODEL_NAME)
+        model_uid = ModelRepository(self.db_router).get_latest_uid(ProcessConfig.MODEL_NAME)
         repo = EmbeddingsRepository(self.db_router, model_uid)
 
         # --- первый батч для определения embedding_dim ---
@@ -106,11 +98,11 @@ class BookEmbeddingIndexer:
 
         base_index = faiss.IndexHNSWFlat(
             self.embedding_dim,
-            HNSW_M,
+            IndexConfig.HNSW_M,
             faiss.METRIC_INNER_PRODUCT
         )
-        base_index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
-        base_index.hnsw.efSearch = HNSW_EF_SEARCH
+        base_index.hnsw.efConstruction = IndexConfig.HNSW_EF_CONSTRUCTION
+        base_index.hnsw.efSearch = IndexConfig.HNSW_EF_SEARCH
         index = faiss.IndexIDMap(base_index)
 
         # --- добавляем все embeddings ---
@@ -131,7 +123,7 @@ class BookEmbeddingIndexer:
             ids_np = np.array(batch_ids, dtype=np.int64)
             index.add_with_ids(vectors_np, ids_np)
 
-        faiss.write_index(index, str(DATA_DIR / f"{MODEL_NAME}.{IndexLevel.CHUNK.value}.faiss"))
+        faiss.write_index(index, str(PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{IndexLevel.CHUNK.value}.faiss"))
         self._index = index
         if self.logger:
             self.logger.info(f"CHUNK индекс построен и сохранён: {len(batch_ids)} векторов, dim={self.embedding_dim}")

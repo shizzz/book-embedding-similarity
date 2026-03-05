@@ -8,7 +8,7 @@ from app.infrastructure.db.services import PairDataLoader
 from app.infrastructure.models import BookPair
 from app.infrastructure.embeddings import HybridEmbeddingProvider
 from app.infrastructure.books import HybridBookProvider
-from app.settings.config import CHUNKS_PER_BOOK, OVERFETCH_FACTOR
+from app.settings import ChunkingConfig
 
 
 class SimilarSearchEngine:
@@ -29,8 +29,8 @@ class SimilarSearchEngine:
         self._step_percent = step_percent
         self._feature_extractor = RerankerFeatureExtractor()
         # параметры используются при chunk-level агрегации
-        self.avg_chunks_per_book: int = CHUNKS_PER_BOOK
-        self.overfetch_factor: float = OVERFETCH_FACTOR
+        self.avg_chunks_per_book: int = ChunkingConfig.CHUNKS_PER_BOOK
+        self.overfetch_factor: float = ChunkingConfig.OVERFETCH_FACTOR
 
         self._book_provider = HybridBookProvider(router)
         self._emb_provider = HybridEmbeddingProvider(router)

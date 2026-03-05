@@ -6,7 +6,7 @@ from app.infrastructure.db import DBRouter
 from .similarSearchEngine import SimilarSearchEngine
 from .indexSimilarSearchEngine import IndexSimilarSearchEngine
 from .bruteforceSimilarSearchEngine import BruteforceSimilarSearchEngine
-from app.settings.config import IndexLevel, BUILD_INDEX_LEVEL
+from app.settings import IndexLevel, IndexConfig
 
 class SimilarSearchEngineFactory:
     INDEX = "index" 
@@ -29,10 +29,10 @@ class SimilarSearchEngineFactory:
             chunk_index = None
             document_index = None
 
-            if BUILD_INDEX_LEVEL in (IndexLevel.CHUNK, IndexLevel.BOTH):
+            if IndexConfig.BUILD_INDEX_LEVEL in (IndexLevel.CHUNK, IndexLevel.BOTH):
                 chunk_index: IndexIDMap = hnsw.load_from_file(IndexLevel.CHUNK)
 
-            if BUILD_INDEX_LEVEL in (IndexLevel.DOCUMENT, IndexLevel.BOTH):
+            if IndexConfig.BUILD_INDEX_LEVEL in (IndexLevel.DOCUMENT, IndexLevel.BOTH):
                 document_index: IndexIDMap = hnsw.load_from_file(IndexLevel.DOCUMENT)
 
             return IndexSimilarSearchEngine(
@@ -41,7 +41,7 @@ class SimilarSearchEngineFactory:
                 document_index=document_index,
                 chunk_index=chunk_index,
                 limit=limit,
-                level=BUILD_INDEX_LEVEL,
+                level=IndexConfig.BUILD_INDEX_LEVEL,
                 exclude_same_authors=exclude_same_authors,
                 step_percent=step_percent,
                 logger=logger

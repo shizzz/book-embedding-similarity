@@ -10,11 +10,11 @@ from app.infrastructure.models import Feedbacks
 from app.utils import Html
 from app.services import TaskState, Similarity
 from ..dependencies import executor, router as dbrouter
-from app.settings.config import SITE_BASE_PATH
+from app.settings import PathsConfig
 
 router = APIRouter()
 similarity = Similarity(dbrouter)
-path_for_static = f"{SITE_BASE_PATH}/static" if SITE_BASE_PATH else "/static"
+path_for_static = f"{PathsConfig.SITE_BASE_PATH}/static" if PathsConfig.SITE_BASE_PATH else "/static"
 
 @router.get("/", response_class=HTMLResponse)
 async def similar_page(

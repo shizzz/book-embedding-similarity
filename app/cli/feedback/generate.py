@@ -3,7 +3,7 @@ import openai
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
 from app.infrastructure.models import Book
-from app.settings.config import DEEPSEEK_API_KEY, OPENAI_API_KEY, LM_STUDIO_BASE_URL
+from app.settings import OtherConfig
 
 router = DBRouter()
 
@@ -88,7 +88,7 @@ def generate_feedback_prompt(source_book: Book, candidate_book: Book) -> str:
 
 def call_chatgpt(prompt: str) -> int | None:
     client = openai.OpenAI(
-        api_key=OPENAI_API_KEY,
+        api_key=OtherConfig.OPENAI_API_KEY,
         base_url="https://api.chatanywhere.tech/v1"
     )
     
@@ -112,7 +112,7 @@ def call_chatgpt(prompt: str) -> int | None:
 def call_deepseek(prompt: str) -> int | None:
     """Вызвать DeepSeek API и получить оценку"""
     try:
-        api_key = DEEPSEEK_API_KEY
+        api_key = OtherConfig.DEEPSEEK_API_KEY
         # Используем DeepSeek API endpoint
         client = openai.OpenAI(
             api_key=api_key,
@@ -141,7 +141,7 @@ def call_lm_studio(prompt: str) -> int | None:
         # Используем LM Studio API endpoint
         client = openai.OpenAI(
             api_key="lm-studio",  # LM Studio использует любой ключ
-            base_url=LM_STUDIO_BASE_URL,  # По умолчанию локальный запуск
+            base_url=OtherConfig.LM_STUDIO_BASE_URL,  # По умолчанию локальный запуск
         )
         
         response = client.chat.completions.create(

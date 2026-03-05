@@ -2,7 +2,7 @@ import os
 import faiss
 from typing import List
 from app.infrastructure.models import BookRegistry, Book
-from app.settings.config import DATA_DIR, HNSW_EF_SEARCH, MODEL_NAME, HNSW_MMAP, IndexLevel
+from app.settings import PathsConfig, ProcessConfig, IndexConfig, IndexLevel
 from .trainers.rerankerTrainer import RerankerTrainer
 try:
     from tqdm import tqdm
@@ -35,11 +35,11 @@ class IndexManager:
         pass
 
     def load_from_file(self, indexLevel: IndexLevel) -> faiss.IndexIDMap:
-        index_file = str(DATA_DIR / f"{MODEL_NAME}.{indexLevel.value}.faiss")
+        index_file = str(PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{indexLevel.value}.faiss")
         if not os.path.exists(index_file):
             raise FileNotFoundError(f"Файл '{index_file}' не существует")
 
-        if HNSW_MMAP:
+        if IndexConfig.HNSW_MMAP:
             index = faiss.read_index(index_file, faiss.IO_FLAG_MMAP)
         else:
             index = faiss.read_index(index_file)
@@ -56,13 +56,19 @@ class IndexManager:
 
         # Обновляем efSearch
         try:
-            if isinstance(index.index, faiss.IndexHNSWFlat):
-                index.index.hnsw.efSearch = HNSW_EF_SEARCH
-            elif isinstance(index, faiss.IndexHNSWFlat):
-                index.hnsw.efSearch = HNSW_EF_SEARCH
+            # Получаем реальный индекс внутри IndexIDMap
+            core_index = getattr(index, "index", index)
+
+            # Проверяем, что это HNSWFlat и есть hnsw атрибут
+            if isinstance(core_index, faiss.IndexHNSWFlat) and hasattr(core_index, "hnsw"):
+                core_index.hnsw.efSearch = IndexConfig.HNSW_EF_SEARCH
+                if self.logger:
+                    self.logger.info(f"efSearch установлен в {IndexConfig.HNSW_EF_SEARCH}")
             else:
                 if self.logger:
-                    self.logger.warning("Не удалось обновить efSearch — неизвестный тип индекса")
+                    self.logger.warning(
+                        f"Не удалось обновить efSearch — индекс не является HNSWFlat или не имеет hnsw"
+                    )
         except Exception as e:
             if self.logger:
                 self.logger.warning(f"Ошибка при установке efSearch: {e}")

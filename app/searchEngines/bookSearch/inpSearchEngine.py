@@ -6,8 +6,7 @@ from typing import AsyncGenerator, Any
 from app.infrastructure.models import Book
 from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
-from app.searchEngines.sources import BookSourceManager
-from app.settings.config import INPX_FOLDER
+from app.settings import PathsConfig
 
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
@@ -99,7 +98,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # Поиск книг (async)
     # -----------------------------
     async def search_books(self) -> AsyncGenerator[Book, None]:
-        zipf = await self._manager.open_zip(INPX_FOLDER)
+        zipf = await self._manager.open_zip(PathsConfig.INPX_FOLDER)
 
         if self._manager.is_remote:
             for info in zipf.infolist():
@@ -152,7 +151,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     # Подсчет общего количества книг
     # -----------------------------
     async def get_total(self) -> int:
-        zipf = await self._manager.open_zip(INPX_FOLDER)
+        zipf = await self._manager.open_zip(PathsConfig.INPX_FOLDER)
 
         total = 0
 

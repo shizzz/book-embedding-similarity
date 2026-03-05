@@ -2,7 +2,7 @@ import lightgbm as lgb
 import numpy as np
 import joblib
 from .rerankerTrainer import RerankerTrainer
-from app.settings.config import RERANKER_FILE
+from app.settings import PathsConfig
 
 class LightGBMRerankerTrainer(RerankerTrainer):
     def train(self, X, y, groups):
@@ -31,4 +31,4 @@ class LightGBMRerankerTrainer(RerankerTrainer):
         }
 
         model = lgb.train(params, dataset, num_boost_round=300)
-        joblib.dump(model, RERANKER_FILE)
+        joblib.dump(model, PathsConfig.RERANKER_FILE)

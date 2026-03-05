@@ -1,4 +1,3 @@
-import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
 from .embedding import Embedding

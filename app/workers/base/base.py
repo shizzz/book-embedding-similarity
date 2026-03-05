@@ -5,12 +5,12 @@ from abc import ABC, abstractmethod
 from app.ui import LiveUI
 from app.workers.sources import ConsoleHandler
 from app.infrastructure.db import Migrator, DBRouter
-from app.settings.config import MAX_WORKERS
+from app.settings import ProcessConfig
 
 class BaseWorker(ABC):
     def __init__(
         self,
-        max_workers: int = MAX_WORKERS,
+        max_workers: int = ProcessConfig.MAX_WORKERS,
         title: str = None
     ):
         self.max_workers: int = max_workers

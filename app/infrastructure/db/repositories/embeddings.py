@@ -2,14 +2,14 @@ import numpy as np
 from ...models.embedding import Embedding
 from ..router import DBRouter
 from .model import ModelRepository
-from app.settings.config import MODEL_NAME
+from app.settings import ProcessConfig
 
 GET_QUERY: str = "SELECT id, book_id, data, shape, type FROM embeddings"
 
 class EmbeddingsRepository:
     def __init__(self, router: DBRouter, model_uid: str = None):
         self.router = router
-        self.model_uid = model_uid or ModelRepository(router).get_latest_uid(MODEL_NAME)
+        self.model_uid = model_uid or ModelRepository(router).get_latest_uid(ProcessConfig.MODEL_NAME)
 
     def get(self, book_id: int) -> list[Embedding]:
         with self.router.embeddings(self.model_uid) as conn:

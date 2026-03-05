@@ -1,5 +1,4 @@
 import asyncio
-from app.settings.config import MAX_WORKERS
 from app.workers import GenerateSimilarWorker
 
 def run(args):
@@ -8,7 +7,6 @@ def run(args):
     queue_size = 0
 
     worker = GenerateSimilarWorker(
-        max_workers = MAX_WORKERS,
         title="Generate similar", 
         batch_size=batch_size,
         queue_size=queue_size,

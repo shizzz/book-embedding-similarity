@@ -1,11 +1,11 @@
 from pathlib import Path
 from .router import DBRouter
-from app.settings.config import BASE_DIR
+from app.settings import PathsConfig
 
 class Migrator:
     def __init__(self, router: DBRouter):
         self.router = router
-        self.base_path = BASE_DIR / "infrastructure" / "db" / "migrations"
+        self.base_path = PathsConfig.BASE_DIR / "infrastructure" / "db" / "migrations"
 
     # ---------- public ----------
     def migrate_all(self, model_uids: list[str]):

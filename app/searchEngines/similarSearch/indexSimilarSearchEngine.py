@@ -3,8 +3,7 @@ from collections import defaultdict
 from faiss import IndexIDMap
 from typing import List, Dict
 from .similarSearchEngine import SimilarSearchEngine
-from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.settings.config import IndexLevel
+from app.settings import IndexLevel
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
     def __init__(

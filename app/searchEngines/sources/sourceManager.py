@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 from app.searchEngines.sources.connection import ConnectionFactory
-from app.settings.config import CACHE_DIR
+from app.settings import PathsConfig
 
 class BookSourceManager:
     """
@@ -28,7 +28,7 @@ class BookSourceManager:
     ):
         self.folder = folder
         self._ui = ui
-        self._cache_dir = CACHE_DIR
+        self._cache_dir = PathsConfig.CACHE_DIR
         os.makedirs(self._cache_dir, exist_ok=True)
         self._archive_locks: dict[str, asyncio.Lock] = {}
 

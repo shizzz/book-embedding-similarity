@@ -8,10 +8,10 @@ from app.model import Model
 from app.infrastructure.models import Book, Feedbacks, BookRegistry
 from app.hnsw.trainers import LightGBMRerankerTrainer
 from app.infrastructure.db.repositories import FeedbackRepository, EmbeddingsRepository, BookRepository
-from app.settings.config import LIB_URL, MODEL_NAME
+from app.settings import PathsConfig, ProcessConfig
 
 def sync_feedbacks(conn):
-    url = f"{LIB_URL}/similar/feedback/"
+    url = f"{PathsConfig.LIB_URL}/similar/feedback/"
 
     try:
         resp = requests.get(url, timeout=60)
@@ -54,7 +54,7 @@ def learn_hnsw(embeddings, feedbacks, books):
     print(f"Поисковая модель обновлена")
 
 def learn_model():
-    print(f"Обучение модели {MODEL_NAME}")
+    print(f"Обучение модели {ProcessConfig.MODEL_NAME}")
     Model().learn_by_feedback()
 
 def train_trasformator(model):

@@ -6,7 +6,7 @@ from app.infrastructure.db.repositories import BookRepository, EmbeddingsReposit
 from app.infrastructure.models import Book, BookRegistry, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from .sources.databaseReporter import DatabaseReporter
-from app.settings.config import CHUNKS_PER_BOOK
+from app.settings import ChunkingConfig
 
 class GenerateEmbeddingsWorker(BaseDbQueueWorker):
     def __init__(
@@ -22,7 +22,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         self._emb_id: int = 1
 
         self._model = Model(self.max_workers)
-        self._max_batch_size: int = int(self._model.st_batch_size // (CHUNKS_PER_BOOK + 2))
+        self._max_batch_size: int = int(self._model.st_batch_size // (ChunkingConfig.CHUNKS_PER_BOOK + 2))
         self._searched_books = set()
         self._parsed = 0
 

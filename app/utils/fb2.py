@@ -3,14 +3,7 @@ import re
 from math import ceil
 from typing import List, Optional
 from app.infrastructure.models import Book, Chunk, ChunkType
-from app.settings.config import (
-    ST_MIN_CHARS, 
-    ST_TARGET_CHARS, 
-    ST_MAX_DESCRIPTION_CHARS, 
-    CHUNKS_PER_BOOK,
-    PREFIX_BUFFER,
-    SECTIONS_RATIO
-)
+from app.settings import ChunkingConfig
 
 class FB2Book:
     NS = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
@@ -75,7 +68,7 @@ class FB2Book:
         return None
 
     def _compute_chunks_targets(self, paragraphs: list[str], desired_chars: int, sections: int) -> tuple[int,list[int]]:
-        chunk_size = max(ST_MIN_CHARS, desired_chars // sections)
+        chunk_size = max(ChunkingConfig.ST_MIN_CHARS, desired_chars // sections)
         num_chunks = min(sections, ceil(desired_chars / (chunk_size * 1.1)))
         num_chunks = min(num_chunks, len(paragraphs))
         chunk_targets = [int(i * len(paragraphs) / num_chunks) for i in range(num_chunks)]
@@ -140,18 +133,18 @@ class FB2Book:
                 break
 
         chunk_text = "\n\n".join(current_chunk).strip()
-        if len(chunk_text) >= ST_MIN_CHARS:
+        if len(chunk_text) >= ChunkingConfig.ST_MIN_CHARS:
             return Chunk(text=chunk_text, type=ChunkType.TEXT)
         return None
 
     def extract_chunks(
         self,
-        target_chars: int = ST_TARGET_CHARS,
-        min_chars: int = ST_MIN_CHARS,
-        max_description_chars: int = ST_MAX_DESCRIPTION_CHARS,
-        sections: int = CHUNKS_PER_BOOK,
-        prefix_buffer: int = PREFIX_BUFFER,
-        sections_ratio: float = SECTIONS_RATIO,
+        target_chars: int = ChunkingConfig.ST_TARGET_CHARS,
+        min_chars: int = ChunkingConfig.ST_MIN_CHARS,
+        max_description_chars: int = ChunkingConfig.ST_MAX_DESCRIPTION_CHARS,
+        sections: int = ChunkingConfig.CHUNKS_PER_BOOK,
+        prefix_buffer: int = ChunkingConfig.PREFIX_BUFFER,
+        sections_ratio: float = ChunkingConfig.SECTIONS_RATIO,
     ) -> tuple[list[Chunk], int]:
         paragraphs = self._extract_paragraphs()
         if not paragraphs:

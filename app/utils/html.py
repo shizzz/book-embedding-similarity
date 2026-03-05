@@ -3,18 +3,17 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from typing import Literal
 
-from app.settings.config import BASE_DIR
+from app.settings import PathsConfig
 from app.infrastructure.models import Book, Feedbacks
 from .toSimilarBooks import to_similar_list
 
 class Html:
-    templates = Jinja2Templates(directory=f"{BASE_DIR}/api/templates")
+    templates = Jinja2Templates(directory=f"{PathsConfig.BASE_DIR}/api/templates")
     SearchType = Literal["title", "author"]
 
     @staticmethod
     def make_lib_url(value: str, kind: SearchType) -> str:
-        from app.settings.config import LIB_URL
-        return f"{LIB_URL}/#/{kind}?{kind}={value}"
+        return f"{PathsConfig.LIB_URL}/#/{kind}?{kind}={value}"
 
     @staticmethod
     def render_similar_table(

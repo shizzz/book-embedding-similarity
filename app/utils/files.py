@@ -1,6 +1,6 @@
 import zipfile
 import os
-from app.settings.config import BOOK_FOLDER
+from app.settings import PathsConfig
 
 def get_file_bytes_from_zip(source_link: str) -> bytes:
     if not source_link:
@@ -17,7 +17,7 @@ def get_file_bytes_from_zip(source_link: str) -> bytes:
     if not fb2_inside:
         raise ValueError(f"fb2_inside is empty in source_link: {source_link}")
 
-    book_folder = BOOK_FOLDER
+    book_folder = PathsConfig.BOOK_FOLDER
     if not book_folder.endswith(os.sep):
         book_folder += os.sep
 

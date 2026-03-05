@@ -5,12 +5,12 @@ from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository
-from app.settings.config import LIB_URL
+from app.settings import PathsConfig
 from app.utils import to_similar_list
 
 def make_lib_url(file_name: str) -> str:
     ex_file = file_name.removesuffix(".fb2")
-    return f"{LIB_URL}/#/extended?page=1&limit=20&ex_file={ex_file}"
+    return f"{PathsConfig.LIB_URL}/#/extended?page=1&limit=20&ex_file={ex_file}"
 
 logging.basicConfig(level=logging.DEBUG,format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

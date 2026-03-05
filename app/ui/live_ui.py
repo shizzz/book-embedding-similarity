@@ -17,19 +17,17 @@ from rich.progress import (
 from time import perf_counter
 from .ui import BaseUI
 from .tqdmLike import TqdmLike, TqdmIterable
-
 from app.infrastructure.models import Report
-from app.settings.config import MAX_WORKERS
 
 class LiveUI(BaseUI):
     def __init__(
             self,
-            max_workers: int = MAX_WORKERS, 
+            max_workers: int, 
             title: str = "Library scanner",
             show_table: bool = True
         ):
-        self.max_workers = max_workers
         self.live: Live = None
+        self._max_workers = max_workers
         self._show_table = show_table
         
         self._label = title
@@ -61,7 +59,7 @@ class LiveUI(BaseUI):
 
     def _make_info(self) -> Text:
         info = Text()
-        for i in range(1, self.max_workers + 1):
+        for i in range(1, self._max_workers + 1):
             key = f"Thread {i}"
             info.append(f"{key}: {self.stats[key]}\n")
         return info

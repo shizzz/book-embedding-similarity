@@ -4,11 +4,11 @@ from app.services import BulkSimilarSearchService
 from app.infrastructure.models import Task, Task, TaskResult, Action
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
-from app.settings.config import SIMILARS_PER_BOOK
+from app.settings import ProcessConfig
 
 class GenerateSimilarWorker(BaseDbQueueWorker):
     _service: BulkSimilarSearchService
-    _limit: int = SIMILARS_PER_BOOK
+    _limit: int = ProcessConfig.SIMILARS_PER_BOOK
 
     def __init__(self, batch_size: int = 50, **kwargs):
         super().__init__(**kwargs)
@@ -38,7 +38,7 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
         self._engine = SimilarSearchEngineFactory.create(
             mode=SimilarSearchEngineFactory.INDEX,
             router=self._router,
-            limit=SIMILARS_PER_BOOK, 
+            limit=ProcessConfig.SIMILARS_PER_BOOK, 
             exclude_same_authors=True, 
             step_percent=1,
             logger=self.logger

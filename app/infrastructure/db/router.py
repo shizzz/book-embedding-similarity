@@ -2,11 +2,11 @@ from pathlib import Path
 from .pool import SQLitePool
 from .pooled_connection import PooledConnection
 from .transaction import DBTransaction
-from app.settings.config import DATA_DIR
+from app.settings import PathsConfig
 
 class DBRouter:
     def __init__(self):
-        self.base_dir = DATA_DIR
+        self.base_dir = PathsConfig.DATA_DIR
         self.base_dir.mkdir(exist_ok=True)
         self._pools = {}
 
