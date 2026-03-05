@@ -178,8 +178,25 @@ class FB2Book:
 
         for idx in chunk_targets:
             chunk = self._build_chunk_around_target(paragraphs, idx, used, chunk_size, prefix_buffer)
-            if chunk:
+            if chunk and len(chunk.text) >= min_chars:
                 chunks.append(chunk)
+
+        # Fallback
+        text_chunk_total = sum(1 for ch in chunks if ch.type == ChunkType.TEXT)
+
+        if text_chunk_total == 0 and paragraphs:
+            all_text = "\n\n".join(paragraphs)
+
+            if len(all_text) >= min_chars:  
+                if len(all_text) > target_chars:
+                    all_text = all_text[:target_chars]
+
+                chunks.append(
+                    Chunk(
+                        text=all_text,
+                        type=ChunkType.TEXT
+                    )
+                )
 
         return chunks, total_chars
 

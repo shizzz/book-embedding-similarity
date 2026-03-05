@@ -16,7 +16,7 @@ class BaseDbQueueWorker(BaseQueueWorker[TEntity], ABC):
 
         self._db_queue = DbQueue(
             self.save_to_db,
-            db_queue_batch_size,
+            db_queue_batch_size or 10,
             db_queue_max_size,
             self.ui,
             self._router,
