@@ -1,20 +1,27 @@
 from dataclasses import dataclass, field
 from typing import Optional
+from enum import IntEnum
 import zlib
+
+class Type(IntEnum):
+    TITLE = 0
+    DESCRIPTION = 1
+    TEXT = 2
 
 @dataclass
 class Chunk:
-    book_id: int
     text: str
+    book_id: int = None
     chunk_id: Optional[int] = None
     length: int = field(init=False)
+    type: int = None
 
     def __post_init__(self):
         self.length = len(self.text)
 
     # --------- Mapper для meta.db ---------
     def to_tuple_meta(self) -> tuple:
-        return (self.chunk_id, self.book_id)
+        return (self.chunk_id, self.book_id, self.type)
 
     @staticmethod
     def from_meta_row(row) -> "Chunk":
@@ -32,12 +39,13 @@ class Chunk:
 
     # --------- Mapper для chunks.db ---------
     def to_tuple_chunks(self) -> tuple:
-        return (self.chunk_id, self.book_id, Chunk.adapt_compressed_text(self.text), self.length)
+        return (self.chunk_id, self.book_id, Chunk.adapt_compressed_text(self.text), self.length, self.type)
 
     @staticmethod
     def from_chunks_row(row) -> "Chunk":
         return Chunk(
             book_id=row["book_id"],
             text=row["data"],
-            chunk_id=row["id"]
+            chunk_id=row["id"],
+            type=row["type"]
         )

@@ -5,7 +5,7 @@ from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar
 from .embedding import Embedding
 from .embeddingCache import EmbeddingCache
-from .chunk import Chunk
+from .chunk import Chunk, Type
 from .report import Report
 
 __all__ = [
@@ -23,5 +23,6 @@ __all__ = [
     "Embedding",
     "EmbeddingCache",
     "Chunk",
-    "Report"
+    "Report",
+    "Type"
 ]

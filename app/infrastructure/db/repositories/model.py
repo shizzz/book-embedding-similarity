@@ -21,10 +21,12 @@ class ModelRepository:
             if row is not None:
                 return row[0]
             
+            cursor.execute("UPDATE models SET active = 0")
+            
             cursor.execute(
                 """
-                INSERT INTO models (uid, name)
-                VALUES (?, ?)
+                INSERT INTO models (uid, name, active)
+                VALUES (?, ?, 1)
                 """,
                 (uid, name)
             )
@@ -41,8 +43,7 @@ class ModelRepository:
                 """
                 SELECT uid
                 FROM models
-                WHERE name = ?
-                ORDER BY date DESC, id DESC
+                WHERE name = ? AND active = 1
                 LIMIT 1
                 """,
                 (name,)

@@ -1,29 +1,34 @@
 import asyncio
 from app.workers.base import BaseDbQueueWorker
-from app.hnsw.services import BookEmbeddingIndexer
 from app.model import Model, generate_embeddings
 from app.infrastructure.db import DBRouter, Migrator
 from app.infrastructure.db.repositories import BookRepository, EmbeddingsRepository, AuthorRepository, ModelRepository, ChunkRepository
 from app.infrastructure.models import Book, BookRegistry, Task, TaskResult, Action, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from .sources.databaseReporter import DatabaseReporter
+from app.settings.config import CHUNKS_PER_BOOK
 
 class GenerateEmbeddingsWorker(BaseDbQueueWorker):
-    def __init__(self, max_batch_size: int = 50, **kwargs):
+    def __init__(
+            self, 
+            max_batch_size: int = 50,
+            **kwargs
+        ):
         super().__init__(**kwargs)
         self.engine = BookSearchEngineFactory.create(BookSearchEngineFactory.INPIX, self.ui)
         self._get_book_idx: int = None
         self._book_id: int = 1
         self._chunk_id: int = 1
         self._emb_id: int = 1
-        self.max_batch_size: int = max_batch_size
 
         self._model = Model(self.max_workers)
+        self._max_batch_size: int = int(self._model.st_batch_size // (CHUNKS_PER_BOOK + 2))
         self._searched_books = set()
         self._parsed = 0
 
     async def process(self, task: Task, _thread_id: int) -> TaskResult:
-        result = await asyncio.to_thread(self._process_book, task.entity)
+        result = task.entity
+        #result = await asyncio.to_thread(self._process_book, task.entity)
         done = len(task.entity)
         return task.to_result(
             done=done,
@@ -117,11 +122,11 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
             await self.ui.done_async(self._get_book_idx)
 
             # Проверяем batch size именно этого registry
-            batch_size = self._adaptive_batch_size(
-                self.queue.qsize() + len(registry)
-            )
+            # batch_size = self._adaptive_batch_size(
+            #     self.queue.qsize() + len(registry)
+            # )
 
-            if len(registry) >= batch_size:
+            if len(registry) >= self._max_batch_size:
                 first_book_name = getattr(registry.books[0], "file_name", "unknown")
                 dataset_str = ":".join(ds.name for ds in key[1])
 
@@ -162,12 +167,11 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         chunks = []
         embeddings = []
         for book in task.entity:
-            if len(book.embedding) == 0:
-                book.empty = True
-                task.dataset.append(Dataset.BOOK)
             if not book.empty:
-                chunks.extend(book.chunks)
-                embeddings.extend(book.embedding)
+                if len(book.chunks or []) > 0:
+                    chunks.extend(book.chunks)
+                if len(book.embedding or []) > 0:
+                    embeddings.extend(book.embedding)
 
         with router.transaction() as tx:
             if Dataset.BOOK in task.dataset:
@@ -227,7 +231,7 @@ class GenerateEmbeddingsWorker(BaseDbQueueWorker):
         
         # Для больших чисел: округляем до ближайшего "красивого" числа
         # Красивое число — кратное 10, не больше max_batch
-        batch = min(queue_size, self.max_batch_size)
+        batch = min(queue_size, self._max_batch_size)
         # Округление вниз до ближайшего кратного 10
         batch = (batch // 10) * 10
         return max(10, batch)

@@ -28,6 +28,7 @@ class Book:
     model_id: int = None
     chunks: List[Chunk] = None
     source_length: int = None
+    text_length: int = None
     empty: bool = None
 
     T = TypeVar("T")
@@ -50,6 +51,7 @@ class Book:
             chunks: List[Chunk] = None,
             shape: int = None,
             source_length: int = None,
+            text_length: int = None,
             empty: bool = None
         ):
         self.id = id
@@ -67,6 +69,7 @@ class Book:
         self.chunks = chunks
         self.shape = shape
         self.source_length = source_length
+        self.text_length = text_length
         self.empty = empty
 
         self.authors = frozenset(self._parse_array(author)) if authors is None and author else frozenset(authors or [])

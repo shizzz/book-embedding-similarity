@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS books (
     source_type TEXT NULL,
     source_link TEXT NULL,
     source_length INTEGER NULL,
+    text_length INTEGER NULL,
     empty INTEGER NOT NULL DEFAULT 0
 );
 
@@ -18,7 +19,8 @@ CREATE TABLE IF NOT EXISTS models (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uid CHAR(32) NOT NULL,
     name TEXT NOT NULL,
-    date DATETIME DEFAULT (datetime('now'))
+    date DATETIME DEFAULT (datetime('now')),
+    active INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS authors (
@@ -58,6 +60,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    type INTEGER NOT NULL,
 
     FOREIGN KEY (book_id)
         REFERENCES books(id)
@@ -66,6 +69,8 @@ CREATE TABLE IF NOT EXISTS chunks (
 
 CREATE INDEX IF NOT EXISTS idx_chunks_book_id
 ON chunks(book_id);
+CREATE INDEX IF NOT EXISTS idx_chunks_type
+ON chunks(type);
 
 CREATE INDEX IF NOT EXISTS idx_books_book ON books(book);
 CREATE INDEX IF NOT EXISTS idx_similar_book_id ON similar(book_id);

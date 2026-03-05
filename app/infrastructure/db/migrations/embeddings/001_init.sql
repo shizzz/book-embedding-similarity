@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS embeddings (
     chunk_id INTEGER NOT NULL,
     seq INTEGER NULL,
     data NUMPY NOT NULL,
-    shape INTEGER NOT NULL
+    shape INTEGER NOT NULL,
+    type INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_embeddings_book_id
@@ -12,3 +13,6 @@ ON embeddings(book_id);
 
 CREATE INDEX IF NOT EXISTS idx_embeddings_chunk_id
 ON embeddings(chunk_id);
+
+CREATE INDEX IF NOT EXISTS idx_embeddings_type
+ON embeddings(type);

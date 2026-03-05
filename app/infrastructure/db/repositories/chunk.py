@@ -5,45 +5,15 @@ class ChunkRepository:
     def __init__(self, router: DBRouter):
         self.router = router
 
-    def create(self, book_id: int, text: str) -> int:
-        with self.router.meta() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO chunks(book_id)
-                VALUES(?)
-                """,
-                (book_id,)
-            )
-
-            chunk_id = cursor.lastrowid
-
-        with self.router.chunks() as conn:
-            conn.execute(
-                """
-                INSERT INTO chunks(
-                    id,
-                    data,
-                    length
-                )
-                VALUES(?,?,?)
-                """,
-                (
-                    chunk_id,
-                    text,
-                    len(text)
-                )
-            )
-
-        return chunk_id
-
     def _create_many_meta(self, conn, chunks: list[Chunk]):
         conn.executemany(
             """
             INSERT INTO chunks(
                 id,
-                book_id
+                book_id,
+                type
             )
-            VALUES(?,?)
+            VALUES(?,?,?)
             """,
             [e.to_tuple_meta() for e in chunks]
         )
@@ -55,9 +25,10 @@ class ChunkRepository:
                     id,
                     book_id,
                     data,
-                    length
+                    length,
+                    type
                 )
-                VALUES(?,?,?,?)
+                VALUES(?,?,?,?,?)
                 """,
                 [e.to_tuple_chunks() for e in chunks]
             )
@@ -68,9 +39,6 @@ class ChunkRepository:
         conn_meta=None,
         conn_chunks=None
     ) -> None:
-        """
-        chunks: [(chunk_id, text), ...]
-        """
         if conn_meta is None:
             with self.router.meta() as conn:
                 self._create_many_meta(conn, chunks)
@@ -87,7 +55,7 @@ class ChunkRepository:
         with self.router.chunks() as conn:
             rows = conn.execute(
                 """
-                SELECT id, book_id, data, length
+                SELECT id, book_id, data, length, type
                 FROM chunks
                 WHERE book_id = ?
                 """,
@@ -112,8 +80,8 @@ class ChunkRepository:
 
     def meta_only(self) -> tuple[int, int]:
         with self.router.chunks() as conn:
-            rows = conn.execute("SELECT id, book_id FROM chunks").fetchall()
-            return [(row["id"], row["book_id"]) for row in rows]
+            rows = conn.execute("SELECT id, book_id, type FROM chunks").fetchall()
+            return [(row["id"], row["book_id"], row["type"]) for row in rows]
 
     def get_max_id(self) -> int:
         with self.router.chunks() as conn:
