@@ -15,10 +15,15 @@ class BaseBookSearchEngine(ABC):
 
     @abstractmethod
     async def search_books(self) -> AsyncGenerator[Book, None]:
-        pass
+        if False:
+            yield  # чтобы типизатор понял что это async generator
 
     @abstractmethod
     async def enrich_book_data(self, book: Book) -> Book:
+        pass
+
+    @abstractmethod
+    async def get_book_data(self, book: Book) -> bytes:
         pass
 
     @abstractmethod

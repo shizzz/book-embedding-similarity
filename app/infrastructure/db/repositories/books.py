@@ -50,6 +50,19 @@ class BookRepository:
             for row in cursor:
                 yield tuple(row)
 
+    async def load_books_after(self, last_id: int, limit: int) -> dict[str, int]:
+        with self.router.meta() as conn:
+            query = """
+                SELECT id, title, path
+                FROM books
+                WHERE id > %s
+                ORDER BY id
+                LIMIT %s
+            """
+
+            rows = conn.execute("SELECT id, book FROM books").fetchall()
+            return {row[1]: row[0] for row in rows}
+
     def get_by_ids(self, ids: list[int]) -> dict[int, dict]:
         if not ids:
             return {}

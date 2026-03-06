@@ -9,7 +9,7 @@ class Model:
     MODEL_DIR = "models"
     TOKEN_TO_CHAR = 5 #: ~token count for one char
     OVERLAP_RATIO = 0.12 #: How much text to connect embeddings
-    VRAM_USAGE_RATIO = 0.85 #: Max memory to fill with chunks
+    VRAM_USAGE_RATIO = 1 #: Max memory to fill with chunks
     DEFAULT_BATCH = 8 #: CPU Batch Size 
 
     transformer: SentenceTransformer

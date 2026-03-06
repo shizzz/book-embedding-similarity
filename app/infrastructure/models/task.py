@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Generic, List
-from enum import Enum, auto
+from enum import Enum, IntEnum, auto
 from app.common.types import TEntity
+from .book import Book
 
-class Action(Enum):
+class Action(IntEnum):
     INSERT = auto()
     DELETE = auto()
     UPDATE = auto()
@@ -14,11 +15,16 @@ class Dataset(Enum):
     AUTHOR = auto()
     CHUNK = auto()
 
+class BookAction(IntEnum):
+    CHUNK_FROM_BOOK = auto()
+    CHUNK_FROM_DB = auto()
+
 @dataclass
 class Task(Generic[TEntity]):
+    id: int
     name: str
     entity: TEntity
-    action: Action
+    action: IntEnum = None
     dataset: List[Dataset] = None
 
     def to_result(
@@ -28,6 +34,7 @@ class Task(Generic[TEntity]):
             entity: TEntity = None
     ) -> "TaskResult[TEntity]":
         return TaskResult(
+            id=self.id,
             name=self.name,
             action=self.action,
             dataset=self.dataset,
@@ -36,6 +43,9 @@ class Task(Generic[TEntity]):
             db_queue_count=db_queue_count
         )
 
+    def clone(self):
+        return Task(self.entity, self.id)
+
 @dataclass
 class TaskResult(Task):
     done: int = 0
@@ -43,8 +53,15 @@ class TaskResult(Task):
 
     def to_task(self) -> "Task[TEntity]":
         return Task(
+            id=self.id,
             name=self.name,
             action=self.action,
             dataset=self.dataset,
             entity=self.entity
         )
+    
+@dataclass
+class BookTask:
+    book: Book
+    data: bytes
+    action: BookAction

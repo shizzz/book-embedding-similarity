@@ -185,3 +185,8 @@ class InpBookSearchEngine(BaseBookSearchEngine):
         book.source_length = len(data)
         fb2 = FB2Book(data)
         fb2.enrich_book(book)
+    
+
+    async def get_book_data(self, book: Book) -> bytes:
+        archive_name, file_name = book.source_link.split("/", 1)
+        return await self._manager.get_book_data(archive_name, file_name)

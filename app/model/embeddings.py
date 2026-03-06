@@ -140,7 +140,8 @@ def assign_embeddings(embeddings, meta):
             chunk_id=chunk.chunk_id,
             data=emb_vector,
             shape=emb_vector.shape[0],
-            seq=seq
+            seq=seq,
+            type=chunk.type,
         )
 
         book.embedding.append(emb)

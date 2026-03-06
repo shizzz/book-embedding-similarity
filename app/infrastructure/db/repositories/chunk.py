@@ -1,3 +1,4 @@
+from typing import List
 from app.infrastructure.db import DBRouter
 from ...models.chunk import Chunk
 
@@ -56,7 +57,7 @@ class ChunkRepository:
         else:
             self._create_many_chunks(conn_chunks, chunks)
 
-    def get_by_book(self, book_id: int) -> None:
+    def get_by_book(self, book_id: int) -> List[Chunk]:
         with self.router.chunks() as conn:
             rows = conn.execute(
                 """

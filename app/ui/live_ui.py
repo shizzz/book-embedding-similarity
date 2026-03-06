@@ -18,16 +18,19 @@ from rich.progress import (
 from time import perf_counter
 from .ui import BaseUI
 from .tqdmLike import TqdmLike, TqdmIterable
+from app.workers.stats import Stats
 from app.infrastructure.models import Report
 
 class LiveUI(BaseUI):
     def __init__(
             self,
-            max_workers: int, 
+            max_workers: int,
+            stats: dict[str, Stats],
             title: str = "Library scanner",
             show_table: bool = True
         ):
         self.live: Live = None
+        self.stats: Stats = stats
         self.model_info = None
         self._max_workers = max_workers
         self._show_table = show_table
@@ -49,22 +52,36 @@ class LiveUI(BaseUI):
         self.lock = asyncio.Lock()
         self.console = Console()
 
-    def _make_table(self) -> Panel:
-        table = Table.grid(padding=(0, 1))
-        table.add_column(style="cyan", no_wrap=True)
-        table.add_column(justify="right")
+    def _make_table(self) -> Table:
+        table = Table(title="Pipeline", expand=True)
 
-        table.add_row("Total", str(self.stats.get("Total", 0)))
-        table.add_row("Remaining", str(self.stats.get("Remaining", 0)))
-        table.add_row("Done", str(self.stats.get("Done", 0)))
-        table.add_row("Errors", str(self.stats.get("Errors", 0)))
+        table.add_column("Stage", justify="left")
+        table.add_column("Progress", justify="right")
+        table.add_column("Queued", justify="right")
+        table.add_column("Errors", justify="right")
 
-        return Panel(
-            table,
-            title=self._label,
-            border_style="blue",
-            expand=True
-        )
+        for name, stat in self.stats.items():
+            s = stat.snapshot()
+
+            processed = s["processed"]
+            queued = s["queued"]
+            errors = s["errors"]
+            total = s.get("total")
+
+            if total:
+                pct = (processed / total) * 100 if total else 0
+                progress = f"{processed}/{total} ({pct:.1f}%)"
+            else:
+                progress = str(processed)
+
+            table.add_row(
+                name,
+                progress,
+                str(queued),
+                str(errors),
+            )
+
+        return table
 
     def _make_info(self) -> Text:
         info = Text()
@@ -120,18 +137,13 @@ class LiveUI(BaseUI):
             grid.add_row(self._make_table())
             if self.model_info:
                 grid.add_row(self._make_model_info())
-            grid.add_row(self._make_info())
+            #grid.add_row(self._make_info())
 
         for idx in self._bars:
             grid.add_row(self._bars[idx])
         return grid
     
     def init(self):
-        self.stats["Total"] = 0
-        self.stats["Remaining"] = 0
-        self.stats["Done"] = 0
-        self.stats["Errors"] = 0
-
         self.live = Live(self.layout(), refresh_per_second=1, console=self.console)
         self.live.start()
 

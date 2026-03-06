@@ -1,22 +1,30 @@
-from lxml import etree
 import re
+from lxml import etree
 from math import ceil
 from typing import List, Optional
 from app.infrastructure.models import Book, Chunk, ChunkType
 from app.settings import ChunkingConfig
+from .book_parser import BookParser
 
-class FB2Book:
-    NS = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
+class FB2BookParser(BookParser):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ns = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
 
-    def __init__(self, fb2_bytes: bytes):
+    def parse(self, data: bytes) -> Book:
+        book = Book(file_name=self.filepath)
+
         parser = etree.XMLParser(
             recover=True,
             huge_tree=True,
             no_network=True
         )
-        self.root = etree.fromstring(fb2_bytes, parser)
+        root = etree.fromstring(data, parser)
 
-    def enrich_book(self, book: Book):
+        self.enrich_book(book, root)
+        return book
+
+    def enrich_book(self, book: Book, root: any):
         enrichers = (
             ("uid", self.get_id),
             ("title", self.get_title),
@@ -26,11 +34,11 @@ class FB2Book:
 
         for attr, getter in enrichers:
             if not getattr(book, attr):
-                setattr(book, attr, getter())
+                setattr(book, attr, getter(root))
 
         # --------- создаем chunks ---------
         if not getattr(book, "chunks", None):
-            raw_chunks, text_length = self.extract_chunks()
+            raw_chunks, text_length = self.extract_chunks(root)
             book.text_length = text_length
             for chunk in raw_chunks:
                 chunk.book_id = book.id
@@ -40,10 +48,10 @@ class FB2Book:
     # =====================
     # TEXT
     # =====================
-    def _extract_paragraphs(self) -> list[str]:
-        nodes = self.root.xpath(
+    def _extract_paragraphs(self, root) -> list[str]:
+        nodes = root.xpath(
             ".//fb2:body//fb2:p | .//fb2:body//fb2:poem//fb2:v",
-            namespaces=self.NS
+            namespaces=self._ns
         )
         paragraphs = []
         for node in nodes:
@@ -151,6 +159,7 @@ class FB2Book:
 
     def extract_chunks(
         self,
+        root: any,
         target_chars: int = ChunkingConfig.ST_TARGET_CHARS,
         min_chars: int = ChunkingConfig.ST_MIN_CHARS,
         max_description_chars: int = ChunkingConfig.ST_MAX_DESCRIPTION_CHARS,
@@ -158,7 +167,7 @@ class FB2Book:
         prefix_buffer: int = ChunkingConfig.PREFIX_BUFFER,
         sections_ratio: float = ChunkingConfig.SECTIONS_RATIO,
     ) -> tuple[list[Chunk], int]:
-        paragraphs = self._extract_paragraphs()
+        paragraphs = self._extract_paragraphs(root)
         if not paragraphs:
             return [], 0
 
@@ -203,26 +212,26 @@ class FB2Book:
     # =====================
     # METADATA
     # =====================
-    def get_title(self) -> Optional[str]:
-        title = self.root.xpath(
+    def get_title(self, root) -> Optional[str]:
+        title = root.xpath(
             "string(.//fb2:book-title)",
-            namespaces=self.NS
+            namespaces=self._ns
         )
         return title.strip() or None
 
-    def get_authors(self) -> List[str]:
+    def get_authors(self, root) -> List[str]:
         authors = []
 
-        author_nodes = self.root.xpath(
+        author_nodes = root.xpath(
             ".//fb2:title-info/fb2:author",
-            namespaces=self.NS
+            namespaces=self._ns
         )
 
         for a in author_nodes:
             parts = [
-                a.findtext("fb2:first-name", namespaces=self.NS),
-                a.findtext("fb2:middle-name", namespaces=self.NS),
-                a.findtext("fb2:last-name", namespaces=self.NS),
+                a.findtext("fb2:first-name", namespaces=self._ns),
+                a.findtext("fb2:middle-name", namespaces=self._ns),
+                a.findtext("fb2:last-name", namespaces=self._ns),
             ]
             name = " ".join(p for p in parts if p)
             if name:
@@ -230,13 +239,13 @@ class FB2Book:
 
         return authors
 
-    def get_description(self) -> Optional[str]:
+    def get_description(self, root) -> Optional[str]:
         """
         Возвращает описание/аннотацию книги (если есть)
         """
-        desc_nodes = self.root.xpath(
+        desc_nodes = root.xpath(
             ".//fb2:title-info/fb2:annotation",
-            namespaces=self.NS
+            namespaces=self._ns
         )
         if not desc_nodes:
             return None
@@ -244,13 +253,13 @@ class FB2Book:
         # берём текст внутри <annotation>, объединяя параграфы
         paragraphs = []
         for node in desc_nodes:
-            ps = node.xpath(".//fb2:p/text()", namespaces=self.NS)
+            ps = node.xpath(".//fb2:p/text()", namespaces=self._ns)
             paragraphs.extend([p.strip() for p in ps if p.strip()])
         return "\n".join(paragraphs) if paragraphs else None
     
-    def get_id(self) -> Optional[str]:
-        book_id = self.root.xpath(
+    def get_id(self, root) -> Optional[str]:
+        book_id = root.xpath(
             "string(.//fb2:document-info/fb2:id)",
-            namespaces=self.NS
+            namespaces=self._ns
         )
         return book_id.strip() or None
