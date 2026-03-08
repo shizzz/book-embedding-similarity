@@ -28,7 +28,7 @@ class Task(Generic[TEntity]):
     action: Optional[IntEnum] = None
     dataset: List["Dataset"] = field(default_factory=list)
 
-    done: int = 0
+    done: int = 1
     db_queue_count: int = 0
 
     def clone(self, *, entity: Optional[TEntity] = None) -> "Task[TEntity]":
@@ -43,7 +43,7 @@ class Task(Generic[TEntity]):
         )
     
 class BatchTask(Task[list[TEntity]]):
-    pass   
+    pass
 
 @dataclass
 class BookTask:

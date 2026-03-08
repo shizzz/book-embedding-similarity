@@ -88,7 +88,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                 buffer.append(task)
 
                 if len(buffer) >= self.batch_size:
-                    await self._process_batch(buffer)
+                    await self._process_batch(buffer, wid)
                     buffer.clear()
             except Exception as e:
                 await self.stats.error(self.name)
@@ -98,15 +98,16 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
         # flush оставшиеся batch-и при shutdown
         if buffer:
-            await self._process_batch(buffer)
+            await self._process_batch(buffer, wid)
 
-    async def _process_batch(self, batch: List[Task]):
-        results = await self.process(batch)
+    async def _process_batch(self, batch: List[Task], wid: int):
+        results = await self.process(batch, wid)
 
         if not results:
             return
 
-        await self.stats.done(self.name, len(batch))
+        total_done = sum(r.done for r in results)
+        await self.stats.done(self.name, total_done)
         for r in results:
             await self.post_process(r)
             await self.dispatch(r)
@@ -122,7 +123,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         """Для stages без input queue"""
         yield  # async generator
 
-    async def process(self, batch: List[Task]) -> List[Task]:
+    async def process(self, batch: List[Task], wid: int) -> List[Task]:
         return batch
 
     async def post_process(self, result: Task):

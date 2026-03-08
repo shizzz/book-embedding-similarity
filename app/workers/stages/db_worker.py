@@ -23,7 +23,7 @@ class DbWorker(BaseQueueWorker):
         self._save = save_func
         self._router = router
 
-    async def process(self, batch: List[Task]) -> List[Task]:
+    async def process(self, batch: List[Task], wid: int) -> List[Task]:
         total_done = await asyncio.to_thread(self._save_batch, batch)
         return batch
 

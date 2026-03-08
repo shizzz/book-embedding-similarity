@@ -52,8 +52,8 @@ class GenerateEmbeddingsWorker:
         
         self.pool: List[BaseQueueWorker] = []
         channel_book = Channel(Stages.BOOK_SEARCH, asyncio.Queue(maxsize=50))
-        channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(200))
-        channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=50))
+        channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(800))
+        channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
 
         self.book_stage = BookProducer(
             router=self.router,
@@ -71,7 +71,7 @@ class GenerateEmbeddingsWorker:
             input_channel=channel_book,
             output_channels=[channel_chunks, channel_db],
             stats=self.stats,
-            batch_size=16,
+            batch_size=64,
             producer_done = self.book_stage.done,
             workers=CHUNK_THREADS,
         )
@@ -83,7 +83,7 @@ class GenerateEmbeddingsWorker:
             input_channel=channel_chunks,
             output_channels=[channel_db],
             stats=self.stats,
-            batch_size=32,
+            batch_size=128,
             producer_done = self.chunk_stage.done,
             workers=EMB_THREADS,
         )
@@ -94,7 +94,7 @@ class GenerateEmbeddingsWorker:
             save_func=self._save,
             input_channel=channel_db,
             stats=self.stats,
-            batch_size=128,
+            batch_size=256,
             producer_done = self.book_stage.done,
             workers=DB_THREADS,
         )

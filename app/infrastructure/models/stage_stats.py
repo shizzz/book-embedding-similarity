@@ -35,9 +35,27 @@ class StageStats:
     def eta(self) -> str:
         if self.total is None or not self.start_time:
             return "-"
+        
         remaining = self.total - self.processed
         elapsed = time.time() - self.start_time
+        
         if self.processed == 0 or elapsed == 0:
             return "-"
+        
         rate = self.processed / elapsed
-        return f"{remaining / rate:.1f}s"
+        remaining_seconds = int(remaining / rate)
+        
+        days, rem = divmod(remaining_seconds, 86400)  # 24*3600
+        hours, rem = divmod(rem, 3600)
+        minutes, seconds = divmod(rem, 60)
+        
+        parts = []
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0 or days > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0 or hours > 0 or days > 0:
+            parts.append(f"{minutes}m")
+        parts.append(f"{seconds}s")
+        
+        return " ".join(parts)

@@ -30,7 +30,7 @@ class Chunker(BaseQueueWorker[BookTask]):
         self._batch: List[Task[List[Chunk]]] = []
         self._chunk_to_book_id = self._repo.get_ids()
 
-    async def process(self, batch: List[Task[BookTask]]) -> List[Task]:
+    async def process(self, batch: List[Task[BookTask]], wid: int) -> List[Task]:
         result: List[Task] = []
 
         for task in batch:

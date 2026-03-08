@@ -152,7 +152,7 @@ class LiveUI(BaseUI):
         try:
             if self._show_table:
                 grid.add_row(self._make_stats_table())
-                #grid.add_row(self._make_edges_table())
+                grid.add_row(self._make_edges_table())
                 if self.model_info:
                     grid.add_row(self._make_model_info())
                 #grid.add_row(self._make_info())
