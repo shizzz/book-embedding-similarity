@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from app.common.types import TEntity
-from app.infrastructure.models import Task, TaskResult
+from app.infrastructure.models import Task
 from .queue_worker import BaseQueueWorker
 from app.workers.sources import DbQueue
 
@@ -33,5 +33,5 @@ class BaseDbQueueWorker(BaseQueueWorker[TEntity], ABC):
     async def before_fin(self) -> None:
         await self._db_queue.stop()
     
-    async def post_process(self, result: TaskResult) -> None:
+    async def post_process(self, result: Task) -> None:
         await self._db_queue.put(result.db_queue_count, result.to_task())

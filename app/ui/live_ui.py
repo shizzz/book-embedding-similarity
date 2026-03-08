@@ -25,12 +25,12 @@ class LiveUI(BaseUI):
     def __init__(
             self,
             max_workers: int,
-            stats: dict[str, Stats],
+            stats: Stats,
             title: str = "Library scanner",
             show_table: bool = True
         ):
         self.live: Live = None
-        self.stats: Stats = stats
+        self.pipeline_stats: Stats = stats
         self.model_info = None
         self._max_workers = max_workers
         self._show_table = show_table
@@ -52,22 +52,25 @@ class LiveUI(BaseUI):
         self.lock = asyncio.Lock()
         self.console = Console()
 
+    async def update(self):
+        async with self.lock:
+            self.live.update(self.layout())
+
     def _make_table(self) -> Table:
-        table = Table(title="Pipeline", expand=True)
+        table = Table(title="Pipeline Status", expand=True)
 
         table.add_column("Stage", justify="left")
         table.add_column("Progress", justify="right")
         table.add_column("Queued", justify="right")
         table.add_column("Errors", justify="right")
 
-        for name, stat in self.stats.items():
-            s = stat.snapshot()
+        for stage_name, stage in self.pipeline_stats.stages.items():
+            processed = stage.processed
+            queued = stage.queue
+            errors = stage.errors
+            total = stage.total
 
-            processed = s["processed"]
-            queued = s["queued"]
-            errors = s["errors"]
-            total = s.get("total")
-
+            # прогресс только если total известен
             if total:
                 pct = (processed / total) * 100 if total else 0
                 progress = f"{processed}/{total} ({pct:.1f}%)"
@@ -75,7 +78,7 @@ class LiveUI(BaseUI):
                 progress = str(processed)
 
             table.add_row(
-                name,
+                stage_name,
                 progress,
                 str(queued),
                 str(errors),

@@ -1,8 +1,5 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import List, TYPE_CHECKING
-if TYPE_CHECKING:
-    from prepared_text import PreparedText
+from typing import List
 
 # ----------------------------
 # Абстрактная стратегия
@@ -11,6 +8,7 @@ class ChunkStrategy(ABC):
     prefix: str = ""
 
     def prepare(self, text: str):
+        from .prepared_text import PreparedText
         """Возвращает объект PreparedText, готовый к разбиению"""
         return PreparedText(self, self.prefix + text)
 

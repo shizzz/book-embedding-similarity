@@ -4,7 +4,7 @@ import gc
 from abc import ABC, abstractmethod
 from typing import Generic
 from app.common.types import TEntity
-from app.infrastructure.models import Task, TaskResult
+from app.infrastructure.models import Task
 from .base import BaseWorker
 
 class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
@@ -16,7 +16,7 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
         self._progress_idx = self.ui.add_progress("Book analys process", "books")
 
     @abstractmethod
-    async def process(self, task: Task, thread_id: int) -> TaskResult:
+    async def process(self, task: Task, thread_id: int) -> Task:
         raise NotImplementedError("process_book must be implemented by subclass")
 
     @abstractmethod
@@ -27,7 +27,7 @@ class BaseQueueWorker(BaseWorker, ABC, Generic[TEntity]):
     async def pull_queue(self) -> None:
         pass
     
-    async def post_process(self, result: TaskResult) -> None:
+    async def post_process(self, result: Task) -> None:
         pass
 
     async def thread_start(self, thread_id: int) -> None:

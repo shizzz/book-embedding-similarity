@@ -1,7 +1,7 @@
 from asyncio import to_thread
 from app.workers.base import BaseDbQueueWorker
 from app.services import BulkSimilarSearchService
-from app.infrastructure.models import Task, Task, TaskResult, Action
+from app.infrastructure.models import Task, Task, Action
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.settings import ProcessConfig
@@ -21,7 +21,7 @@ class GenerateSimilarWorker(BaseDbQueueWorker):
         self._services[thread_id] = BulkSimilarSearchService(self._engine, logger=self.logger)
         pass
 
-    async def process(self, task: Task, thread_id: int) -> TaskResult:
+    async def process(self, task: Task, thread_id: int) -> Task:
         service = self._services[thread_id]
         result = await to_thread(service.run, task.entity)
         

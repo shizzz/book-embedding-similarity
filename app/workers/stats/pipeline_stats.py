@@ -1,5 +1,5 @@
 from app.infrastructure.models import StageStats
-from stats import Stats
+from .stats import Stats
 
 class PipelineStats(Stats):
     def __init__(self):

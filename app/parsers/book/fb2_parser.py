@@ -28,13 +28,14 @@ class FB2BookParser(BookParser):
         enrichers = (
             ("uid", self.get_id),
             ("title", self.get_title),
-            ("authors", self.get_authors),
-            ("author", lambda: ", ".join(book.authors))
+            ("authors", self.get_authors)
         )
 
         for attr, getter in enrichers:
             if not getattr(book, attr):
                 setattr(book, attr, getter(root))
+
+        book.author = ", ".join(book.authors)
 
         # --------- создаем chunks ---------
         if not getattr(book, "chunks", None):
@@ -61,8 +62,8 @@ class FB2BookParser(BookParser):
                 paragraphs.append(text)
         return paragraphs
 
-    def _get_description_chunk(self, max_description_chars: int) -> Chunk|None:
-        description = self.get_description()
+    def _get_description_chunk(self, root, max_description_chars: int) -> Chunk|None:
+        description = self.get_description(root)
         if not description:
             return None
         description = re.sub(r"\s+", " ", description).strip()
@@ -173,10 +174,10 @@ class FB2BookParser(BookParser):
 
         chunks: list[Chunk] = []
 
-        title_chunk = self.get_title()
+        title_chunk = self.get_title(root)
         if title_chunk:
             chunks.append(Chunk(text=title_chunk, type=ChunkType.TITLE))
-        desc_chunk = self._get_description_chunk(max_description_chars)
+        desc_chunk = self._get_description_chunk(root, max_description_chars)
         if desc_chunk:
             chunks.append(desc_chunk)
 

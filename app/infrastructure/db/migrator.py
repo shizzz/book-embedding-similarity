@@ -9,11 +9,11 @@ class Migrator:
 
     # ---------- public ----------
     def migrate_all(self, model_uids: list[str]):
-        self._migrate_meta()
-        self._migrate_chunks()
+        self.migrate_meta()
+        self.migrate_chunks()
 
         for uid in model_uids:
-            self._migrate_embeddings(uid)
+            self.migrate_embeddings(uid)
 
     def migrate_meta(self):
         self._apply_dir(

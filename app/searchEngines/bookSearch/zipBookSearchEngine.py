@@ -1,7 +1,6 @@
 import asyncio
 from typing import AsyncGenerator, Any
 from app.infrastructure.models import Book
-from app.utils import FB2Book
 from .bookSearchEngine import BaseBookSearchEngine
 
 
@@ -43,13 +42,3 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
             total += await self._manager.archive_book_total(archive)
 
         return total
-
-    # -----------------------------
-    # Получение данных книги
-    # -----------------------------
-    async def enrich_book_data(self, book: Book):
-        archive_name, file_name = book.source_link.split("/", 1)
-        data = await self._manager.get_book_data(archive_name, file_name)
-        book.source_length = len(data)
-        fb2 = FB2Book(data)
-        fb2.enrich_book(book)

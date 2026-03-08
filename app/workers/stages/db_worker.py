@@ -1,7 +1,8 @@
 import asyncio
+from app.infrastructure.models import Stages
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
-from app.infrastructure.models import Task, TaskResult
+from app.infrastructure.models import Task
 from typing import List
 
 class DbWorker(BaseQueueWorker):
@@ -12,20 +13,18 @@ class DbWorker(BaseQueueWorker):
             self,
             router: DBRouter,
             save_func,
+            name: str = Stages.DB,
             *args, 
             **kwargs
         ):
-        super().__init__(*args, **kwargs)
+        super().__init__(name=name ,*args, **kwargs)
         self._save_func = save_func
         self._router = router
 
-    async def process(self, batch: List[Task]) -> List[TaskResult]:
-        # сохраняем batch в БД в отдельном thread
+    async def process(self, batch: List[Task]) -> List[Task]:
         total_done = await asyncio.to_thread(self._save_batch, batch)
-        # возвращаем TaskResult для post_process / fan-out
-        return [TaskResult(task=t.to_result(total_done), done=1) for t in batch]
+        return batch
 
     def _save_batch(self, batch: List[Task]) -> int:
-        entities = [e.entity for e in batch]
-        self._save_func(self._router, entities)
-        return len(entities)
+        self._save_func(self._router, batch)
+        return len(batch)

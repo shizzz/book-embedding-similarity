@@ -7,7 +7,7 @@ from app.parsers.chunk import ChunkStrategyFactory
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.infrastructure.models import Task, TaskResult, Chunk, Embedding
+from app.infrastructure.models import Task, Chunk, Embedding, Action, Stages
 from typing import List
 
 class EmbeddingWorker(BaseQueueWorker):
@@ -18,10 +18,11 @@ class EmbeddingWorker(BaseQueueWorker):
             self,
             model: Model,
             router: DBRouter,
+            name: str = Stages.EMBEDDING,
             *args, 
             **kwargs
         ):
-        super().__init__(*args, **kwargs)
+        super().__init__(name=name, *args, **kwargs)
 
         self._model = model 
         self._max_chars = model.info.st_chunk_size
@@ -30,21 +31,23 @@ class EmbeddingWorker(BaseQueueWorker):
         self._min_chars = max(100, int(self._max_chars * 0.15))
         
         self._repo = EmbeddingsRepository(router, model.info.uid)
-        self._emb_id = self._repo.get_max_id()
+        self._emb_id = self._repo.get_max_id()       
+        self._emb_id_lock = asyncio.Lock()
         self._emb_to_chunk_id = self._repo.get_ids()
 
-    async def process(self, batch: List[Task[Chunk]]) -> List[TaskResult[Embedding]]:
+    async def process(self, batch: List[Task[Chunk]]) -> List[Task[Embedding]]:
         chunks = [task.entity for task in batch if task.entity not in self._emb_to_chunk_id]
         if len(chunks) > 0:
-            return await asyncio.to_thread(self._embedding_process, chunks)
+            texts, meta = self._collect_chunks(chunks)
+            embeddings = await asyncio.to_thread(self._embedding_process, texts)
+
+            return await self._assign_embeddings(embeddings, meta)
         else:
             return []
     
-    def _embedding_process(self, batch: List[Chunk]) -> List[TaskResult[Embedding]]:  
-        texts, meta = self._collect_chunks(batch)
-
+    def _embedding_process(self, batch: List[str]) -> np.ndarray:
         embeddings = self._model.transformer.encode(
-            texts,
+            batch,
             batch_size=self._transformer_batch_size,
             convert_to_numpy=True,
             normalize_embeddings=True,
@@ -54,9 +57,7 @@ class EmbeddingWorker(BaseQueueWorker):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        embeddings = embeddings.astype(np.float32, copy=False)
-
-        return self._assign_embeddings(embeddings, meta)
+        return embeddings.astype(np.float32, copy=False)
 
     def _collect_chunks(self, chunks: List[Chunk]) -> tuple[List[str], List[tuple[Chunk, int]]]:
         texts = []
@@ -80,8 +81,8 @@ class EmbeddingWorker(BaseQueueWorker):
 
         return texts, meta
 
-    def _assign_embeddings(self, embeddings: np.ndarray, meta: List[tuple[Chunk, int]]) -> List[TaskResult[Embedding]]:
-        tasks: List[TaskResult] = []
+    async def _assign_embeddings(self, embeddings: np.ndarray, meta: List[tuple[Chunk, int]]) -> List[Task[Embedding]]:
+        tasks: List[Task] = []
 
         chunk_seq_counter = defaultdict(int)
         for emb_vector, (chunk, _) in zip(embeddings, meta):
@@ -89,7 +90,7 @@ class EmbeddingWorker(BaseQueueWorker):
             chunk_seq_counter[(chunk.book_id, chunk.chunk_id)] += 1
 
             emb = Embedding(
-                id=self._reserve_id(),
+                id=await self._reserve_id(),
                 book_id=chunk.book_id,
                 chunk_id=chunk.chunk_id,
                 data=emb_vector,
@@ -98,16 +99,18 @@ class EmbeddingWorker(BaseQueueWorker):
                 type=chunk.type,
             )
 
-            task = TaskResult(
+            task = Task(
                 emb.id,
                 ",".join(map(str, (emb.book_id, emb.chunk_id, emb.seq))),
-                entity=emb
+                entity=emb,
+                action=Action.EMBEDDING
             )
 
-            tasks.append(tasks)
+            tasks.append(task)
         return tasks
     
-    def _reserve_id(self) -> int:
-        id = self._emb_id
-        self._emb_id += 1
-        return id
+    async def _reserve_id(self) -> int:
+        async with self._emb_id_lock:
+            id = self._emb_id
+            self._emb_id += 1
+            return id

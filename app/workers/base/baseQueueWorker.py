@@ -1,9 +1,10 @@
 import asyncio
+import logging
 from abc import ABC
 from typing import Optional, Generic, List
 from app.workers.stats import Stats, NullStats
 from app.common.types import TEntity
-from app.infrastructure.models import Task, TaskResult
+from app.infrastructure.models import Task, Channel
 
 class BaseQueueWorker(ABC, Generic[TEntity]):
     """
@@ -11,32 +12,45 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
     """
     def __init__(
         self,
-        input_queue: Optional[asyncio.Queue] = None,
-        output_queues: Optional[List[asyncio.Queue]] = None,
+        input_channel: Optional[Channel] = None,
+        output_channels: Optional[List[Channel]] = None,
         stats: Stats = NullStats(),
         batch_size: int = 1,
         name: str = "Stage",
-        edge: str = "Done"
+        producer_done = asyncio.Event(),
+        workers: int = 1
     ):
         self.stats = stats
         self.name = name
-        self.edge = edge
-        self.input_queue = input_queue or asyncio.Queue(batch_size)
-        self.output_queues = output_queues or []
+        self.done = asyncio.Event()
+        self.output_channels = output_channels or []
         self.batch_size = batch_size
 
+        self._has_input = input_channel is not None
+        self._workers_count = workers
         self._workers: List[asyncio.Task] = []
-        self._producer_done = asyncio.Event()
+        self._producer_done = producer_done
         self._flush_lock = asyncio.Lock()
 
-    async def start(self, max_workers: int):
-        await self.stats.register_stage(self.name, self.workers)
+        self.input_queue = input_channel.queue if input_channel else asyncio.Queue()
+        self.get_logger(self.name)
+
+    async def start(self):
+        await self.stats.register_stage(self.name, self._workers_count)
+
+        edges = {ch.edge_name for ch in self.output_channels}
+        if not edges:
+            await self.stats.register_edge(self.name, "Done")
+        else:
+            for e in edges:
+                await self.stats.register_edge(self.name, e)
+
         # старт producer если нет input
         if not self.has_input():
             asyncio.create_task(self._produce())
 
         # старт worker'ов
-        for i in range(max_workers):
+        for i in range(self._workers_count):
             self._workers.append(asyncio.create_task(self._worker(i)))
 
     async def wait(self):
@@ -48,10 +62,11 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         for w in self._workers:
             w.cancel()
         await asyncio.gather(*self._workers, return_exceptions=True)
+        self.done.set()
 
     def has_input(self) -> bool:
         """Есть ли input queue"""
-        return False
+        return self._has_input
 
     async def _produce(self):
         """Для stages без input"""
@@ -65,6 +80,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         while True:
             try:
                 task = await self.input_queue.get()
+                await self.stats.queue_size(self.name, self.input_queue.qsize())
             except asyncio.CancelledError:
                 break
 
@@ -74,6 +90,9 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                 if len(buffer) >= self.batch_size:
                     await self._process_batch(buffer)
                     buffer.clear()
+            except Exception as e:
+                await self.stats.task_error(self.name)
+                self.logger.exception(e)
             finally:
                 self.input_queue.task_done()
 
@@ -103,14 +122,36 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         """Для stages без input queue"""
         yield  # async generator
 
-    async def process(self, batch: List[Task]) -> List[TaskResult]:
-        return [b.to_result() for b in batch]
+    async def process(self, batch: List[Task]) -> List[Task]:
+        return batch
 
-    async def post_process(self, result: TaskResult):
+    async def post_process(self, result: Task):
         """Опционально сохраняем в БД"""
         pass
 
-    async def dispatch(self, result: TaskResult):
-        await self.stats.register_edge(self.name, self.edge)
-        for q in self.output_queues:
-            await q.put(result.clone())
+    def route(self, item, channels: list[Channel]) -> list[Channel]:
+        return channels
+
+    async def dispatch(self, result: Task):
+        targets = self.route(result, self.output_channels)
+        for channel in targets:
+            await self.stats.queue_size(channel.downstream, channel.queue.qsize())
+            await channel.queue.put(result.clone())
+
+    def get_logger(self, name: str = "app") -> None:
+        self.logger = logging.getLogger(name)
+
+        # если handlers уже есть — значит логгер уже настроен
+        if self.logger.handlers:
+            return self.logger
+
+        self.logger.setLevel(logging.INFO)
+
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+        )
+        handler.setFormatter(formatter)
+
+        self.logger.addHandler(handler)
+        self.logger.propagate = False

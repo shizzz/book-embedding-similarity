@@ -39,7 +39,7 @@ class ChunkRepository:
                 [e.to_tuple_chunks() for e in chunks]
             )
 
-    def create_many(
+    def save_bulk(
         self,
         chunks: list[Chunk],
         conn_meta=None,

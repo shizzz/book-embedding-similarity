@@ -1,6 +1,10 @@
 from abc import ABC
+from app.infrastructure.models import StageStats
 
 class Stats(ABC):
+    stages: dict[str, StageStats] = {}
+    edges: set[tuple[str, str]] = set()
+    
     async def register_stage(self, name: str, workers: int):
         pass
 
