@@ -56,32 +56,45 @@ class LiveUI(BaseUI):
         async with self.lock:
             self.live.update(self.layout())
 
-    def _make_table(self) -> Table:
-        table = Table(title="Pipeline Status", expand=True)
+    def _make_stats_table(self) -> Table:
+        table = Table(expand=True)
+        table.add_column("Stage")
+        table.add_column("Progress")
+        table.add_column("Processed")
+        table.add_column("Total")
+        table.add_column("Queued")
+        table.add_column("Errors")
+        table.add_column("Speed")
+        table.add_column("ETA")
 
-        table.add_column("Stage", justify="left")
-        table.add_column("Progress", justify="right")
-        table.add_column("Queued", justify="right")
-        table.add_column("Errors", justify="right")
-
-        for stage_name, stage in self.pipeline_stats.stages.items():
-            processed = stage.processed
-            queued = stage.queue
-            errors = stage.errors
-            total = stage.total
-
-            # прогресс только если total известен
-            if total:
-                pct = (processed / total) * 100 if total else 0
-                progress = f"{processed}/{total} ({pct:.1f}%)"
-            else:
-                progress = str(processed)
-
+        for stage_name, st in self.pipeline_stats.stages.items():
+            progress_bar = "█" * int((st.processed / st.total * 20)) + "░" * (20 - int((st.processed / st.total * 20))) if st.total else ""
             table.add_row(
                 stage_name,
-                progress,
-                str(queued),
-                str(errors),
+                progress_bar + f" {st.percent}" if st.total else "-",
+                str(st.processed),
+                str(st.total) if st.total else "-",
+                str(st.queue),
+                str(st.errors),
+                st.speed,
+                st.eta
+            )
+        return table
+    
+    def _make_edges_table(self):
+        table = Table(title="Edges", expand=True)
+
+        table.add_column("From")
+        table.add_column("To")
+        table.add_column("Count")
+        table.add_column("Speed")
+
+        for edge in self.pipeline_stats.edges.values():
+            table.add_row(
+                edge.upstream,
+                edge.downstream,
+                str(edge.count),
+                edge.speed
             )
 
         return table
@@ -136,14 +149,18 @@ class LiveUI(BaseUI):
         
     def layout(self) -> Table:
         grid = Table.grid(expand=True)
-        if self._show_table:
-            grid.add_row(self._make_table())
-            if self.model_info:
-                grid.add_row(self._make_model_info())
-            #grid.add_row(self._make_info())
+        try:
+            if self._show_table:
+                grid.add_row(self._make_stats_table())
+                #grid.add_row(self._make_edges_table())
+                if self.model_info:
+                    grid.add_row(self._make_model_info())
+                #grid.add_row(self._make_info())
 
-        for idx in self._bars:
-            grid.add_row(self._bars[idx])
+            for idx in self._bars:
+                grid.add_row(self._bars[idx])
+        except Exception as e:
+            print(e)
         return grid
     
     def init(self):

@@ -42,6 +42,9 @@ class Task(Generic[TEntity]):
             db_queue_count=self.db_queue_count,
         )
     
+class BatchTask(Task[list[TEntity]]):
+    pass   
+
 @dataclass
 class BookTask:
     book: Book

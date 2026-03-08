@@ -1,24 +1,31 @@
 from abc import ABC
 from app.infrastructure.models import StageStats
+from .edges import EdgeStats
 
 class Stats(ABC):
     stages: dict[str, StageStats] = {}
-    edges: set[tuple[str, str]] = set()
+    edges: dict[tuple[str, str], EdgeStats] = {}
     
-    async def register_stage(self, name: str, workers: int):
+    async def register_stage(self, name: str, workers: int = 1):
+        pass
+    
+    async def unregister_stage(self, name: str, workers: int = 1):
         pass
 
-    async def register_edge(self, src: str, dst: str):
+    def register_edge(self, upstream: str, downstream: str):
+        pass
+
+    def edge_dispatch(self, upstream: str, downstream: str, n=1):
         pass
 
     async def set_total(self, stage: str, total: int):
         pass
 
-    async def task_done(self, stage: str, count: int = 1):
+    async def done(self, stage: str, count: int = 1):
         pass
 
     async def queue_size(self, stage: str, size: int):
         pass
 
-    async def task_error(self, stage: str):
+    async def error(self, stage: str):
         pass

@@ -1,5 +1,6 @@
 import asyncio
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
+from app.workers.stats import Stats
 from app.infrastructure.models import Book
 from .bookSearchEngine import BaseBookSearchEngine
 
@@ -7,8 +8,8 @@ from .bookSearchEngine import BaseBookSearchEngine
 class ZipBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "zip"
 
-    def __init__(self, folder: str, ui: Any = None):
-        super().__init__(folder, ui)
+    def __init__(self, folder: str, stats: Stats = None):
+        super().__init__(folder, stats)
 
     # -----------------------------
     # Поиск книг

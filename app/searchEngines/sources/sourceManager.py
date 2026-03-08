@@ -4,7 +4,8 @@ import zipfile
 import asyncio
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
+from app.workers.stats import Stats
 from app.searchEngines.sources.connection import ConnectionFactory
 from app.settings import PathsConfig
 
@@ -24,10 +25,11 @@ class BookSourceManager:
     def __init__(
         self,
         folder: str,
-        ui: Any = None
+        stats: Stats = None
     ):
         self.folder = folder
-        self._ui = ui
+        self.path = urlparse(folder).path
+        self._stats = stats
         self._cache_dir = PathsConfig.CACHE_DIR
         os.makedirs(self._cache_dir, exist_ok=True)
         self._archive_locks: dict[str, asyncio.Lock] = {}
@@ -99,6 +101,7 @@ class BookSourceManager:
         """
         # Получаем имя архива из URL
         archive_name = self.get_archive_name(archive_url)
+        path = urlparse(archive_url).path
 
         local_path = os.path.join(self._cache_dir, archive_name)
 
@@ -111,7 +114,7 @@ class BookSourceManager:
         async with lock:
             if not os.path.exists(local_path):
                 # Используем приватный метод для скачивания полного URL
-                await self._download_archive(archive_url, local_path)
+                await self._download_archive(path, local_path)
 
         return zipfile.ZipFile(local_path)
 
@@ -178,7 +181,8 @@ class BookSourceManager:
     # ============================================================
     async def _ensure_local(
         self,
-        archive_name: str
+        archive_name: str,
+        url: str = None
     ) -> str:
         local_path = os.path.join(
             self._cache_dir,
@@ -201,7 +205,7 @@ class BookSourceManager:
                 return local_path
 
             await self._download_archive(
-                archive_name,
+                url or f"{self.path}{archive_name}",
                 local_path
             )
 
@@ -209,13 +213,15 @@ class BookSourceManager:
 
     async def _download_archive(
         self,
-        archive_name: str,
+        remote_path: str,
         local_path: str
     ):
         """
         Скачивает архив с поддержкой докачки, прогресса в МБ и корректного lock.
         """
         tmp_path = local_path + ".tmp"
+        loop = asyncio.get_running_loop()
+        archive_name = self.get_archive_name(remote_path)
 
         def _download():
             with ConnectionFactory.create(self.folder) as conn:
@@ -223,22 +229,34 @@ class BookSourceManager:
                 # проверяем уже скачанные байты для докачки
                 downloaded = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
 
-                progress_idx = None
-                if self._ui:
-                    progress_idx = self._ui.add_progress(f"Загрузка {archive_name}", "B")
-                    total_size = conn.get_file_size(archive_name)
-                    self._ui.update_total(int(total_size / 1024 / 1024), progress_idx)
+                if self._stats:
+                    total_size = conn.get_file_size(remote_path)
+                    loop.call_soon_threadsafe(
+                        asyncio.create_task,
+                        self._stats.set_total(archive_name, total_size)
+                    )
+                    loop.call_soon_threadsafe(
+                        asyncio.create_task,
+                        self._stats.done(archive_name, int(total_size / 1024 / 1024))
+                    )
+                    
                     if downloaded:
                         # сразу показываем уже скачанные МБ
-                        self._ui.done(progress_idx, int(downloaded / 1024 / 1024))
+                        loop.call_soon_threadsafe(
+                            asyncio.create_task,
+                            self._stats.done(archive_name, int(downloaded / 1024 / 1024))
+                        )
 
                 def progress_callback(bytes_read: int):
-                    if self._ui and progress_idx is not None:
-                        self._ui.done(progress_idx, int(bytes_read / 1024 / 1024))
+                    if self._stats:
+                        loop.call_soon_threadsafe(
+                            asyncio.create_task,
+                            self._stats.done(archive_name, int(bytes_read / 1024 / 1024))
+                        )
 
                 # Скачиваем с resume_from
                 conn.download(
-                    archive_name,
+                    remote_path,
                     tmp_path,
                     progress_callback=progress_callback,
                     resume_from=downloaded
@@ -246,11 +264,9 @@ class BookSourceManager:
 
                 os.rename(tmp_path, local_path)
 
-                if self._ui and progress_idx is not None:
-                    self._ui.remove_progress(progress_idx)
-
-        # выполняем скачивание в отдельном потоке
+        if self._stats: await self._stats.register_stage(archive_name, 1)
         await asyncio.to_thread(_download)
+        if self._stats: await self._stats.unregister_stage(archive_name, 1)
     
     async def ensure_archive_in_cache(self, archive_name: str) -> str:
         local_path = os.path.join(self._cache_dir, archive_name)
@@ -267,7 +283,7 @@ class BookSourceManager:
             if os.path.exists(local_path):
                 return local_path
 
-            await self._download_archive(archive_name, local_path)
+            await self._download_archive(f"{self.path}{archive_name}", local_path)
         return local_path
     
     # ============================================================

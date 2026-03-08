@@ -2,7 +2,8 @@ import asyncio
 import os
 import zipfile
 from datetime import datetime
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
+from app.workers.stats import Stats
 from app.infrastructure.models import Book
 from .bookSearchEngine import BaseBookSearchEngine
 from app.settings import PathsConfig
@@ -10,8 +11,8 @@ from app.settings import PathsConfig
 class InpBookSearchEngine(BaseBookSearchEngine):
     TYPE: str = "inpix"
 
-    def __init__(self, folder: str, ui: Any = None):
-        super().__init__(folder, ui)
+    def __init__(self, folder: str, stats: Stats = None):
+        super().__init__(folder, stats)
 
     # -----------------------------
     # Парсинг одного файла внутри ZIP

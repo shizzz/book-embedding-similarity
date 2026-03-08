@@ -1,14 +1,15 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
+from app.workers.stats import Stats
 from app.infrastructure.models import Book
 from app.searchEngines.sources import BookSourceManager
 
 class BaseBookSearchEngine(ABC):
-    def __init__(self, folder: str, ui: Any = None):
+    def __init__(self, folder: str, stats: Stats = None):
         self._manager = BookSourceManager(
             folder=folder,
-            ui=ui
+            stats=stats
         )
         self._semaphore = asyncio.Semaphore(3)
         self._tasks = []

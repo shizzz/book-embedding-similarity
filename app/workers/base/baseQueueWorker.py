@@ -91,7 +91,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                     await self._process_batch(buffer)
                     buffer.clear()
             except Exception as e:
-                await self.stats.task_error(self.name)
+                await self.stats.error(self.name)
                 self.logger.exception(e)
             finally:
                 self.input_queue.task_done()
@@ -106,7 +106,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         if not results:
             return
 
-        await self.stats.task_done(self.name, len(batch))
+        await self.stats.done(self.name, len(batch))
         for r in results:
             await self.post_process(r)
             await self.dispatch(r)
@@ -136,6 +136,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         targets = self.route(result, self.output_channels)
         for channel in targets:
             await self.stats.queue_size(channel.downstream, channel.queue.qsize())
+            await self.stats.edge_dispatch(self.name, channel.downstream)
             await channel.queue.put(result.clone())
 
     def get_logger(self, name: str = "app") -> None:

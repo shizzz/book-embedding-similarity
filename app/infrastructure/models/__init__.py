@@ -1,6 +1,6 @@
 from .book import Book, BookRegistry
 from .bookPair import BookPair
-from .task import Task, Action, Dataset, BookAction, BookTask, Action
+from .task import Task, BatchTask, Action, Dataset, BookAction, BookTask, Action
 from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar
 from .embedding import Embedding
@@ -17,6 +17,7 @@ __all__ = [
     "BookPair",
     "BookTask",
     "Task",
+    "BatchTask",
     "Action",
     "BookAction",
     "Dataset",

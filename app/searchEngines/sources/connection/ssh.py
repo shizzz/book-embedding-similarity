@@ -33,10 +33,9 @@ class SSHConnection(BaseConnection):
         progress_callback=None,
         resume_from: int = 0
     ):
-        full = f"{self.remote_path}/{remote}"
         mode = "ab" if resume_from else "wb"
 
-        with self.sftp.file(full, "rb") as src, open(local, mode) as dst:
+        with self.sftp.file(remote, "rb") as src, open(local, mode) as dst:
             if resume_from:
                 src.seek(resume_from)
             while chunk := src.read(1024 * 1024):
@@ -52,5 +51,4 @@ class SSHConnection(BaseConnection):
             self.client.close()
 
     def get_file_size(self, remote: str) -> int:
-        full = f"{self.remote_path}/{remote}"
-        return self.sftp.stat(full).st_size
+        return self.sftp.stat(remote).st_size
