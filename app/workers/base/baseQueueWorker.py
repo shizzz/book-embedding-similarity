@@ -92,7 +92,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                 buffer.append(task)
                 self.batch_strategy.on_add(task)
 
-                if self._producer_done and self.input_queue.empty:
+                if self._producer_done.is_set() and self.input_queue.empty():
                     break
 
                 if self.batch_strategy.should_flush(buffer):
