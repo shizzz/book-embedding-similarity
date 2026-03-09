@@ -41,12 +41,13 @@ class Chunker(BaseQueueWorker[BookTask]):
                 parsed = parser.parse(task.entity.data)
                 Book.merge_from(book, parsed)
 
-                task = Task(
+                book_task = Task(
                     id=book.id,
                     name=book.file_name,
                     entity=book,
                     action=Action.BOOK
                 )
+                result.append(book_task)
 
                 if len(book.chunks or []) > 0:
                     for chunk in book.chunks:
@@ -57,13 +58,13 @@ class Chunker(BaseQueueWorker[BookTask]):
                     book.chunks = await self._enrich_from_db(book)
             
             for chunk in book.chunks:
-                task = Task(
+                chunk_task = Task(
                     id=chunk.chunk_id,
                     name=book.file_name,
                     entity=chunk,
                     action=Action.CHUNK
                 )
-                result.append(task)
+                result.append(chunk_task)
         return result
 
     def route(self, task: Task, channels: list[Channel]) -> list[Channel]:
