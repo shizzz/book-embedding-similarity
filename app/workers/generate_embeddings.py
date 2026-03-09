@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import List
 from app.model import Model
 from app.common.types import TEntity
@@ -8,17 +9,24 @@ from app.infrastructure.models import Book, Chunk, Embedding, Channel, Action, B
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.settings import ProcessConfig
 from app.ui.live_ui import LiveUI
+from app.workers.sources import ConsoleHandler
 from app.workers.base import BaseQueueWorker
 from app.workers.stats import PipelineStats
 from app.workers.stages import BookProducer, Chunker, DbWorker, EmbeddingWorker
 
 BOOK_THREADS: int = 1
 CHUNK_THREADS: int = 4
-EMB_THREADS: int = 2
+EMB_THREADS: int = 4
 DB_THREADS: int = 1
 
 class GenerateEmbeddingsWorker:
     def __init__(self, batch: int):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        handler = ConsoleHandler(console=getattr(self, "ui", None) and getattr(self.ui, "console", None))
+        handler.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(message)s'))
+        self.logger.addHandler(handler)
+
         self.name = "Generate embeddings"
         self.model = Model(EMB_THREADS)
         self.router = DBRouter()
@@ -51,8 +59,8 @@ class GenerateEmbeddingsWorker:
         )
         
         self.pool: List[BaseQueueWorker] = []
-        channel_book = Channel(Stages.BOOK_SEARCH, asyncio.Queue(maxsize=50))
-        channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(800))
+        channel_book = Channel(Stages.CHUNK, asyncio.Queue(maxsize=50))
+        channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(100))
         channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
 
         self.book_stage = BookProducer(
@@ -62,6 +70,7 @@ class GenerateEmbeddingsWorker:
             stats=self.stats,
             batch_size=10,
             workers=BOOK_THREADS,
+            logger = self.logger, 
         )
         self.pool.append(self.book_stage)
 
@@ -74,6 +83,7 @@ class GenerateEmbeddingsWorker:
             batch_size=64,
             producer_done = self.book_stage.done,
             workers=CHUNK_THREADS,
+            logger = self.logger, 
         )
         self.pool.append(self.chunk_stage)
 
@@ -86,6 +96,7 @@ class GenerateEmbeddingsWorker:
             batch_size=128,
             producer_done = self.chunk_stage.done,
             workers=EMB_THREADS,
+            logger = self.logger, 
         )
         self.pool.append(self.embedding_stage)
 
@@ -97,6 +108,7 @@ class GenerateEmbeddingsWorker:
             batch_size=256,
             producer_done = self.book_stage.done,
             workers=DB_THREADS,
+            logger = self.logger, 
         )
         self.pool.append(self.db_stage)
 

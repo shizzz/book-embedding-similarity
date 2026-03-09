@@ -68,8 +68,8 @@ class Model:
             self.info.gpu_name = gpu_name
             self.info.measure_mem_per_chunk_mb = self._measure_mem_per_chunk()
 
-            mem_per_chunk = self.info.measure_mem_per_chunk_mb or self.info.estimate_mem_per_chunk_mb
-            batch_size = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / mem_per_chunk))
+            mem_per_chunk = self.info.estimate_mem_per_chunk_mb
+            batch_size = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / (mem_per_chunk * self._threads)))
 
         self.info.st_batch_size = batch_size or self.DEFAULT_BATCH
 

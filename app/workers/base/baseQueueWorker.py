@@ -3,6 +3,7 @@ import logging
 from abc import ABC
 from typing import Optional, Generic, List
 from app.workers.stats import Stats, NullStats
+from app.workers.batchStrategies import CountBatchStrategy
 from app.common.types import TEntity
 from app.infrastructure.models import Task, Channel
 
@@ -18,7 +19,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         batch_size: int = 1,
         name: str = "Stage",
         producer_done = asyncio.Event(),
-        workers: int = 1
+        workers: int = 1,
+        logger: logging.Logger = None
     ):
         self.stats = stats
         self.name = name
@@ -32,8 +34,10 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._producer_done = producer_done
         self._flush_lock = asyncio.Lock()
 
-        self.input_queue = input_channel.queue if input_channel else asyncio.Queue()
-        self.get_logger(self.name)
+        self.input_queue = input_channel.queue if input_channel else asyncio.Queue(100)
+        self.logger = logger or self.get_logger(self.name)
+
+        self.batch_strategy = CountBatchStrategy(self.batch_size)
 
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count)
@@ -86,10 +90,15 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
             try:
                 buffer.append(task)
+                self.batch_strategy.on_add(task)
 
-                if len(buffer) >= self.batch_size:
+                if self._producer_done and self.input_queue.empty:
+                    break
+
+                if self.batch_strategy.should_flush(buffer):
                     await self._process_batch(buffer, wid)
                     buffer.clear()
+                    self.batch_strategy.reset()
             except Exception as e:
                 await self.stats.error(self.name)
                 self.logger.exception(e)
@@ -140,14 +149,14 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.stats.edge_dispatch(self.name, channel.downstream)
             await channel.queue.put(result.clone())
 
-    def get_logger(self, name: str = "app") -> None:
-        self.logger = logging.getLogger(name)
+    def get_logger(self, name: str = "app") -> logging.Logger:
+        logger = logging.getLogger(name)
 
         # если handlers уже есть — значит логгер уже настроен
-        if self.logger.handlers:
-            return self.logger
+        if logger.handlers:
+            return logger
 
-        self.logger.setLevel(logging.INFO)
+        logger.setLevel(logging.INFO)
 
         handler = logging.StreamHandler()
         formatter = logging.Formatter(
@@ -155,5 +164,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         )
         handler.setFormatter(formatter)
 
-        self.logger.addHandler(handler)
-        self.logger.propagate = False
+        logger.addHandler(handler)
+        logger.propagate = False
+
+        return logger
