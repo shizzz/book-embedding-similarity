@@ -48,9 +48,7 @@ class EmbeddingWorker(BaseQueueWorker):
             texts, meta = self._collect_chunks(chunks)
             embeddings = await asyncio.to_thread(self._embedding_process, texts)
  
-            del batch
             return await self._assign_embeddings(embeddings, meta)
-        del batch
         return None
     
     @staticmethod

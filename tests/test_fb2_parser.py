@@ -76,7 +76,7 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book = parser.parse(data)
+        book, chunks = parser.parse(data)
 
         # file_name should be set to the original filepath
         self.assertTrue(str(book.file_name).endswith("118674.fb2"))
@@ -88,15 +88,15 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertEqual(book.author, "pCLtпл GDьg hASдвmSъm")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(book.chunks)
-        self.assertGreaterEqual(len(book.chunks), 2)
-        types = {c.type for c in book.chunks}
+        self.assertIsNotNone(chunks)
+        self.assertGreaterEqual(len(chunks), 2)
+        types = {c.type for c in chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIn(ChunkType.DESCRIPTION, types)
         self.assertIsNotNone(book.text_length)
         self.assertGreater(book.text_length, 0)
 
-        for chunk in book.chunks:
+        for chunk in chunks:
           if chunk.type == ChunkType.TEXT:
             self.assertGreater(chunk.length, 1000)
 
@@ -108,7 +108,7 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book = parser.parse(data)
+        book, chunks = parser.parse(data)
 
         # file_name should be set to the original filepath
         self.assertTrue(str(book.file_name).endswith("144825.fb2"))
@@ -120,8 +120,8 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertEqual(book.author, "ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(book.chunks)
-        self.assertEqual(len(book.chunks), 0)
+        self.assertIsNotNone(chunks)
+        self.assertEqual(len(chunks), 0)
         self.assertEqual(book.empty, True)
             
     def test_poem(self):
@@ -132,7 +132,7 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book = parser.parse(data)
+        book, chunks = parser.parse(data)
 
         # file_name should be set to the original filepath
         self.assertTrue(str(book.file_name).endswith("75252.fb2"))
@@ -144,14 +144,14 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertEqual(book.author, "YEлхтSsD nlbGэuWRм эJhп")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(book.chunks)
-        self.assertGreaterEqual(len(book.chunks), 3)
-        types = {c.type for c in book.chunks}
+        self.assertIsNotNone(chunks)
+        self.assertGreaterEqual(len(chunks), 3)
+        types = {c.type for c in chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIsNotNone(book.text_length)
         self.assertGreater(book.text_length, 0)
 
-        for chunk in book.chunks:
+        for chunk in chunks:
           if chunk.type == ChunkType.TEXT:
             self.assertGreater(chunk.length, 1000)
             
@@ -163,7 +163,7 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book = parser.parse(data)
+        book, chunks = parser.parse(data)
 
         # file_name should be set to the original filepath
         self.assertTrue(str(book.file_name).endswith("1132.fb2"))
@@ -175,9 +175,9 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertEqual(book.author, "PцmэkDk drьCж")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(book.chunks)
-        self.assertGreaterEqual(len(book.chunks), 2 + ChunkingConfig.CHUNKS_PER_BOOK)
-        types = {c.type for c in book.chunks}
+        self.assertIsNotNone(chunks)
+        self.assertGreaterEqual(len(chunks), 2 + ChunkingConfig.CHUNKS_PER_BOOK)
+        types = {c.type for c in chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIn(ChunkType.DESCRIPTION, types)
         self.assertIsNotNone(book.text_length)
@@ -185,7 +185,7 @@ class TestFB2BookParser(unittest.TestCase):
 
         total_length  = 0
         target_chunk_length = int(ChunkingConfig.ST_TARGET_CHARS * 0.95 / ChunkingConfig.CHUNKS_PER_BOOK)
-        for chunk in book.chunks:
+        for chunk in chunks:
           if chunk.type == ChunkType.TEXT:
             total_length  += chunk.length
             self.assertGreater(chunk.length, target_chunk_length)

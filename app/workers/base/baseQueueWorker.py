@@ -31,7 +31,6 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._workers_count = workers
         self._workers: List[asyncio.Task] = []
         self._flush_lock = asyncio.Lock()
-        self._buffers: dict[int, List[Task]] = {}
 
         self.input_channel = input_channel if input_channel else Channel("self", asyncio.Queue(100))
         self.logger = logger or self.get_logger(self.name)
@@ -83,7 +82,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         await self.input_channel.done()
 
     async def _worker(self, wid: int):
-        buffer = self._buffers.setdefault(wid, [])
+        buffer = []
         batch_strategy = self.batch_strategy_factory()
 
         while True:
@@ -154,8 +153,9 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         for channel in targets:
             await self.stats.queue_size(channel.downstream, channel.queue.qsize())
             await self.stats.edge_dispatch(self.name, channel.downstream)
-            await channel.queue.put(result.clone())
-
+            await channel.queue.put(result.clone(entity=result.entity))
+            result.entity = None
+            
     def get_logger(self, name: str = "app") -> logging.Logger:
         logger = logging.getLogger(name)
 

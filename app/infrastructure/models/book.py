@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
-from .embedding import Embedding
-from .chunk import Chunk
 
 def safe_get(row, key, default=None):
     try:
@@ -23,9 +21,7 @@ class Book:
     source_type: Optional[str]
     source_link: Optional[str]
     uid: str = None
-    embedding: List[Embedding] = None
     model_id: int = None
-    chunks: List[Chunk] = None
     source_length: int = None
     text_length: int = None
     empty: bool = None
@@ -45,9 +41,7 @@ class Book:
             data: bytes = None,
             source_type: str = None,
             source_link: str = None,
-            embedding: List[Embedding] = None,
             model_id: int = None,
-            chunks: List[Chunk] = None,
             shape: int = None,
             source_length: int = None,
             text_length: int = None,
@@ -63,9 +57,7 @@ class Book:
         self.data = data
         self.source_type = source_type
         self.source_link = source_link
-        self.embedding = embedding
         self.model_id = model_id
-        self.chunks = chunks
         self.shape = shape
         self.source_length = source_length
         self.text_length = text_length
@@ -171,10 +163,6 @@ class BookRegistry:
     @property
     def texts(self):
         yield from (book.text for book in self.books)
-    
-    @property
-    def embeddings(self):
-        yield from (book.embedding for book in self.books)
 
     def get(self, book_id: int) -> Optional["Book"]:
         return self._book_map.get(book_id)

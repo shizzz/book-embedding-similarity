@@ -38,17 +38,18 @@ class Chunker(BaseQueueWorker[BookTask]):
 
         for task in batch:
             book = task.entity.book
+            chunks: List[Chunk] = []
 
             if task.entity.data:
                 parser = BookParserFactory.create_parser(book.file_name)
-                parsed = parser.parse(task.entity.data)
-                Book.merge_from(book, parsed)
+                parsed_book, chunks = parser.parse(task.entity.data)
+                Book.merge_from(book, parsed_book)
 
                 book.source_length = len(task.entity.data)
-                if parsed.empty is not None:
-                    book.empty = parsed.empty
+                if parsed_book.empty is not None:
+                    book.empty = parsed_book.empty
 
-                parsed = None
+                parsed_book = None
 
                 book_task = Task(
                     id=book.id,
@@ -58,8 +59,8 @@ class Chunker(BaseQueueWorker[BookTask]):
                 )
                 result.append(book_task)
 
-                if len(book.chunks or []) > 0:
-                    for chunk in book.chunks:
+                if len(chunks or []) > 0:
+                    for chunk in chunks:
                         chunk.book_id = book.id
                         chunk.chunk_id = await self._reserve_id()
 
@@ -74,10 +75,10 @@ class Chunker(BaseQueueWorker[BookTask]):
 
             if task.entity.data is None:
                 if book.id in self._chunk_to_book_id:
-                    book.chunks = await self._enrich_from_db(book)
+                    chunks = await self._enrich_from_db(book)
                     action = Action.EMBEDDING
             
-            for chunk in book.chunks:
+            for chunk in chunks:
                 chunk_task = Task(
                     id=chunk.chunk_id,
                     name=book.file_name,
@@ -86,6 +87,9 @@ class Chunker(BaseQueueWorker[BookTask]):
                 )
                 result.append(chunk_task)
 
+            del chunks
+            del book
+            
             task.entity.data = None
         return result
 
@@ -95,8 +99,7 @@ class Chunker(BaseQueueWorker[BookTask]):
 
     async def _enrich_from_db(self, book: Book) -> List[Chunk]:
         def _sync(book_id: int) -> List[Chunk]:
-            chunks = self._repo.get_by_book(book_id)
-            return chunks
+            return self._repo.get_by_book(book_id)
 
         return await asyncio.to_thread(_sync, book.id)
 

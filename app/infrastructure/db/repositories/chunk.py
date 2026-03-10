@@ -59,16 +59,16 @@ class ChunkRepository:
 
     def get_by_book(self, book_id: int) -> List[Chunk]:
         with self.router.chunks() as conn:
-            rows = conn.execute(
+            cur = conn.execute(
                 """
                 SELECT id, book_id, data, length, type
                 FROM chunks
                 WHERE book_id = ?
                 """,
                 (book_id,)
-            ).fetchall()
+            )
 
-            return [Chunk.from_chunks_row(r) for r in rows]
+            return [Chunk.from_chunks_row(r) for r in cur]
 
     def get_text(self, chunk_id: int) -> str | None:
         with self.router.chunks() as conn:
