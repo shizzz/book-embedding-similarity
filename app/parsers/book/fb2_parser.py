@@ -39,12 +39,15 @@ class FB2BookParser(BookParser):
 
         # --------- создаем chunks ---------
         if not getattr(book, "chunks", None):
-            raw_chunks, text_length = self.extract_chunks(root)
+            chunks, text_length = self.extract_chunks(root)
             book.text_length = text_length
-            for chunk in raw_chunks:
-                chunk.book_id = book.id
-
-            book.chunks = raw_chunks
+            if not any(chunk.type == ChunkType.TEXT for chunk in chunks):
+                book.empty = True
+                book.chunks = []
+            else:
+                for chunk in chunks:
+                    chunk.book_id = book.id
+                book.chunks = chunks
 
     # =====================
     # TEXT

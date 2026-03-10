@@ -8,6 +8,8 @@ class Action(IntEnum):
     BOOK = auto()
     CHUNK = auto()
     EMBEDDING = auto()
+    BOTH = auto()
+    NONE = auto()
 
 class Dataset(Enum):
     BOOK = auto()

@@ -9,7 +9,9 @@ from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Chann
 
 ROUTES = {
     Action.BOOK: {Stages.DB},
-    Action.CHUNK: {Stages.EMBEDDING, Stages.DB},
+    Action.EMBEDDING: {Stages.EMBEDDING},
+    Action.BOTH: {Stages.EMBEDDING, Stages.DB},
+    Action.NONE: {},
 }
 
 class Chunker(BaseQueueWorker[BookTask]):
@@ -32,11 +34,12 @@ class Chunker(BaseQueueWorker[BookTask]):
 
     async def process(self, batch: List[Task[BookTask]], wid: int) -> List[Task]:
         result: List[Task] = []
+        action = Action.BOTH
 
         for task in batch:
             book = task.entity.book
 
-            if task.entity.data:
+            if task.entity.data and (not book.empty or book.empty is None):
                 parser = BookParserFactory.create_parser(book.file_name)
                 parsed = parser.parse(task.entity.data)
                 Book.merge_from(book, parsed)
@@ -54,15 +57,19 @@ class Chunker(BaseQueueWorker[BookTask]):
                         chunk.book_id = book.id
                         chunk.chunk_id = await self._reserve_id()
             else:
-                if book.id not in self._chunk_to_book_id:
+                if book.id in self._chunk_to_book_id:
                     book.chunks = await self._enrich_from_db(book)
+                    action = Action.EMBEDDING
+
+            if book.empty:
+                continue
             
             for chunk in book.chunks:
                 chunk_task = Task(
                     id=chunk.chunk_id,
                     name=book.file_name,
                     entity=chunk,
-                    action=Action.CHUNK
+                    action=action
                 )
                 result.append(chunk_task)
         return result
