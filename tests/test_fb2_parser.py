@@ -1,9 +1,13 @@
 import unittest
+from pathlib import Path
 
 from lxml import etree
 
 from app.parsers.book.fb2_parser import FB2BookParser
 from app.infrastructure.models import ChunkType
+
+
+DATA_DIR = Path(__file__).parent / "data"
 
 
 class TestFB2BookParser(unittest.TestCase):
@@ -112,6 +116,34 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertIsNotNone(book.chunks)
         self.assertGreaterEqual(len(book.chunks), 2)
         types = [c.type for c in book.chunks]
+        self.assertIn(ChunkType.TITLE, types)
+        self.assertIn(ChunkType.DESCRIPTION, types)
+        self.assertIsNotNone(book.text_length)
+        self.assertGreater(book.text_length, 0)
+
+    def test_parse_real_fb2_file_from_disk(self):
+        fb2_path = DATA_DIR / "sample_simple.fb2"
+        self.assertTrue(fb2_path.is_file(), f"FB2 test file not found: {fb2_path}")
+
+        with fb2_path.open("rb") as f:
+            data = f.read()
+
+        parser = FB2BookParser(filepath=str(fb2_path))
+        book = parser.parse(data)
+
+        # file_name should be set to the original filepath
+        self.assertTrue(str(book.file_name).endswith("sample_simple.fb2"))
+
+        # Metadata from the real FB2 file
+        self.assertEqual(book.title, "Disk Sample Title")
+        self.assertEqual(book.uid, "DISK-BOOK-ID-1")
+        self.assertEqual(book.authors, ["Alice Smith"])
+        self.assertEqual(book.author, "Alice Smith")
+
+        # Chunks and text length should be populated
+        self.assertIsNotNone(book.chunks)
+        self.assertGreaterEqual(len(book.chunks), 2)
+        types = {c.type for c in book.chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIn(ChunkType.DESCRIPTION, types)
         self.assertIsNotNone(book.text_length)

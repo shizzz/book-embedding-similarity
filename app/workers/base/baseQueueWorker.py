@@ -33,6 +33,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._workers: List[asyncio.Task] = []
         self._producer_done = producer_done
         self._flush_lock = asyncio.Lock()
+        self._buffers: dict[int, List[Task]] = {}
 
         self.input_queue = input_channel.queue if input_channel else asyncio.Queue(100)
         self.logger = logger or self.get_logger(self.name)
@@ -79,7 +80,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._producer_done.set()
 
     async def _worker(self, wid: int):
-        buffer: List[Task] = []
+        buffer = self._buffers.setdefault(wid, [])
 
         while True:
             try:
@@ -105,9 +106,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             finally:
                 self.input_queue.task_done()
 
-        # flush оставшиеся batch-и при shutdown
-        if buffer:
-            await self._process_batch(buffer, wid)
+        # оставшиеся batch-и будут обработаны в _flush
 
     async def _process_batch(self, batch: List[Task], wid: int):
         results = await self.process(batch, wid)
@@ -123,7 +122,12 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
     async def _flush(self):
         async with self._flush_lock:
-            pass
+            # принудительно обработать оставшиеся batch-и у всех worker'ов
+            for wid, buffer in self._buffers.items():
+                if buffer:
+                    await self._process_batch(buffer, wid)
+                    buffer.clear()
+            self.batch_strategy.reset()
 
     # -------------------------------
     # Методы, которые нужно реализовать
