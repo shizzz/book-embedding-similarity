@@ -35,11 +35,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
         return False
 
     async def produce(self):
-        i = 0
         async for book in self._engine.search_books():
-            i += 1
-            if i > 1000:
-                break
             yield Task(
                 id=book.id,
                 name=book.file_name,
