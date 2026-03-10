@@ -41,3 +41,6 @@ class PipelineStats(Stats):
 
     async def error(self, stage):
         self.stages[stage].errors += 1
+
+    async def finish(self, stage: str):
+        self.stages[stage].finished = True

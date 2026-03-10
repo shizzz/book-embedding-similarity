@@ -1,7 +1,6 @@
 import asyncio
 import torch
 import numpy as np
-from functools import cache
 from collections import defaultdict
 from app.model import Model
 from app.parsers.chunk import ChunkStrategyFactory
@@ -24,7 +23,12 @@ class EmbeddingWorker(BaseQueueWorker):
             *args, 
             **kwargs
         ):
-        super().__init__(name=name, *args, **kwargs)
+        super().__init__(
+            name=name,
+            batch_strategy=lambda: CharBatchStrategy(self._batch_char_limit),
+            *args, 
+            **kwargs
+        )
 
         self._model = model 
         self._max_chars = model.info.st_chunk_size
@@ -38,25 +42,23 @@ class EmbeddingWorker(BaseQueueWorker):
         self._emb_to_chunk_id = self._repo.get_ids()
         self._current_batch_size = int(self._transformer_batch_size)
 
-        self.batch_strategy = CharBatchStrategy(self._char_count)
-
-    async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[Embedding]]:
-        chunks = [task.entity for task in batch if task.entity not in self._emb_to_chunk_id]
+    async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[Embedding]] | None:
+        chunks = [task.entity for task in batch if task.entity.chunk_id not in self._emb_to_chunk_id]   
         if len(chunks) > 0:
             texts, meta = self._collect_chunks(chunks)
             embeddings = await asyncio.to_thread(self._embedding_process, texts)
-
+ 
+            del batch
             return await self._assign_embeddings(embeddings, meta)
-        else:
-            return []
+        del batch
+        return None
     
     @staticmethod
-    @cache
-    def char_count(chars: int, size: int) -> int:
+    def batch_char_limit(chars: int, size: int) -> int:
         return chars * size
 
-    def _char_count(self):
-        return EmbeddingWorker.char_count(int(self._model.info.st_chunk_size - self._model.info.st_overlap), self._current_batch_size)
+    def _batch_char_limit(self):
+        return EmbeddingWorker.batch_char_limit(int(self._model.info.st_chunk_size - self._model.info.st_overlap), self._current_batch_size)
 
     def _embedding_process(self, batch: List[str]) -> np.ndarray:
         while True:

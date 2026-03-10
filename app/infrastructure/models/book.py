@@ -100,7 +100,7 @@ class Book:
             source_type=safe_get(row, "source_type"),
             source_link=safe_get(row, "source_link"),
             source_length=safe_get(row, "source_length"),
-            empty=safe_get(row, "empty"),
+            empty=bool(safe_get(row, "empty")),
         )
     
     @classmethod

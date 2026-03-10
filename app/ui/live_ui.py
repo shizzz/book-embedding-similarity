@@ -58,6 +58,7 @@ class LiveUI(BaseUI):
 
     def _make_stats_table(self) -> Table:
         table = Table(expand=True)
+        
         table.add_column("Stage")
         table.add_column("Progress")
         table.add_column("Processed")
@@ -66,19 +67,52 @@ class LiveUI(BaseUI):
         table.add_column("Errors")
         table.add_column("Speed")
         table.add_column("ETA")
+        table.add_column("Status")
+        table.add_column("Pressure")
 
-        for stage_name, st in self.pipeline_stats.stages.items():
-            progress_bar = "█" * int((st.processed / st.total * 20)) + "░" * (20 - int((st.processed / st.total * 20))) if st.total else ""
+        stages = self.pipeline_stats.stages
+
+        for stage_name, st in stages.items():
+            # progress bar
+            if st.total:
+                pct = st.processed / st.total
+                filled = int(pct * 20)
+                progress_bar = "█" * filled + "░" * (20 - filled)
+                progress = f"{progress_bar} {st.percent}"
+            else:
+                progress = "-"
+
+            stage_text = Text(stage_name)
+
+            # статус
+            status = "✓" if st.finished else "RUN"
+
+            # throughput pressure
+            workers = getattr(st, "workers", 1)
+            speed = getattr(st, "speed_value", 1)  # items/sec
+            pressure_value = st.queue / max(speed * workers, 1)  # avoid div0
+            pressure_str = f"{pressure_value:.1f}"
+
+            pressure_text = Text(pressure_str)
+            # подсветка bottleneck: давление выше порога и stage не done
+            if pressure_value > 1 and not st.finished:
+                stage_text.stylize("bold red")
+                pressure_text.stylize("bold red")
+
             table.add_row(
-                stage_name,
-                progress_bar + f" {st.percent}" if st.total else "-",
+                stage_text,
+                progress,
                 str(st.processed),
                 str(st.total) if st.total else "-",
                 str(st.queue),
                 str(st.errors),
                 st.speed,
-                st.eta
+                st.eta,
+                status,
+                pressure_text
             )
+
+        table.caption = f"Runtime: {self.pipeline_stats.runtime}"
         return table
     
     def _make_edges_table(self):

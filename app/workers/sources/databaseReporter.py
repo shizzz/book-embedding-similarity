@@ -1,4 +1,5 @@
 from app.infrastructure.models.report import Report
+from app.settings import ChunkingConfig
 
 class DatabaseReporter:
     def __init__(self, router, model_uid: str):
@@ -7,12 +8,11 @@ class DatabaseReporter:
 
     def generate(
             self, 
-            chunk_max_chars: int,
             new_books: set | None = None,
         ) -> Report:
 
         report = Report()
-        min_chars = max(100, int(chunk_max_chars * 0.15))
+        min_chars = ChunkingConfig.ST_MIN_CHARS
 
         # --- BOOKS ---
         with self.router.meta() as conn:

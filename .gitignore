@@ -1,6 +1,6 @@
 .vscode
 .continue
-data
+/data
 __pycache__
 *.pyc
 *.db

@@ -54,7 +54,7 @@ class FB2BookParser(BookParser):
     # =====================
     def _extract_paragraphs(self, root) -> list[str]:
         nodes = root.xpath(
-            ".//fb2:body//fb2:p | .//fb2:body//fb2:poem//fb2:v",
+            ".//fb2:body[not(@name='notes')]//fb2:p | .//fb2:body[not(@name='notes')]//fb2:poem//fb2:v",
             namespaces=self._ns
         )
         paragraphs = []
@@ -191,8 +191,16 @@ class FB2BookParser(BookParser):
 
         for idx in chunk_targets:
             chunk = self._build_chunk_around_target(paragraphs, idx, used, chunk_size, prefix_buffer)
-            if chunk and len(chunk.text) >= min_chars:
-                chunks.append(chunk)
+            if chunk:
+                if len(chunk.text) < chunk_size * 0.5 and chunks:
+                    # attach to previous
+                    prev = chunks[-1]
+                    if prev.type == ChunkType.TEXT:
+                        prev.text = prev.text.rstrip() + "\n\n" + chunk.text
+                if len(chunk.text) < min_chars:
+                    continue
+                else:
+                    chunks.append(chunk)
 
         # Fallback
         text_chunk_total = sum(1 for ch in chunks if ch.type == ChunkType.TEXT)

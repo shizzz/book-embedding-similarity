@@ -3,7 +3,7 @@ from typing import List
 from app.searchEngines.bookSearch import BaseBookSearchEngine
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
-from app.infrastructure.db.repositories import BookRepository
+from app.infrastructure.db.repositories import BookRepository, ChunkRepository
 from app.infrastructure.models import Task, Book, BookAction, BookTask, Stages
 
 class BookProducer(BaseQueueWorker[BookTask]):
@@ -21,22 +21,25 @@ class BookProducer(BaseQueueWorker[BookTask]):
         super().__init__(name=name, *args, **kwargs)
 
         self._engine = search_engine
-        self._repo = BookRepository(router)
+        self._book_repo = BookRepository(router)
+        self._chunk_repo = ChunkRepository(router)
         self._book_id = BookRepository(router).get_max_id()
         self._batch: List[Task[BookTask]] = []
+        self._c = 0
 
     def has_input(self) -> bool:
         return False
 
     async def produce(self):
-        file_to_id = self._repo.get_file_to_id()     
+        file_to_id = self._book_repo.get_file_to_id()     
+        self._chunk_to_book_id = self._chunk_repo.get_ids()
         self.count_task = asyncio.create_task(self.count_total())
 
         async for book in self._engine.search_books():
             if book.file_name in file_to_id:
                 book = await self._enrich_from_db(book)
                 data = None
-                if not book.empty and len(book.chunks or []) == 0:
+                if not book.empty and book.id not in self._chunk_to_book_id:
                     data = await self._engine.get_book_data(book)
                 
                 yield Task(
@@ -56,10 +59,10 @@ class BookProducer(BaseQueueWorker[BookTask]):
                     name=book.file_name,
                     entity=BookTask(book, data, BookAction.BOOK)
                 )
-
+                
     async def _enrich_from_db(self, book: Book) -> Book:
         def _sync(file_name: str):
-            db_book = self._repo.get_full_by_file(file_name)
+            db_book = self._book_repo.get_full_by_file(file_name)
             if not db_book:
                 return None
 

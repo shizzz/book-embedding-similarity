@@ -19,7 +19,7 @@ class EmbeddingsRepository:
     def get_ids(self) -> set[int]:
         with self.router.embeddings(self.model_uid) as conn:
             rows = conn.execute("SELECT DISTINCT chunk_id FROM embeddings").fetchall()
-            return [r[0] for r in rows]
+            return {r[0] for r in rows}
 
     def get_all_batch(self, batch_size: int = 1):
         with self.router.embeddings(self.model_uid) as conn:

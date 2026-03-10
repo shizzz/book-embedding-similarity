@@ -39,10 +39,16 @@ class Chunker(BaseQueueWorker[BookTask]):
         for task in batch:
             book = task.entity.book
 
-            if task.entity.data and (not book.empty or book.empty is None):
+            if task.entity.data:
                 parser = BookParserFactory.create_parser(book.file_name)
                 parsed = parser.parse(task.entity.data)
                 Book.merge_from(book, parsed)
+
+                book.source_length = len(task.entity.data)
+                if parsed.empty is not None:
+                    book.empty = parsed.empty
+
+                parsed = None
 
                 book_task = Task(
                     id=book.id,
@@ -56,13 +62,20 @@ class Chunker(BaseQueueWorker[BookTask]):
                     for chunk in book.chunks:
                         chunk.book_id = book.id
                         chunk.chunk_id = await self._reserve_id()
-            else:
+
+
+            if book.empty:
+                result.append(Task(
+                    id=0, 
+                    name="Done",
+                    entity=None, 
+                    action=Action.NONE))
+                continue
+
+            if task.entity.data is None:
                 if book.id in self._chunk_to_book_id:
                     book.chunks = await self._enrich_from_db(book)
                     action = Action.EMBEDDING
-
-            if book.empty:
-                continue
             
             for chunk in book.chunks:
                 chunk_task = Task(
@@ -72,6 +85,8 @@ class Chunker(BaseQueueWorker[BookTask]):
                     action=action
                 )
                 result.append(chunk_task)
+
+            task.entity.data = None
         return result
 
     def route(self, task: Task, channels: list[Channel]) -> list[Channel]:

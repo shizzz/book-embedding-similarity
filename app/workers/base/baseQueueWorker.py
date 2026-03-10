@@ -1,9 +1,9 @@
 import asyncio
 import logging
 from abc import ABC
-from typing import Optional, Generic, List
+from typing import Optional, Generic, List, Callable
 from app.workers.stats import Stats, NullStats
-from app.workers.batchStrategies import CountBatchStrategy
+from app.workers.batchStrategies import CountBatchStrategy, BaseBatchStrategy
 from app.common.types import TEntity
 from app.infrastructure.models import Task, Channel
 
@@ -18,40 +18,40 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         stats: Stats = NullStats(),
         batch_size: int = 1,
         name: str = "Stage",
-        producer_done = asyncio.Event(),
         workers: int = 1,
-        logger: logging.Logger = None
+        logger: logging.Logger = None,
+        batch_strategy: Optional[Callable[[], BaseBatchStrategy]] = None
     ):
         self.stats = stats
         self.name = name
-        self.done = asyncio.Event()
         self.output_channels = output_channels or []
         self.batch_size = batch_size
 
         self._has_input = input_channel is not None
         self._workers_count = workers
         self._workers: List[asyncio.Task] = []
-        self._producer_done = producer_done
         self._flush_lock = asyncio.Lock()
         self._buffers: dict[int, List[Task]] = {}
 
-        self.input_queue = input_channel.queue if input_channel else asyncio.Queue(100)
+        self.input_channel = input_channel if input_channel else Channel("self", asyncio.Queue(100))
         self.logger = logger or self.get_logger(self.name)
 
-        self.batch_strategy = CountBatchStrategy(self.batch_size)
+        self.batch_strategy_factory = (
+            batch_strategy
+            if batch_strategy is not None
+            else lambda: CountBatchStrategy(batch_size)
+        )
 
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count)
 
-        edges = {ch.edge_name for ch in self.output_channels}
-        if not edges:
-            await self.stats.register_edge(self.name, "Done")
-        else:
-            for e in edges:
-                await self.stats.register_edge(self.name, e)
+        for ch in self.output_channels:
+             await self.stats.register_edge(self.name, ch.edge_name)
+             await ch.add_upstream()
 
         # старт producer если нет input
         if not self.has_input():
+            await self.input_channel.add_upstream()
             asyncio.create_task(self._produce())
 
         # старт worker'ов
@@ -60,14 +60,17 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
     async def wait(self):
         # ждём producer
-        await self._producer_done.wait()
-        await self.input_queue.join()
+        await self.input_channel.upstream_done.wait()
+        await self.input_channel.queue.join()
         await self._flush()
         # отменяем workers
         for w in self._workers:
             w.cancel()
         await asyncio.gather(*self._workers, return_exceptions=True)
-        self.done.set()
+        for ch in self.output_channels:
+            await ch.done()
+        await self.stats.finish(self.name)
+        self.logger.info(f"{self.name} worker is DONE")
 
     def has_input(self) -> bool:
         """Есть ли input queue"""
@@ -76,37 +79,43 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
     async def _produce(self):
         """Для stages без input"""
         async for task in self.produce():
-            await self.input_queue.put(task)
-        self._producer_done.set()
+            await self.input_channel.queue.put(task)
+        await self.input_channel.done()
 
     async def _worker(self, wid: int):
         buffer = self._buffers.setdefault(wid, [])
+        batch_strategy = self.batch_strategy_factory()
 
         while True:
+            if self.input_channel.upstream_done.is_set() and self.input_channel.queue.empty():
+                break
+
             try:
-                task = await self.input_queue.get()
-                await self.stats.queue_size(self.name, self.input_queue.qsize())
+                task = await self.input_channel.queue.get()
+                await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
             except asyncio.CancelledError:
                 break
 
             try:
                 buffer.append(task)
-                self.batch_strategy.on_add(task)
+                batch_strategy.on_add(task)
 
-                if self._producer_done.is_set() and self.input_queue.empty():
-                    break
-
-                if self.batch_strategy.should_flush(buffer):
+                if batch_strategy.should_flush(buffer):
                     await self._process_batch(buffer, wid)
+                    for task in buffer:
+                        if task.entity:
+                            task.entity = None
                     buffer.clear()
-                    self.batch_strategy.reset()
+                    batch_strategy.reset()
             except Exception as e:
                 await self.stats.error(self.name)
                 self.logger.exception(e)
             finally:
-                self.input_queue.task_done()
+                self.input_channel.queue.task_done()
 
-        # оставшиеся batch-и будут обработаны в _flush
+        await self._process_batch(buffer, wid)
+        buffer.clear()
+        batch_strategy.reset()
 
     async def _process_batch(self, batch: List[Task], wid: int):
         results = await self.process(batch, wid)
@@ -121,13 +130,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.dispatch(r)
 
     async def _flush(self):
-        async with self._flush_lock:
-            # принудительно обработать оставшиеся batch-и у всех worker'ов
-            for wid, buffer in self._buffers.items():
-                if buffer:
-                    await self._process_batch(buffer, wid)
-                    buffer.clear()
-            self.batch_strategy.reset()
+        pass
 
     # -------------------------------
     # Методы, которые нужно реализовать

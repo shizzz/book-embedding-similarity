@@ -9,7 +9,7 @@ class ChunkRepository:
     def get_ids(self) -> set[int]:
         with self.router.meta() as conn:
             rows = conn.execute("SELECT DISTINCT book_id FROM chunks").fetchall()
-            return [r[0] for r in rows]
+            return {r[0] for r in rows}
         
     def _create_many_meta(self, conn, chunks: list[Chunk]):
         conn.executemany(

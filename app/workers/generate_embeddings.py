@@ -13,6 +13,7 @@ from app.workers.sources import ConsoleHandler
 from app.workers.base import BaseQueueWorker
 from app.workers.stats import PipelineStats
 from app.workers.stages import BookProducer, Chunker, DbWorker, EmbeddingWorker
+from app.workers.sources.databaseReporter import DatabaseReporter
 
 BOOK_THREADS: int = 1
 CHUNK_THREADS: int = 4
@@ -51,6 +52,12 @@ class GenerateEmbeddingsWorker:
         await asyncio.gather(*(worker.start() for worker in self.pool))
         await asyncio.gather(*(worker.wait() for worker in self.pool))
 
+        report = DatabaseReporter(self.router, self.model.info.uid).generate()
+        self.ui.report(report)
+        await self.ui.update()
+
+        self._ui_task.cancel()
+
     async def setup_stages(self):
         self.ui = LiveUI(
             max_workers=ProcessConfig.MAX_WORKERS,
@@ -81,7 +88,6 @@ class GenerateEmbeddingsWorker:
             output_channels=[channel_chunks, channel_db],
             stats=self.stats,
             batch_size=64,
-            producer_done = self.book_stage.done,
             workers=CHUNK_THREADS,
             logger = self.logger, 
         )
@@ -94,7 +100,6 @@ class GenerateEmbeddingsWorker:
             output_channels=[channel_db],
             stats=self.stats,
             batch_size=128,
-            producer_done = self.chunk_stage.done,
             workers=EMB_THREADS,
             logger = self.logger, 
         )
@@ -106,7 +111,6 @@ class GenerateEmbeddingsWorker:
             input_channel=channel_db,
             stats=self.stats,
             batch_size=256,
-            producer_done = self.book_stage.done,
             workers=DB_THREADS,
             logger = self.logger, 
         )

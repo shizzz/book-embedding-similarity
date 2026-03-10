@@ -11,6 +11,7 @@ class StageStats:
         self.queue: int = 0
         self.workers = workers
         self.start_time: float | None = None
+        self.finished: bool = False
 
     def start(self):
         self.start_time = time.time()
