@@ -154,11 +154,11 @@ class BookSourceManager:
                 mem = io.BytesIO(data)
                 zipf = zipfile.ZipFile(mem)
 
-                BookSourceManager._zip_cache[archive_name] = (
-                    zipf,
-                    mem,
-                    access
-                )
+                # BookSourceManager._zip_cache[archive_name] = (
+                #     zipf,
+                #     mem,
+                #     access
+                # )
 
             # cleanup old entries
             to_remove = [
