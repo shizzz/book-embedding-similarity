@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:FictionBook xmlns:ns0="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:ns1="http://www.w3.org/1999/xlink">
+ <ns0:description>
+  <ns0:title-info>
+   <ns0:genre>бiEщOcRFULюя</ns0:genre>
+   <ns0:author>
+    <ns0:first-name />
+    <ns0:last-name>ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK</ns0:last-name>
+   </ns0:author>
+   <ns0:book-title>чzплrёpfсэбeдBPяcйeхYмсф</ns0:book-title>
+   <ns0:date />
+   <ns0:coverpage>
+    <ns0:image ns1:href="#_1.jpg" /></ns0:coverpage>
+   <ns0:lang>cш</ns0:lang>
+  </ns0:title-info>
+  <ns0:document-info>
+   <ns0:author>
+    <ns0:first-name>nsд.</ns0:first-name>
+    <ns0:last-name>нюO.</ns0:last-name>
+   </ns0:author>
+   <ns0:program-used>BR SrPьшc Aд.ш</ns0:program-used>
+   <ns0:date value="2008-11-25">Sp gпчуJтso ыiюd</ns0:date>
+   <ns0:id>CotoфыгZ-цrtм-щоеU-SдSq-zzLюnфTLnFVi</ns0:id>
+   <ns0:version>a.е</ns0:version>
+   <ns0:history>
+    <ns0:p>х.у DMD zRAмJтyigaгмJчвfDэаpoшkv LKьлBzlwшэlXMхX</ns0:p>
+   </ns0:history>
+  </ns0:document-info>
+ </ns0:description>
+ <ns0:body>
+  <ns0:section>
+   <ns0:image ns1:href="#_2.jpg_0" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_3.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_4.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_5.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_6.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_7.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_8.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_9.jpg" />
+   <ns0:empty-line />
+   <ns0:image ns1:href="#_10.jpg" />
+  </ns0:section>
+ </ns0:body>
+</ns0:FictionBook>

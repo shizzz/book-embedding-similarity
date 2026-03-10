@@ -1,11 +1,9 @@
 import unittest
 from pathlib import Path
-
 from lxml import etree
-
 from app.parsers.book.fb2_parser import FB2BookParser
 from app.infrastructure.models import ChunkType
-
+from app.settings import ChunkingConfig
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -70,59 +68,8 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertLessEqual(len(chunk.text), max_chars)
         self.assertIn("desc", chunk.text)
 
-    def test_parse_populates_book_metadata_and_chunks(self):
-        xml = b"""<?xml version="1.0" encoding="utf-8"?>
-        <FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
-          <description>
-            <title-info>
-              <book-title>  Sample  Title  </book-title>
-              <author>
-                <first-name>John</first-name>
-                <last-name>Doe</last-name>
-              </author>
-              <annotation>
-                <p>First line of description.</p>
-                <p>Second line of description.</p>
-              </annotation>
-            </title-info>
-            <document-info>
-              <id>BOOK-ID-123</id>
-            </document-info>
-          </description>
-          <body>
-            <section>
-              <p>Paragraph one text.</p>
-              <p>Paragraph two text.</p>
-              <poem>
-                <v>Poem line one.</v>
-                <v>Poem line two.</v>
-              </poem>
-            </section>
-          </body>
-        </FictionBook>
-        """
-
-        parser = FB2BookParser(filepath="sample.fb2")
-        book = parser.parse(xml)
-
-        # Basic metadata
-        self.assertEqual(book.file_name, "sample.fb2")
-        self.assertEqual(book.title, "Sample Title")
-        self.assertEqual(book.uid, "BOOK-ID-123")
-        self.assertEqual(book.authors, ["John Doe"])
-        self.assertEqual(book.author, "John Doe")
-
-        # Chunks and text length
-        self.assertIsNotNone(book.chunks)
-        self.assertGreaterEqual(len(book.chunks), 2)
-        types = [c.type for c in book.chunks]
-        self.assertIn(ChunkType.TITLE, types)
-        self.assertIn(ChunkType.DESCRIPTION, types)
-        self.assertIsNotNone(book.text_length)
-        self.assertGreater(book.text_length, 0)
-
-    def test_parse_real_fb2_file_from_disk(self):
-        fb2_path = DATA_DIR / "sample_simple.fb2"
+    def test_book_with_chords_at_end(self):
+        fb2_path = DATA_DIR / "118674.fb2"
         self.assertTrue(fb2_path.is_file(), f"FB2 test file not found: {fb2_path}")
 
         with fb2_path.open("rb") as f:
@@ -132,13 +79,13 @@ class TestFB2BookParser(unittest.TestCase):
         book = parser.parse(data)
 
         # file_name should be set to the original filepath
-        self.assertTrue(str(book.file_name).endswith("sample_simple.fb2"))
+        self.assertTrue(str(book.file_name).endswith("118674.fb2"))
 
         # Metadata from the real FB2 file
-        self.assertEqual(book.title, "Disk Sample Title")
-        self.assertEqual(book.uid, "DISK-BOOK-ID-1")
-        self.assertEqual(book.authors, ["Alice Smith"])
-        self.assertEqual(book.author, "Alice Smith")
+        self.assertEqual(book.title, "нрkqS J FъHI мZEIN uRзNлjbж")
+        self.assertEqual(book.uid, "сlLfAKоB-VoVк-пncO-oJлb-lвьSцyUвrbEq")
+        self.assertEqual(book.authors, ["pCLtпл GDьg hASдвmSъm"])
+        self.assertEqual(book.author, "pCLtпл GDьg hASдвmSъm")
 
         # Chunks and text length should be populated
         self.assertIsNotNone(book.chunks)
@@ -149,7 +96,101 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertIsNotNone(book.text_length)
         self.assertGreater(book.text_length, 0)
 
+        for chunk in book.chunks:
+          if chunk.type == ChunkType.TEXT:
+            self.assertGreater(chunk.length, 1000)
 
+    def test_empty_book(self):
+        fb2_path = DATA_DIR / "144825.fb2"
+        self.assertTrue(fb2_path.is_file(), f"FB2 test file not found: {fb2_path}")
+
+        with fb2_path.open("rb") as f:
+            data = f.read()
+
+        parser = FB2BookParser(filepath=str(fb2_path))
+        book = parser.parse(data)
+
+        # file_name should be set to the original filepath
+        self.assertTrue(str(book.file_name).endswith("144825.fb2"))
+
+        # Metadata from the real FB2 file
+        self.assertEqual(book.title, "чzплrёpfсэбeдBPяcйeхYмсф")
+        self.assertEqual(book.uid, "CotoфыгZ-цrtм-щоеU-SдSq-zzLюnфTLnFVi")
+        self.assertEqual(book.authors, ["ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK"])
+        self.assertEqual(book.author, "ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK")
+
+        # Chunks and text length should be populated
+        self.assertIsNotNone(book.chunks)
+        self.assertEqual(len(book.chunks), 0)
+        self.assertEqual(book.empty, True)
+            
+    def test_poem(self):
+        fb2_path = DATA_DIR / "75252.fb2"
+        self.assertTrue(fb2_path.is_file(), f"FB2 test file not found: {fb2_path}")
+
+        with fb2_path.open("rb") as f:
+            data = f.read()
+
+        parser = FB2BookParser(filepath=str(fb2_path))
+        book = parser.parse(data)
+
+        # file_name should be set to the original filepath
+        self.assertTrue(str(book.file_name).endswith("75252.fb2"))
+
+        # Metadata from the real FB2 file
+        self.assertEqual(book.title, "lвыщvщаDP")
+        self.assertEqual(book.uid, "mуцfэEkm-PnэQ-mкKд-pмкU-EфclщZyцLhцA")
+        self.assertEqual(book.authors, ["YEлхтSsD nlbGэuWRм эJhп"])
+        self.assertEqual(book.author, "YEлхтSsD nlbGэuWRм эJhп")
+
+        # Chunks and text length should be populated
+        self.assertIsNotNone(book.chunks)
+        self.assertGreaterEqual(len(book.chunks), 3)
+        types = {c.type for c in book.chunks}
+        self.assertIn(ChunkType.TITLE, types)
+        self.assertIsNotNone(book.text_length)
+        self.assertGreater(book.text_length, 0)
+
+        for chunk in book.chunks:
+          if chunk.type == ChunkType.TEXT:
+            self.assertGreater(chunk.length, 1000)
+            
+    def test_normal_book(self):
+        fb2_path = DATA_DIR / "1132.fb2"
+        self.assertTrue(fb2_path.is_file(), f"FB2 test file not found: {fb2_path}")
+
+        with fb2_path.open("rb") as f:
+            data = f.read()
+
+        parser = FB2BookParser(filepath=str(fb2_path))
+        book = parser.parse(data)
+
+        # file_name should be set to the original filepath
+        self.assertTrue(str(book.file_name).endswith("1132.fb2"))
+
+        # Metadata from the real FB2 file
+        self.assertEqual(book.title, "PhиоьnRTGZ Qта")
+        self.assertEqual(book.uid, "KHчъяslT-GхCq-рGjc-Hнjз-VтMяrбdшvсаъ")
+        self.assertEqual(book.authors, ["PцmэkDk drьCж"])
+        self.assertEqual(book.author, "PцmэkDk drьCж")
+
+        # Chunks and text length should be populated
+        self.assertIsNotNone(book.chunks)
+        self.assertGreaterEqual(len(book.chunks), 2 + ChunkingConfig.CHUNKS_PER_BOOK)
+        types = {c.type for c in book.chunks}
+        self.assertIn(ChunkType.TITLE, types)
+        self.assertIn(ChunkType.DESCRIPTION, types)
+        self.assertIsNotNone(book.text_length)
+        self.assertGreater(book.text_length, 0)
+
+        total_length  = 0
+        target_chunk_length = int(ChunkingConfig.ST_TARGET_CHARS * 0.95 / ChunkingConfig.CHUNKS_PER_BOOK)
+        for chunk in book.chunks:
+          if chunk.type == ChunkType.TEXT:
+            total_length  += chunk.length
+            self.assertGreater(chunk.length, target_chunk_length)
+        self.assertGreater(total_length, ChunkingConfig.ST_TARGET_CHARS * 0.95)
+            
 if __name__ == "__main__":
     unittest.main()
 
