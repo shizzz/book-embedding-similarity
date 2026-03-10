@@ -128,53 +128,16 @@ class BookSourceManager:
     ) -> AsyncGenerator[zipfile.ZipFile, None]:
         archive_path = await self._ensure_local(archive_name)
 
-        async with BookSourceManager._cache_lock:
-            BookSourceManager._access_counter += 1
-            access = BookSourceManager._access_counter
-            cached = BookSourceManager._zip_cache.get(
-                archive_name
-            )
+        # Чтение файла в отдельном потоке, чтобы не блокировать asyncio
+        def _open_zip():
+            return zipfile.ZipFile(archive_path, "r")
 
-            if cached:
-                zipf, mem, _ = cached
-                BookSourceManager._zip_cache[archive_name] = (
-                    zipf,
-                    mem,
-                    access
-                )
+        zipf = await asyncio.to_thread(_open_zip)
 
-            else:
-                data = await asyncio.to_thread(
-                    lambda: open(
-                        archive_path,
-                        "rb"
-                    ).read()
-                )
-
-                mem = io.BytesIO(data)
-                zipf = zipfile.ZipFile(mem)
-
-                # BookSourceManager._zip_cache[archive_name] = (
-                #     zipf,
-                #     mem,
-                #     access
-                # )
-
-            # cleanup old entries
-            to_remove = [
-                name
-                for name, (_, _, last)
-                in BookSourceManager._zip_cache.items()
-                if access - last
-                > BookSourceManager._max_idle_accesses
-            ]
-
-            for name in to_remove:
-                zipf_old, mem_old, _ = \
-                    BookSourceManager._zip_cache.pop(name)
-                zipf_old.close()
-
-        yield zipf
+        try:
+            yield zipf
+        finally:
+            zipf.close()
 
     # ============================================================
     # download logic

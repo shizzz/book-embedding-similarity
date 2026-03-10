@@ -27,25 +27,41 @@ class BookProducer(BaseQueueWorker[BookTask]):
         self._batch: List[Task[BookTask]] = []
         self._c = 0
 
+        self.count_task = asyncio.create_task(self.count_total())
+        self._file_to_id = self._book_repo.get_file_to_id()     
+        self._chunk_to_book_id = self._chunk_repo.get_ids()
+
     def has_input(self) -> bool:
         return False
 
     async def produce(self):
-        file_to_id = self._book_repo.get_file_to_id()     
-        self._chunk_to_book_id = self._chunk_repo.get_ids()
-        self.count_task = asyncio.create_task(self.count_total())
-
+        i = 0
         async for book in self._engine.search_books():
-            if book.file_name in file_to_id:
+            i += 1
+            if i > 1000:
+                break
+            yield Task(
+                id=book.id,
+                name=book.file_name,
+                entity=book
+            )
+
+    async def process(self, batch: List[Task[Book]], wid: int) -> List[Task[BookTask]]:
+        tasks: List[Task[BookTask]] = []
+        for item in batch:
+            book = item.entity
+            if book.file_name in self._file_to_id:
                 book = await self._enrich_from_db(book)
                 data = None
                 if not book.empty and book.id not in self._chunk_to_book_id:
                     data = await self._engine.get_book_data(book)
                 
-                yield Task(
-                    id=book.id,
-                    name=book.file_name,
-                    entity=BookTask(book, data, BookAction.CHUNK)
+                tasks.append(
+                    Task(
+                        id=book.id,
+                        name=book.file_name,
+                        entity=BookTask(book, data, BookAction.CHUNK)
+                    )
                 )
             else:
                 book.id = self.reserve_id()
@@ -54,11 +70,14 @@ class BookProducer(BaseQueueWorker[BookTask]):
                 if not data:
                     continue
 
-                yield Task(
-                    id=book.id,
-                    name=book.file_name,
-                    entity=BookTask(book, data, BookAction.BOOK)
+                tasks.append(
+                    Task(
+                        id=book.id,
+                        name=book.file_name,
+                        entity=BookTask(book, data, BookAction.BOOK)
+                    )
                 )
+        return tasks
                 
     async def _enrich_from_db(self, book: Book) -> Book:
         def _sync(file_name: str):

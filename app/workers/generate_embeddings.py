@@ -51,6 +51,7 @@ class GenerateEmbeddingsWorker:
         self._ui_task = asyncio.create_task(self.refresh_ui_loop())
         await asyncio.gather(*(worker.start() for worker in self.pool))
         await asyncio.gather(*(worker.wait() for worker in self.pool))
+        await self.ui.update()
 
         report = DatabaseReporter(self.router, self.model.info.uid).generate()
         self.ui.report(report)

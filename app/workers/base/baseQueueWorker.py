@@ -41,6 +41,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             else lambda: CountBatchStrategy(batch_size)
         )
 
+        self._to_flush = []
+
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count)
 
@@ -86,17 +88,21 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         batch_strategy = self.batch_strategy_factory()
 
         while True:
-            if self.input_channel.upstream_done.is_set() and self.input_channel.queue.empty():
-                break
-
             try:
                 task = await self.input_channel.queue.get()
-                await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
+                buffer.append(task)
+                batch_strategy.on_add(task)
+            # на случай, если в момент остановки воркеров буфер был не пуст, сливаем его в flush
             except asyncio.CancelledError:
+                if task:
+                    buffer.append(task)
+                if len(buffer) > 0:
+                    self._to_flush.extend(buffer)
                 break
 
             try:
-                buffer.append(task)
+                await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
+                
                 batch_strategy.on_add(task)
 
                 if batch_strategy.should_flush(buffer):
@@ -112,9 +118,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             finally:
                 self.input_channel.queue.task_done()
 
-        await self._process_batch(buffer, wid)
-        buffer.clear()
-        batch_strategy.reset()
+            task = None
 
     async def _process_batch(self, batch: List[Task], wid: int):
         results = await self.process(batch, wid)
@@ -129,7 +133,10 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.dispatch(r)
 
     async def _flush(self):
-        pass
+        if len(self._to_flush) > 0:
+            await self._process_batch(self._to_flush, -1)
+            self._to_flush.clear()
+
 
     # -------------------------------
     # Методы, которые нужно реализовать
