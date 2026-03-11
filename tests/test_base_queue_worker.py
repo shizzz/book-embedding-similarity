@@ -10,11 +10,15 @@ from app.infrastructure.models.task import Task
 class DummyWorker(BaseQueueWorker[int]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.processed_batches: list[list[int]] = []
+        self.processed_batches: list[int] = []
 
     async def process(self, batch: list[Task], wid: int) -> list[Task]:
-        self.processed_batches.append([t.entity for t in batch])
+        self.processed_batches.extend([t.entity for t in batch])
         return batch
+    
+    async def produce(self):
+        for i in range(1000):
+            yield Task(id=i, name=i, entity=i)
 
     async def dispatch(self, result: Task):
         # No-op to avoid touching real channels in tests
@@ -52,12 +56,12 @@ class TestBaseQueueWorker(unittest.IsolatedAsyncioTestCase):
 
         # Worker should have processed all items in batches and then shut down.
         self.assertTrue(output_channel.upstream_done.is_set())
-        flattened = [item for batch in worker.processed_batches for item in batch]
+        flattened = [entity for entity in worker.processed_batches]
         self.assertEqual(sorted(flattened), list(range(total_items)))
 
 class TestProducerQueueWorker(unittest.IsolatedAsyncioTestCase):
     async def test_producer_starts_and_shut_down(self):
-        batch_size = 2
+        batch_size = 32
 
         queue: asyncio.Queue[Task[int]] = asyncio.Queue()
         output_channel = Channel(downstream="sky", queue=queue)
@@ -75,6 +79,7 @@ class TestProducerQueueWorker(unittest.IsolatedAsyncioTestCase):
 
         # Worker should have processed all items in batches and then shut down.
         self.assertTrue(output_channel.upstream_done.is_set())
+        self.assertEqual(len(worker.processed_batches), 1000)
 
 
 if __name__ == "__main__":

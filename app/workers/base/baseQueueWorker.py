@@ -41,7 +41,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             else lambda: CountBatchStrategy(batch_size)
         )
 
-        self._buffers: dict[int, List[Task]] = {}
+        self._puller_tasks: List[asyncio.Task] = []
 
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count)
@@ -64,9 +64,9 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         await self.input_channel.upstream_done.wait()
         await self.input_channel.queue.join()
         # отменяем workers
-        for w in self._workers:
+        for w in self._puller_tasks:
             w.cancel()
-        await self._flush()
+        await self.flush()
         await asyncio.gather(*self._workers, return_exceptions=True)
         for ch in self.output_channels:
             await ch.done()
@@ -84,24 +84,14 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         await self.input_channel.done()
 
     async def _worker(self, wid: int):
-        buffer = self._buffers.setdefault(wid, [])
+        buffer = []
         batch_strategy = self.batch_strategy_factory()
 
-        while True:
-            try:
-                task = await self.input_channel.queue.get()
-            except asyncio.CancelledError:
-                if task:
-                    buffer.append(task)
-                break
+        async def callback(task: Task):
+            buffer.append(task)
+            batch_strategy.on_add(task)
 
             try:
-                buffer.append(task)
-                batch_strategy.on_add(task)
-                await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
-                
-                batch_strategy.on_add(task)
-
                 if batch_strategy.should_flush(buffer):
                     await self._process_batch(buffer, wid)
                     buffer.clear()
@@ -112,7 +102,23 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             finally:
                 self.input_channel.queue.task_done()
 
-            task = None
+        async def puller():
+            while True:
+                task = None
+                task = await self.input_channel.queue.get()
+                await callback(task)
+
+        puller_task = asyncio.create_task(puller())
+        self._puller_tasks.append(puller_task)
+
+        try:
+            await puller_task
+        except asyncio.CancelledError:
+            pass
+
+        if buffer:
+            await self._process_batch(buffer, wid)
+            buffer.clear()
 
     async def _process_batch(self, batch: List[Task], wid: int):
         results = await self.process(batch, wid)
@@ -126,13 +132,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.post_process(r)
             await self.dispatch(r)
 
-    async def _flush(self):
-        # принудительно обработать оставшиеся batch-и у всех worker'ов
-        for wid, buffer in self._buffers.items():
-            if buffer:
-                await self._process_batch(buffer, wid)
-                buffer.clear()
-
+    async def flush(self):
+        pass
 
     # -------------------------------
     # Методы, которые нужно реализовать
