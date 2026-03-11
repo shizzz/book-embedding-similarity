@@ -5,10 +5,10 @@ from app.common.types import TEntity
 from .book import Book
 
 class Action(IntEnum):
-    BOOK = auto()
-    CHUNK = auto()
+    GRAB = auto()
+    PARSE = auto()
     EMBEDDING = auto()
-    BOTH = auto()
+    DB = auto()
     NONE = auto()
 
 class Dataset(IntEnum):
@@ -26,25 +26,28 @@ class Task(Generic[TEntity]):
     id: int
     name: str
     entity: TEntity
-
-    action: Optional[IntEnum] = None
+    actions: list[Action] = field(default_factory=list)
     dataset: Optional[Dataset] = None
 
     done: int = 1
     db_queue_count: int = 0
+
+    def __post_init__(self):
+        if isinstance(self.actions, Action):
+            self.actions = [self.actions]
 
     def clone(self, *, entity: Optional[TEntity] = None) -> "Task[TEntity]":
         return Task(
             id=self.id,
             name=self.name,
             entity=entity if entity is not None else self.entity,
-            action=self.action,
+            actions=self.actions,
             dataset=self.dataset,
             done=self.done,
             db_queue_count=self.db_queue_count,
         )
     
-class BatchTask(Task[list[TEntity]]):
+class BatchTask(Task[List[TEntity]]):
     pass
 
 @dataclass

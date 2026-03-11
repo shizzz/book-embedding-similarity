@@ -8,7 +8,7 @@ from app.infrastructure.db.repositories import BookRepository, ChunkRepository, 
 from app.infrastructure.models import Book, Chunk, Embedding, Channel, Dataset, BatchTask, Stages
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.workers.base import BaseQueueWorker, BaseWorker
-from app.workers.stages import BookProducer, Chunker, DbWorker, EmbeddingWorker
+from app.workers.stages import BookProducer, Parser, DbWorker, EmbeddingWorker
 from app.workers.sources.databaseReporter import DatabaseReporter
 
 BOOK_THREADS: int = 1
@@ -39,7 +39,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         self.ui.model_info = self.model.info
         
         self.pool: List[BaseQueueWorker] = []
-        channel_book = Channel(Stages.CHUNK, asyncio.Queue(maxsize=50))
+        channel_book = Channel(Stages.PARSER, asyncio.Queue(maxsize=50))
         channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(100))
         channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
 
@@ -54,7 +54,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
         )
         self.pool.append(self.book_stage)
 
-        self.chunk_stage = Chunker(
+        self.chunk_stage = Parser(
             router=self.router,
             search_engine=self.search_engine,
             input_channel=channel_book,
