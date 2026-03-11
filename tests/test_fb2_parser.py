@@ -76,27 +76,27 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book, chunks = parser.parse(data)
+        parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
-        self.assertTrue(str(book.file_name).endswith("118674.fb2"))
+        self.assertTrue(str(parsed.book.file_name).endswith("118674.fb2"))
 
         # Metadata from the real FB2 file
-        self.assertEqual(book.title, "нрkqS J FъHI мZEIN uRзNлjbж")
-        self.assertEqual(book.uid, "сlLfAKоB-VoVк-пncO-oJлb-lвьSцyUвrbEq")
-        self.assertEqual(book.authors, ["pCLtпл GDьg hASдвmSъm"])
-        self.assertEqual(book.author, "pCLtпл GDьg hASдвmSъm")
+        self.assertEqual(parsed.book.title, "нрkqS J FъHI мZEIN uRзNлjbж")
+        self.assertEqual(parsed.book.uid, "сlLfAKоB-VoVк-пncO-oJлb-lвьSцyUвrbEq")
+        self.assertEqual(parsed.book.authors, ["pCLtпл GDьg hASдвmSъm"])
+        self.assertEqual(parsed.book.author, "pCLtпл GDьg hASдвmSъm")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(chunks)
-        self.assertGreaterEqual(len(chunks), 2)
-        types = {c.type for c in chunks}
+        self.assertIsNotNone(parsed.chunks)
+        self.assertGreaterEqual(len(parsed.chunks), 2)
+        types = {c.type for c in parsed.chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIn(ChunkType.DESCRIPTION, types)
-        self.assertIsNotNone(book.text_length)
-        self.assertGreater(book.text_length, 0)
+        self.assertIsNotNone(parsed.book.text_length)
+        self.assertGreater(parsed.book.text_length, 0)
 
-        for chunk in chunks:
+        for chunk in parsed.chunks:
           if chunk.type == ChunkType.TEXT:
             self.assertGreater(chunk.length, 1000)
 
@@ -108,21 +108,21 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book, chunks = parser.parse(data)
+        parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
-        self.assertTrue(str(book.file_name).endswith("144825.fb2"))
+        self.assertTrue(str(parsed.book.file_name).endswith("144825.fb2"))
 
         # Metadata from the real FB2 file
-        self.assertEqual(book.title, "чzплrёpfсэбeдBPяcйeхYмсф")
-        self.assertEqual(book.uid, "CotoфыгZ-цrtм-щоеU-SдSq-zzLюnфTLnFVi")
-        self.assertEqual(book.authors, ["ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK"])
-        self.assertEqual(book.author, "ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK")
+        self.assertEqual(parsed.book.title, "чzплrёpfсэбeдBPяcйeхYмсф")
+        self.assertEqual(parsed.book.uid, "CotoфыгZ-цrtм-щоеU-SдSq-zzLюnфTLnFVi")
+        self.assertEqual(parsed.book.authors, ["ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK"])
+        self.assertEqual(parsed.book.author, "ъvэяnяъpMecwfMKqaztEyзOZqcсyjyъqтссK")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(chunks)
-        self.assertEqual(len(chunks), 0)
-        self.assertEqual(book.empty, True)
+        self.assertIsNotNone(parsed.chunks)
+        self.assertEqual(len(parsed.chunks), 0)
+        self.assertEqual(parsed.book.empty, True)
             
     def test_poem(self):
         fb2_path = DATA_DIR / "75252.fb2"
@@ -132,26 +132,26 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book, chunks = parser.parse(data)
+        parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
-        self.assertTrue(str(book.file_name).endswith("75252.fb2"))
+        self.assertTrue(str(parsed.book.file_name).endswith("75252.fb2"))
 
         # Metadata from the real FB2 file
-        self.assertEqual(book.title, "lвыщvщаDP")
-        self.assertEqual(book.uid, "mуцfэEkm-PnэQ-mкKд-pмкU-EфclщZyцLhцA")
-        self.assertEqual(book.authors, ["YEлхтSsD nlbGэuWRм эJhп"])
-        self.assertEqual(book.author, "YEлхтSsD nlbGэuWRм эJhп")
+        self.assertEqual(parsed.book.title, "lвыщvщаDP")
+        self.assertEqual(parsed.book.uid, "mуцfэEkm-PnэQ-mкKд-pмкU-EфclщZyцLhцA")
+        self.assertEqual(parsed.book.authors, ["YEлхтSsD nlbGэuWRм эJhп"])
+        self.assertEqual(parsed.book.author, "YEлхтSsD nlbGэuWRм эJhп")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(chunks)
-        self.assertGreaterEqual(len(chunks), 3)
-        types = {c.type for c in chunks}
+        self.assertIsNotNone(parsed.chunks)
+        self.assertGreaterEqual(len(parsed.chunks), 3)
+        types = {c.type for c in parsed.chunks}
         self.assertIn(ChunkType.TITLE, types)
-        self.assertIsNotNone(book.text_length)
-        self.assertGreater(book.text_length, 0)
+        self.assertIsNotNone(parsed.book.text_length)
+        self.assertGreater(parsed.book.text_length, 0)
 
-        for chunk in chunks:
+        for chunk in parsed.chunks:
           if chunk.type == ChunkType.TEXT:
             self.assertGreater(chunk.length, 1000)
             
@@ -163,29 +163,29 @@ class TestFB2BookParser(unittest.TestCase):
             data = f.read()
 
         parser = FB2BookParser(filepath=str(fb2_path))
-        book, chunks = parser.parse(data)
+        parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
-        self.assertTrue(str(book.file_name).endswith("1132.fb2"))
+        self.assertTrue(str(parsed.book.file_name).endswith("1132.fb2"))
 
         # Metadata from the real FB2 file
-        self.assertEqual(book.title, "PhиоьnRTGZ Qта")
-        self.assertEqual(book.uid, "KHчъяslT-GхCq-рGjc-Hнjз-VтMяrбdшvсаъ")
-        self.assertEqual(book.authors, ["PцmэkDk drьCж"])
-        self.assertEqual(book.author, "PцmэkDk drьCж")
+        self.assertEqual(parsed.book.title, "PhиоьnRTGZ Qта")
+        self.assertEqual(parsed.book.uid, "KHчъяslT-GхCq-рGjc-Hнjз-VтMяrбdшvсаъ")
+        self.assertEqual(parsed.book.authors, ["PцmэkDk drьCж"])
+        self.assertEqual(parsed.book.author, "PцmэkDk drьCж")
 
         # Chunks and text length should be populated
-        self.assertIsNotNone(chunks)
-        self.assertGreaterEqual(len(chunks), 2 + ChunkingConfig.CHUNKS_PER_BOOK)
-        types = {c.type for c in chunks}
+        self.assertIsNotNone(parsed.chunks)
+        self.assertGreaterEqual(len(parsed.chunks), 2 + ChunkingConfig.CHUNKS_PER_BOOK)
+        types = {c.type for c in parsed.chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIn(ChunkType.DESCRIPTION, types)
-        self.assertIsNotNone(book.text_length)
-        self.assertGreater(book.text_length, 0)
+        self.assertIsNotNone(parsed.book.text_length)
+        self.assertGreater(parsed.book.text_length, 0)
 
         total_length  = 0
         target_chunk_length = int(ChunkingConfig.ST_TARGET_CHARS * 0.95 / ChunkingConfig.CHUNKS_PER_BOOK)
-        for chunk in chunks:
+        for chunk in parsed.chunks:
           if chunk.type == ChunkType.TEXT:
             total_length  += chunk.length
             self.assertGreater(chunk.length, target_chunk_length)

@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
-from app.infrastructure.models import Book, Chunk
+from app.infrastructure.models import ParseResult
 
 class BookParser(ABC):
     def __init__(self, filepath: str):
         self.filepath = filepath
 
     @abstractmethod
-    def parse(self, data: bytes) -> Tuple[Book, List[Chunk]]:
+    def parse(self, data: bytes) -> ParseResult:
         """Парсит книгу и возвращает словарь с метаданными и текстом."""
         pass

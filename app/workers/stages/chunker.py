@@ -37,19 +37,19 @@ class Chunker(BaseQueueWorker[BookTask]):
         action = Action.BOTH
 
         for task in batch:
-            parsed_book = None
-            chunks = None
+            parsed = None
             book = task.entity.book
             chunks: List[Chunk] = []
 
             if task.entity.data:
                 parser = BookParserFactory.create_parser(book.file_name)
-                parsed_book, chunks = parser.parse(task.entity.data)
-                Book.merge_from(book, parsed_book)
+                parsed = parser.parse(task.entity.data)
+                chunks = parsed.chunks
+                Book.merge_from(book, parsed.book)
 
                 book.source_length = len(task.entity.data)
-                if parsed_book.empty is not None:
-                    book.empty = parsed_book.empty
+                if parsed.book.empty is not None:
+                    book.empty = parsed.book.empty
 
                 book_task = Task(
                     id=book.id,

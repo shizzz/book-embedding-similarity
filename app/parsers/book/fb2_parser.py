@@ -1,8 +1,8 @@
 import re
 from lxml import etree
 from math import ceil
-from typing import List, Tuple, Optional
-from app.infrastructure.models import Book, Chunk, ChunkType
+from typing import List, Optional
+from app.infrastructure.models import Book, Chunk, ChunkType, ParseResult
 from app.settings import ChunkingConfig
 from .book_parser import BookParser
 
@@ -11,7 +11,7 @@ class FB2BookParser(BookParser):
         super().__init__(*args, **kwargs)
         self._ns = {"fb2": "http://www.gribuser.ru/xml/fictionbook/2.0"}
 
-    def parse(self, data: bytes) -> Tuple[Book, List[Chunk]]:
+    def parse(self, data: bytes) -> ParseResult:
         book = Book(file_name=self.filepath)
 
         parser = etree.XMLParser(
@@ -23,7 +23,7 @@ class FB2BookParser(BookParser):
 
         return self.enrich_book(book, root)
 
-    def enrich_book(self, book: Book, root: any) -> Tuple[Book, List[Chunk]]:
+    def enrich_book(self, book: Book, root: any) -> ParseResult:
         chunks: List[Chunk] = []
         enrichers = (
             ("uid", self.get_id),
@@ -43,11 +43,13 @@ class FB2BookParser(BookParser):
             book.text_length = text_length
             if not any(chunk.type == ChunkType.TEXT for chunk in chunks):
                 book.empty = True
+                chunks = []
             else:
                 for chunk in chunks:
                     chunk.book_id = book.id
 
-        return book, chunks
+        result = ParseResult(book=book, chunks=chunks)
+        return result
 
     # =====================
     # TEXT

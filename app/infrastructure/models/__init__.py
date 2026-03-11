@@ -10,6 +10,7 @@ from .constants import ChunkType, Stages
 from .report import Report
 from .stage_stats import StageStats
 from .channel import Channel
+from .parse_result import ParseResult
 
 __all__ = [
     "Book",
@@ -33,5 +34,6 @@ __all__ = [
     "StageStats",
     "Channel",
     "SaveTarget",
-    "Stages"
+    "Stages",
+    "ParseResult"
 ]
