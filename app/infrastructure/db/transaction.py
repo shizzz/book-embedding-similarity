@@ -1,3 +1,5 @@
+import asyncio
+
 class DBTransaction:
     def __init__(self, router):
         self.router = router
@@ -36,3 +38,38 @@ class DBTransaction:
             self.commit()
         else:
             self.rollback()
+
+class TransactionAsync:
+    def __init__(self, *, router, model_uid: str | None):
+        self._router = router
+        self._model_uid = model_uid
+        self._tx: DBTransaction | None = None
+        self._locks: list[asyncio.Lock] = []
+
+    async def __aenter__(self) -> DBTransaction:
+        self._locks = [self._router.meta_lock(), self._router.chunks_lock()]
+        if self._model_uid is not None:
+            self._locks.append(self._router.embeddings_lock(self._model_uid))
+
+        # Fixed order to avoid deadlocks
+        for lock in self._locks:
+            await lock.acquire()
+
+        try:
+            self._tx = self._router.transaction().__enter__()
+            return self._tx
+        except Exception:
+            for lock in reversed(self._locks):
+                lock.release()
+            self._locks = []
+            raise
+
+    async def __aexit__(self, exc_type, exc, tb):
+        try:
+            if self._tx is not None:
+                return self._tx.__exit__(exc_type, exc, tb)
+        finally:
+            for lock in reversed(self._locks):
+                lock.release()
+            self._locks = []
+            self._tx = None

@@ -24,10 +24,10 @@ class DbWorker(BaseQueueWorker):
         self._router = router
 
     async def process(self, batch: List[Task], wid: int) -> List[Task]:
-        total_done = await asyncio.to_thread(self._save_batch, batch)
+        await self._save_batch(batch)
         return batch
 
-    def _save_batch(self, batch: List[Task]) -> int:
+    async def _save_batch(self, batch: List[Task]) -> int:
         groups: dict[IntEnum | None, tuple[Task, list]] = {}
 
         for task in batch:
@@ -43,6 +43,9 @@ class DbWorker(BaseQueueWorker):
             for base, entities in groups.values()
         ]
 
-        self._save(self._router, grouped_tasks)
+        if asyncio.iscoroutinefunction(self._save):
+            await self._save(self._router, grouped_tasks)
+        else:
+            await asyncio.to_thread(self._save, self._router, grouped_tasks)
 
         return len(batch)
