@@ -12,6 +12,7 @@ class StageStats:
         self.workers = workers
         self.start_time: float | None = None
         self.finished: bool = False
+        self.speed_value: float = 0
 
     def start(self):
         self.start_time = time.time()
@@ -29,8 +30,11 @@ class StageStats:
             return "-"
         elapsed = time.time() - self.start_time
         if elapsed == 0:
+            self.speed_value = 0
             return "-"
-        return f"{self.processed / elapsed:.2f}/s"
+
+        self.speed_value = self.processed / elapsed
+        return f"{self.speed_value:.2f}/s"
 
     @property
     def eta(self) -> str:

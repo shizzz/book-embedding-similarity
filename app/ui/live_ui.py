@@ -88,9 +88,7 @@ class LiveUI(BaseUI):
             status = "✓" if st.finished else "RUN"
 
             # throughput pressure
-            workers = getattr(st, "workers", 1)
-            speed = getattr(st, "speed_value", 1)  # items/sec
-            pressure_value = st.queue / max(speed * workers, 1)  # avoid div0
+            pressure_value = st.queue / max(st.speed_value * st.workers, 1)  # avoid div0
             pressure_str = f"{pressure_value:.1f}"
 
             pressure_text = Text(pressure_str)
