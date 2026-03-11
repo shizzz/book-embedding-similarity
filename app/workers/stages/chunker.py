@@ -5,7 +5,7 @@ from app.workers.base import BaseQueueWorker
 from app.parsers.book import BookParserFactory
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import ChunkRepository
-from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Channel, Stages
+from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Channel, Stages, Dataset
 
 ROUTES = {
     Action.BOOK: {Stages.DB},
@@ -37,6 +37,8 @@ class Chunker(BaseQueueWorker[BookTask]):
         action = Action.BOTH
 
         for task in batch:
+            parsed_book = None
+            chunks = None
             book = task.entity.book
             chunks: List[Chunk] = []
 
@@ -49,13 +51,12 @@ class Chunker(BaseQueueWorker[BookTask]):
                 if parsed_book.empty is not None:
                     book.empty = parsed_book.empty
 
-                parsed_book = None
-
                 book_task = Task(
                     id=book.id,
                     name=book.file_name,
                     entity=book,
-                    action=Action.BOOK
+                    action=Action.BOOK,
+                    dataset=Dataset.BOOK,
                 )
                 result.append(book_task)
 
@@ -66,11 +67,14 @@ class Chunker(BaseQueueWorker[BookTask]):
 
 
             if book.empty:
-                result.append(Task(
-                    id=0, 
-                    name="Done",
-                    entity=None, 
-                    action=Action.NONE))
+                result.append(
+                    Task(
+                        id=0, 
+                        name="Done",
+                        entity=None, 
+                        action=Action.NONE,
+                    )
+                )
                 continue
 
             if task.entity.data is None:
@@ -83,14 +87,10 @@ class Chunker(BaseQueueWorker[BookTask]):
                     id=chunk.chunk_id,
                     name=book.file_name,
                     entity=chunk,
-                    action=action
+                    action=action,
+                    dataset=Dataset.CHUNK,
                 )
                 result.append(chunk_task)
-
-            del chunks
-            del book
-            
-            task.entity.data = None
         return result
 
     def route(self, task: Task, channels: list[Channel]) -> list[Channel]:

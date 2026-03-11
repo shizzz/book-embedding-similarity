@@ -1,4 +1,5 @@
 from ..router import DBRouter
+from ...models.book import BookRegistry, Book
 
 class AuthorRepository:
     def __init__(self, router: DBRouter):
@@ -27,14 +28,14 @@ class AuthorRepository:
                 [(book_id, aid) for aid in author_ids]
             )
     
-    def save_bulk(self, books: list, conn=None):
+    def save_bulk(self, books: list[Book], conn=None):
         if conn is None:
             with self.router.meta() as conn:
                 self._save_bulk(conn, books) 
         else:
             self._save_bulk(conn, books)
             
-    def _save_bulk(self, conn, books: list):
+    def _save_bulk(self, conn, books: list[Book]):
         cursor = conn.cursor()
 
         # собрать всех авторов

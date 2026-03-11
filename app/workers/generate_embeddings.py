@@ -4,8 +4,8 @@ from typing import List
 from app.model import Model
 from app.common.types import TEntity
 from app.infrastructure.db import DBRouter, Migrator, DBTransaction
-from app.infrastructure.db.repositories import BookRepository, ChunkRepository, EmbeddingsRepository, ModelRepository
-from app.infrastructure.models import Book, Chunk, Embedding, Channel, Action, BatchTask, Stages
+from app.infrastructure.db.repositories import BookRepository, ChunkRepository, EmbeddingsRepository, ModelRepository, AuthorRepository
+from app.infrastructure.models import Book, Chunk, Embedding, Channel, Dataset, BatchTask, Stages
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.settings import ProcessConfig
 from app.ui.live_ui import LiveUI
@@ -39,9 +39,9 @@ class GenerateEmbeddingsWorker:
         ModelRepository(self.router).get_or_create(self.model.info.uid, self.model.info.model_name)
 
         self._savers = {
-            Action.BOOK: self._save_books,
-            Action.CHUNK: self._save_chunks,
-            Action.EMBEDDING: self._save_embeddings,
+            Dataset.BOOK: self._save_books,
+            Dataset.CHUNK: self._save_chunks,
+            Dataset.EMBEDDING: self._save_embeddings,
         }
 
     async def run(self):
@@ -56,8 +56,6 @@ class GenerateEmbeddingsWorker:
         report = DatabaseReporter(self.router, self.model.info.uid).generate()
         self.ui.report(report)
         await self.ui.update()
-
-        self._ui_task.cancel()
 
     async def setup_stages(self):
         self.ui = LiveUI(
@@ -124,6 +122,7 @@ class GenerateEmbeddingsWorker:
 
     def _save_books(self, books: List[Book], tx: DBTransaction):
         BookRepository(self.router).save_bulk(books, conn=tx.meta())
+        AuthorRepository(self.router).save_bulk(books, conn=tx.meta())
 
     def _save_chunks(self, chunks: List[Chunk], tx: DBTransaction):
         ChunkRepository(self.router).save_bulk(chunks, conn_meta=tx.meta(), conn_chunks=tx.chunks())
@@ -134,5 +133,5 @@ class GenerateEmbeddingsWorker:
     def _save(self, router: DBRouter, tasks: List[BatchTask[TEntity]]):
         with router.transaction() as tx:
             for task in tasks:
-                saver = self._savers[task.action]
+                saver = self._savers[task.dataset]
                 saver(task.entity, tx)

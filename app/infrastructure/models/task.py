@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Generic, Optional, List
-from enum import Enum, IntEnum, auto
+from enum import IntEnum, auto
 from app.common.types import TEntity
 from .book import Book
 
@@ -11,7 +11,7 @@ class Action(IntEnum):
     BOTH = auto()
     NONE = auto()
 
-class Dataset(Enum):
+class Dataset(IntEnum):
     BOOK = auto()
     EMBEDDING = auto()
     AUTHOR = auto()
@@ -28,7 +28,7 @@ class Task(Generic[TEntity]):
     entity: TEntity
 
     action: Optional[IntEnum] = None
-    dataset: List["Dataset"] = field(default_factory=list)
+    dataset: Optional[Dataset] = None
 
     done: int = 1
     db_queue_count: int = 0
@@ -39,7 +39,7 @@ class Task(Generic[TEntity]):
             name=self.name,
             entity=entity if entity is not None else self.entity,
             action=self.action,
-            dataset=self.dataset.copy(),
+            dataset=self.dataset,
             done=self.done,
             db_queue_count=self.db_queue_count,
         )

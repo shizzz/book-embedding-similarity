@@ -41,7 +41,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             else lambda: CountBatchStrategy(batch_size)
         )
 
-        self._to_flush = []
+        self._buffers: dict[int, List[Task]] = {}
 
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count)
@@ -63,10 +63,10 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         # ждём producer
         await self.input_channel.upstream_done.wait()
         await self.input_channel.queue.join()
-        await self._flush()
         # отменяем workers
         for w in self._workers:
             w.cancel()
+        await self._flush()
         await asyncio.gather(*self._workers, return_exceptions=True)
         for ch in self.output_channels:
             await ch.done()
@@ -84,32 +84,26 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         await self.input_channel.done()
 
     async def _worker(self, wid: int):
-        buffer = []
+        buffer = self._buffers.setdefault(wid, [])
         batch_strategy = self.batch_strategy_factory()
 
         while True:
             try:
                 task = await self.input_channel.queue.get()
-                buffer.append(task)
-                batch_strategy.on_add(task)
-            # на случай, если в момент остановки воркеров буфер был не пуст, сливаем его в flush
             except asyncio.CancelledError:
                 if task:
                     buffer.append(task)
-                if len(buffer) > 0:
-                    self._to_flush.extend(buffer)
                 break
 
             try:
+                buffer.append(task)
+                batch_strategy.on_add(task)
                 await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
                 
                 batch_strategy.on_add(task)
 
                 if batch_strategy.should_flush(buffer):
                     await self._process_batch(buffer, wid)
-                    for task in buffer:
-                        if task.entity:
-                            task.entity = None
                     buffer.clear()
                     batch_strategy.reset()
             except Exception as e:
@@ -133,9 +127,11 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.dispatch(r)
 
     async def _flush(self):
-        if len(self._to_flush) > 0:
-            await self._process_batch(self._to_flush, -1)
-            self._to_flush.clear()
+        # принудительно обработать оставшиеся batch-и у всех worker'ов
+        for wid, buffer in self._buffers.items():
+            if buffer:
+                await self._process_batch(buffer, wid)
+                buffer.clear()
 
 
     # -------------------------------
@@ -160,8 +156,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         for channel in targets:
             await self.stats.queue_size(channel.downstream, channel.queue.qsize())
             await self.stats.edge_dispatch(self.name, channel.downstream)
-            await channel.queue.put(result.clone(entity=result.entity))
-            result.entity = None
+            await channel.queue.put(result.clone())
             
     def get_logger(self, name: str = "app") -> logging.Logger:
         logger = logging.getLogger(name)

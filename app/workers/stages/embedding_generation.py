@@ -8,7 +8,7 @@ from app.workers.batchStrategies import CharBatchStrategy
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.infrastructure.models import Task, Chunk, Embedding, Action, Stages
+from app.infrastructure.models import Task, Chunk, Embedding, Action, Stages, Dataset
 from typing import List
 
 class EmbeddingWorker(BaseQueueWorker):
@@ -124,7 +124,8 @@ class EmbeddingWorker(BaseQueueWorker):
                 emb.id,
                 ",".join(map(str, (emb.book_id, emb.chunk_id, emb.seq))),
                 entity=emb,
-                action=Action.EMBEDDING
+                action=Action.EMBEDDING,
+                dataset=Dataset.EMBEDDING,
             )
 
             tasks.append(task)

@@ -31,12 +31,12 @@ class DbWorker(BaseQueueWorker):
         groups: dict[IntEnum | None, tuple[Task, list]] = {}
 
         for task in batch:
-            action = task.action
+            dataset = task.dataset
 
-            if action in groups:
-                groups[action][1].append(task.entity)
+            if dataset in groups:
+                groups[dataset][1].append(task.entity)
             else:
-                groups[action] = (task, [task.entity])
+                groups[dataset] = (task, [task.entity])
 
         grouped_tasks: list[BatchTask[TEntity]] = [
             base.clone(entity=entities)
