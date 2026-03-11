@@ -44,7 +44,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._puller_tasks: List[asyncio.Task] = []
 
     async def start(self):
-        await self.stats.register_stage(self.name, self._workers_count)
+        await self.stats.register_stage(self.name, self._workers_count, self.input_channel.queue.maxsize)
 
         for ch in self.output_channels:
              await self.stats.register_edge(self.name, ch.edge_name)
@@ -81,6 +81,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         """Для stages без input"""
         async for task in self.produce():
             await self.input_channel.queue.put(task)
+            await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
         await self.input_channel.done()
 
     async def _worker(self, wid: int):

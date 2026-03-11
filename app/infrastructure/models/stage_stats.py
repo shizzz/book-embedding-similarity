@@ -9,6 +9,7 @@ class StageStats:
         self.processed: int = 0
         self.errors: int = 0
         self.queue: int = 0
+        self.queue_max_size: int = 0
         self.workers = workers
         self.start_time: float | None = None
         self.finished: bool = False

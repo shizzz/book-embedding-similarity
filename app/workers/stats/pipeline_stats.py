@@ -7,8 +7,9 @@ class PipelineStats(Stats):
         self.stages: dict[str, StageStats] = {}
         self.edges: dict[tuple[str, str], EdgeStats] = {}
 
-    async def register_stage(self, name: str, workers: int = 1):
+    async def register_stage(self, name: str, workers: int = 1, queue_max_size: int = 0):
         st = StageStats(name, workers)
+        st.queue_max_size = queue_max_size
         st.start()
         self.stages[name] = st
 

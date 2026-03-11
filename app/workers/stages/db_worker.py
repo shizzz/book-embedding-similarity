@@ -48,6 +48,6 @@ class DbWorker(BaseQueueWorker):
         if self._is_save_async:
             await self._save(self._workers_count, self._router, grouped_tasks)
         else:
-            await asyncio.to_thread(self._workers_count, self._save, self._router, grouped_tasks)
+            await asyncio.to_thread(self._save, self._workers_count, self._router, grouped_tasks)
 
         return len(batch)

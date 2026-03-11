@@ -79,7 +79,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
 
         self.db_stage = DbWorker(
             router=self.router,
-            save_func=self._save_async,
+            save_func=self._save,
             input_channel=channel_db,
             stats=self.stats,
             batch_size=500,
@@ -98,7 +98,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
     def _save_embeddings(self, emb: List[Embedding], tx: DBTransaction):
         EmbeddingsRepository(self.router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
 
-    def _save(self, router: DBRouter, tasks: List[BatchTask[TEntity]]):
+    def _save(self, threads: int, router: DBRouter, tasks: List[BatchTask[TEntity]]):
         with router.transaction() as tx:
             for task in tasks:
                 saver = self._savers[task.dataset]
@@ -106,7 +106,7 @@ class GenerateEmbeddingsWorker(BaseWorker):
     
     async def _save_async(self, threads: int, router: DBRouter, tasks: List[BatchTask[TEntity]]):
         if threads > 1:
-            async with router.lock_all(self.model.info.uid) as tx:
-                await asyncio.to_thread(self._save, router, tasks)
+            async with router.lock_all(self.model.info.uid):
+                await asyncio.to_thread(self._save, threads, router, tasks)
         else:
-            await asyncio.to_thread(self._save, router, tasks)
+            await asyncio.to_thread(self._save, threads, router, tasks)
