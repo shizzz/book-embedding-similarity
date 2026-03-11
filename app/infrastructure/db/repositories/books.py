@@ -125,6 +125,16 @@ class BookRepository:
             rows = conn.execute("SELECT id, book FROM books").fetchall()
             return {row[1]: row[0] for row in rows}
         
+    def get_max_id(self) -> int:
+        with self.router.meta() as conn:
+            cursor = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'books'")
+            row = cursor.fetchone()
+            if row is None:
+                start_id = 1
+            else:
+                start_id = row["seq"] + 1
+            return start_id
+        
     def save_bulk(self, books: BookRegistry, conn=None):
         if conn is None:
             with self.router.meta() as conn:
@@ -164,13 +174,3 @@ class BookRepository:
                 for book in books
             ]
         )
-        
-    def get_max_id(self) -> int:
-        with self.router.meta() as conn:
-            cursor = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'books'")
-            row = cursor.fetchone()
-            if row is None:
-                start_id = 1
-            else:
-                start_id = row["seq"] + 1
-            return start_id

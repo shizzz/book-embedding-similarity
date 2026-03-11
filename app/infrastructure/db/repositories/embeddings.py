@@ -122,23 +122,6 @@ class EmbeddingsRepository:
     def count(self) -> int:
         with self.router.embeddings(self.model_uid) as conn:
             return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
-    
-    def delete(self, to_delete: list[int]) -> None:
-        with self.router.embeddings(self.model_uid) as conn:
-            query = f"DELETE FROM embeddings WHERE book_id IN ({','.join(['?']*len(to_delete))})"
-            conn.execute(query, to_delete)
-
-    def meta_only(self, book_id: int = None) -> Embedding:
-        with self.router.embeddings(self.model_uid) as conn:
-            query = "SELECT id, book_id, chunk_id, seq, NULL AS data, shape, type FROM embeddings"
-            params = ()
-
-            if book_id is not None:
-                query += " WHERE book_id = ?"
-                params = (int(book_id),)
-
-            cursor = conn.execute(query, params).fetchall()
-            return [Embedding.from_row(r) for r in cursor]
         
     def get_max_id(self) -> int:
         with self.router.embeddings(self.model_uid) as conn:

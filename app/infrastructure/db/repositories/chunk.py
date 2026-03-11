@@ -83,11 +83,6 @@ class ChunkRepository:
 
             return row["data"] if row else None
 
-    def meta_only(self) -> tuple[int, int]:
-        with self.router.chunks() as conn:
-            rows = conn.execute("SELECT id, book_id, type FROM chunks").fetchall()
-            return [(row["id"], row["book_id"], row["type"]) for row in rows]
-
     def get_max_id(self) -> int:
         with self.router.chunks() as conn:
             cursor = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'chunks'")
