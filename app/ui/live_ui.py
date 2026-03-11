@@ -88,7 +88,7 @@ class LiveUI(BaseUI):
             status = "✓" if st.finished else "RUN"
 
             # throughput pressure
-            pressure_value = st.queue / max(st.speed_value * st.workers, 1)  # avoid div0
+            pressure_value = st.queue / max(st.speed_value, 1)  # avoid div0
             pressure_str = f"{pressure_value:.1f}"
 
             pressure_text = Text(pressure_str)
@@ -367,7 +367,6 @@ class LiveUI(BaseUI):
             total = self.model_info.total_vram_mb
 
             if free and total:
-
                 used = total - free
 
                 bar = ProgressBar(
@@ -381,6 +380,17 @@ class LiveUI(BaseUI):
                     f"{self._fmt_mb(used)} / {self._fmt_mb(total)}"
                 )
                 right.add_row("", bar)
+
+                temp_style = "green"
+                if self.model_info.temp > 75:
+                    temp_style = "yellow"
+                if self.model_info.temp > 85:
+                    temp_style = "red"
+
+                right.add_row(
+                    "GPU temp",
+                    Text(f"{self.model_info.temp}°C", style=temp_style)
+                )
 
         grid = Table.grid(expand=True)
         grid.add_column()

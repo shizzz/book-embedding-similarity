@@ -128,6 +128,13 @@ class ModelInfo:
     _total_vram_mb: int = None
 
     @property
+    def temp(self) -> int:
+        if self.cuda_available:
+            return torch.cuda.temperature()
+        else:
+            return 0
+
+    @property
     def free_vram_mb(self) -> int:
         if self.cuda_available:
             free, total = torch.cuda.mem_get_info()
