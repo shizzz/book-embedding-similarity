@@ -7,11 +7,7 @@ from app.infrastructure.db import DBRouter, Migrator, DBTransaction
 from app.infrastructure.db.repositories import BookRepository, ChunkRepository, EmbeddingsRepository, ModelRepository, AuthorRepository
 from app.infrastructure.models import Book, Chunk, Embedding, Channel, Dataset, BatchTask, Stages
 from app.searchEngines.bookSearch import BookSearchEngineFactory
-from app.settings import ProcessConfig
-from app.ui.live_ui import LiveUI
-from app.workers.sources import ConsoleHandler
-from app.workers.base import BaseQueueWorker
-from app.workers.stats import PipelineStats
+from app.workers.base import BaseQueueWorker, BaseWorker
 from app.workers.stages import BookProducer, Chunker, DbWorker, EmbeddingWorker
 from app.workers.sources.databaseReporter import DatabaseReporter
 
@@ -20,22 +16,11 @@ CHUNK_THREADS: int = 4
 EMB_THREADS: int = 4
 DB_THREADS: int = 1
 
-class GenerateEmbeddingsWorker:
+class GenerateEmbeddingsWorker(BaseWorker):
     def __init__(self, batch: int):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
-        handler = ConsoleHandler(console=getattr(self, "ui", None) and getattr(self.ui, "console", None))
-        handler.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(message)s'))
-        self.logger.addHandler(handler)
-
-        self.name = "Generate embeddings"
+        super().__init__(name="Generate embeddings", logger=logging.getLogger(__name__))
         self.model = Model(EMB_THREADS)
-        self.router = DBRouter()
         Migrator(self.router).migrate_all([self.model.info.uid])
-
-        self.stats = PipelineStats()
-        self.search_engine = BookSearchEngineFactory().create(BookSearchEngineFactory.INPIX, self.stats)
-        self.stages = []
         ModelRepository(self.router).get_or_create(self.model.info.uid, self.model.info.model_name)
 
         self._savers = {
@@ -43,26 +28,15 @@ class GenerateEmbeddingsWorker:
             Dataset.CHUNK: self._save_chunks,
             Dataset.EMBEDDING: self._save_embeddings,
         }
+        
+        self.search_engine = BookSearchEngineFactory().create(BookSearchEngineFactory.INPIX, self.stats)
 
-    async def run(self):
-        await self.setup_stages()
-        self.ui.init()
-        self.ui.model_info = self.model.info
-        self._ui_task = asyncio.create_task(self.refresh_ui_loop())
-        await asyncio.gather(*(worker.start() for worker in self.pool))
-        await asyncio.gather(*(worker.wait() for worker in self.pool))
-        await self.ui.update()
-
+    async def after_run(self) -> None:
         report = DatabaseReporter(self.router, self.model.info.uid).generate()
         self.ui.report(report)
-        await self.ui.update()
 
     async def setup_stages(self):
-        self.ui = LiveUI(
-            max_workers=ProcessConfig.MAX_WORKERS,
-            title=self.name,
-            stats=self.stats
-        )
+        self.ui.model_info = self.model.info
         
         self.pool: List[BaseQueueWorker] = []
         channel_book = Channel(Stages.CHUNK, asyncio.Queue(maxsize=50))
@@ -114,11 +88,6 @@ class GenerateEmbeddingsWorker:
             logger = self.logger, 
         )
         self.pool.append(self.db_stage)
-
-    async def refresh_ui_loop(self):
-        while True:
-            await self.ui.update()
-            await asyncio.sleep(1)
 
     def _save_books(self, books: List[Book], tx: DBTransaction):
         BookRepository(self.router).save_bulk(books, conn=tx.meta())
