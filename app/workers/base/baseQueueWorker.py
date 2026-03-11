@@ -132,12 +132,13 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.post_process(r)
             await self.dispatch(r)
 
-    async def flush(self):
-        pass
-
     # -------------------------------
     # Методы, которые нужно реализовать
     # -------------------------------
+    async def flush(self):
+        """Для чистки в конретных реализациях"""
+        pass
+
     async def produce(self):
         """Для stages без input queue"""
         yield  # async generator

@@ -14,12 +14,19 @@ class RerankerFeatureExtractor:
         # else:
         #     a = pair.source_emb
         #     b = pair.candidate_emb
-        a = pair.source_emb
-        b = pair.candidate_emb
+        def sim(a: np.ndarray | None, b: np.ndarray | None) -> tuple[float, float, int]:
+            if a is None or b is None:
+                return 0.0, 0.0, 0
+            dot = float(np.dot(a, b))
+            cos = dot / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+            return cos, dot, 1
 
-        # косинус и dot
-        dot_score = float(np.dot(a, b))
-        cosine_score = dot_score / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+        # TEXT
+        cosine_score, dot_score, has_text = sim(pair.source_emb, pair.candidate_emb)
+        # TITLE (может отсутствовать)
+        title_cosine, title_dot, has_title = sim(pair.source_title_emb, pair.candidate_title_emb)
+        # DESCRIPTION (может отсутствовать)
+        desc_cosine, desc_dot, has_desc = sim(pair.source_description_emb, pair.candidate_description_emb)
 
         # автор
         source_set = {x.strip() for x in (pair.source.author or "").split(",") if x.strip()}
@@ -42,6 +49,12 @@ class RerankerFeatureExtractor:
         return [
             cosine_score,
             dot_score,
+            title_cosine,
+            title_dot,
+            has_title,
+            desc_cosine,
+            desc_dot,
+            has_desc,
             same_author,
             same_serie,
             genre_overlap,

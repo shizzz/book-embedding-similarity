@@ -9,7 +9,7 @@ class HybridEmbeddingProvider(EmbeddingProvider):
     def __init__(
         self,
         db_router: DBRouter,
-        cache_data: Dict[int, Tuple[np.ndarray, int]] | None = None
+        cache_data: Dict[int, Tuple[np.ndarray, int, int]] | None = None
     ):
         # Провайдер БД
         self._db_provider = DBEmbeddingProvider(db_router)
@@ -23,7 +23,7 @@ class HybridEmbeddingProvider(EmbeddingProvider):
     def get_by_ids(
         self,
         embedding_ids: List[int],
-    ) -> Dict[int, Tuple[np.ndarray, int]]:
+    ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         result = {}
 
         # 1. Сначала проверяем кэш
@@ -41,7 +41,7 @@ class HybridEmbeddingProvider(EmbeddingProvider):
     def get_by_book_ids(
         self,
         book_ids: List[int],
-    ) -> Dict[int, Tuple[np.ndarray, int]]:
+    ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         result = {}
 
         # 1. Сначала кэш

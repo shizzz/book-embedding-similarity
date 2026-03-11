@@ -11,11 +11,11 @@ class DBEmbeddingProvider(EmbeddingProvider):
     def get_by_ids(
         self,
         embedding_ids: List[int],
-    ) -> Dict[int, Tuple[np.ndarray, int]]:
+    ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         return self._repo.get_by_ids(embedding_ids)
 
     def get_by_book_ids(
         self,
         book_ids: List[int],
-    ) -> Dict[int, Tuple[np.ndarray, int]]:
+    ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         return self._repo.get_by_book_ids(book_ids)

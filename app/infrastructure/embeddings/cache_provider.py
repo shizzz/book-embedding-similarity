@@ -6,7 +6,7 @@ from app.infrastructure.providers import EmbeddingProvider
 class CacheEmbeddingProvider(EmbeddingProvider):
     def __init__(
         self,
-        data: Dict[int, Tuple[np.ndarray, int]]
+        data: Dict[int, Tuple[np.ndarray, int, int]]
     ):
         # embedding_id -> (vector, book_id)
         self._data = data
@@ -19,7 +19,7 @@ class CacheEmbeddingProvider(EmbeddingProvider):
     def get_by_ids(
         self,
         embedding_ids: List[int],
-    ) -> Dict[int, Tuple[np.ndarray, int]]:
+    ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         return {
             emb_id: self._data[emb_id]
             for emb_id in embedding_ids
@@ -29,7 +29,7 @@ class CacheEmbeddingProvider(EmbeddingProvider):
     def get_by_book_ids(
         self,
         book_ids: List[int],
-    ) -> Dict[int, Tuple[np.ndarray, int]]:
+    ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         result = {}
 
         for book_id in book_ids:
