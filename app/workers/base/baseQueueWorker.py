@@ -102,6 +102,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                 self.logger.exception(e)
             finally:
                 self.input_channel.queue.task_done()
+                await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
 
         async def puller():
             while True:
