@@ -10,7 +10,7 @@ from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Chann
 ROUTES = {
     Action.EMBEDDING: {Stages.EMBEDDING},
     Action.DB: {Stages.DB},
-    Action.NONE: {},
+    Action.NONE: set(),
 }
 
 class Parser(BaseQueueWorker[BookTask]):
@@ -65,19 +65,18 @@ class Parser(BaseQueueWorker[BookTask]):
                         chunk.book_id = book.id
                         chunk.chunk_id = await self._reserve_id()
 
-
-            if book.empty:
-                result.append(
-                    Task(
-                        id=0, 
-                        name="Done",
-                        entity=None, 
-                        actions=Action.NONE,
+            if task.entity.data is None:      
+                if book.empty:
+                    result.append(
+                        Task(
+                            id=0, 
+                            name="Done",
+                            entity=None, 
+                            actions=Action.NONE,
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if task.entity.data is None:
                 if book.id in self._chunk_to_book_id:
                     chunks = await self._enrich_from_db(book)
             
