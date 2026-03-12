@@ -12,7 +12,7 @@ class EmbeddingProducer(BaseQueueWorker[Embedding]):
     Читает книги из источника библиотеки
     """
     def __init__(
-            self, 
+            self,
             router: DBRouter,
             name: str = Stages.EMBEDDING,
             *args, 

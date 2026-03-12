@@ -1,13 +1,16 @@
 import numpy as np
 import faiss
 from typing import List
+from app.infrastructure.db import DBRouter
+from app.infrastructure.db.repositories import BookRepository, EmbeddingsRepository
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.models import Task, Action, Embedding, Stages
 from app.settings import PathsConfig, ProcessConfig, IndexConfig, IndexLevel
 
 class Indexer(BaseQueueWorker[Embedding]):
     def __init__(
-            self, 
+            self,
+            router: DBRouter,
             level: IndexLevel,
             name: str = Stages.INDEX,
             *args, 
@@ -19,6 +22,9 @@ class Indexer(BaseQueueWorker[Embedding]):
         self.embedding_dim = None
         self.index: faiss.IndexIDMap = None
         self._count: int = 0
+
+        self._book_repo = BookRepository(router)
+        self._emb_repo = EmbeddingsRepository(router)
 
     def create_index(self, shape: int):
         base_index = faiss.IndexHNSWFlat(
@@ -68,6 +74,16 @@ class Indexer(BaseQueueWorker[Embedding]):
         self._count += len(ids)
 
         return result
+
+    async def count_total(self) -> None:
+        total = None
+        if self.level == IndexLevel.DOCUMENT:
+            total = self._book_repo.count()
+        elif self.level == IndexLevel.CHUNK:
+            total = self._emb_repo.count()
+
+        if total:
+            await self.stats.set_total(self.name, total)
 
     async def fin(self):
         faiss.write_index(self.index, str(PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level}.faiss"))

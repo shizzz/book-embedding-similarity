@@ -174,3 +174,7 @@ class BookRepository:
                 for book in books
             ]
         )
+
+    def count(self) -> int:
+        with self.router.meta() as conn:
+            return conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]

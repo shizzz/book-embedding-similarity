@@ -49,6 +49,7 @@ class IndexPipeline(Pipeline):
             self.pool.append(merge_stage)
 
             doc_index_stage = Indexer(
+                router=self._router,
                 level=IndexLevel.DOCUMENT,
                 batch_size=5000,
                 input_channel=merged_channel,
@@ -61,6 +62,7 @@ class IndexPipeline(Pipeline):
 
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.CHUNK:
             chunk_index_stage = Indexer(
+                router=self._router,
                 level=IndexLevel.CHUNK,
                 batch_size=5000,
                 input_channel=emb_channel_index,

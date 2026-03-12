@@ -35,7 +35,7 @@ class EmbeddingsRepository:
 
             for offset in range(0, total, batch_size):
                 cursor.execute(
-                    f"{GET_QUERY}{order_clause} LIMIT ? OFFSET ?",
+                    f"{GET_QUERY} WHERE [type] == 2 {order_clause} LIMIT ? OFFSET ?",
                     (batch_size, offset)
                 )
                 rows = cursor.fetchall()
@@ -127,7 +127,7 @@ class EmbeddingsRepository:
 
     def count(self) -> int:
         with self.router.embeddings(self.model_uid) as conn:
-            return conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+            return conn.execute("SELECT COUNT(*) FROM embeddings WHERE [type] == 2").fetchone()[0]
         
     def get_max_id(self) -> int:
         with self.router.embeddings(self.model_uid) as conn:
