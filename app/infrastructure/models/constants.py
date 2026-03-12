@@ -7,6 +7,6 @@ class ChunkType(IntEnum):
 
 class Stages(StrEnum):
     BOOK_SEARCH = "BookSearchProducer"
-    CHUNK = "Chunk"
+    PARSER = "Parser"
     EMBEDDING = "Embedding"
     DB = "DB"

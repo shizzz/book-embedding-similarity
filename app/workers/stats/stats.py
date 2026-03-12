@@ -8,7 +8,7 @@ class Stats(ABC):
     edges: dict[tuple[str, str], EdgeStats] = {}
     start_time = time.time()
     
-    async def register_stage(self, name: str, workers: int = 1):
+    async def register_stage(self, name: str, workers: int = 1, queue_max_size: int = 0):
         pass
     
     async def unregister_stage(self, name: str, workers: int = 1):

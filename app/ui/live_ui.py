@@ -58,7 +58,7 @@ class LiveUI(BaseUI):
 
     def _make_stats_table(self) -> Table:
         table = Table(expand=True)
-        
+
         table.add_column("Stage")
         table.add_column("Progress")
         table.add_column("Processed")
@@ -72,8 +72,22 @@ class LiveUI(BaseUI):
 
         stages = self.pipeline_stats.stages
 
+        # определяем bottleneck
+        bottleneck_stage = None
+        max_score = 0
+
         for stage_name, st in stages.items():
-            # progress bar
+            if st.finished:
+                continue
+            queue_ratio = st.queue / st.queue_max_size if st.queue_max_size else 0
+            pressure = st.queue / max(st.speed_value, 1)
+            score = pressure * (1 + queue_ratio)
+
+            if not st.finished and score > max_score:
+                max_score = score
+                bottleneck_stage = stage_name
+
+        for stage_name, st in stages.items():
             if st.total:
                 pct = st.processed / st.total
                 filled = int(pct * 20)
@@ -84,16 +98,17 @@ class LiveUI(BaseUI):
 
             stage_text = Text(stage_name)
 
-            # статус
             status = "✓" if st.finished else "RUN"
 
-            # throughput pressure
-            pressure_value = st.queue / max(st.speed_value * st.workers, 1)  # avoid div0
+            pressure_value = st.queue / max(st.speed_value, 1)
             pressure_str = f"{pressure_value:.1f}"
-
             pressure_text = Text(pressure_str)
-            # подсветка bottleneck: давление выше порога и stage не done
+
             if pressure_value > 1 and not st.finished:
+                stage_text.stylize("yellow")
+                pressure_text.stylize("yellow")
+
+            if stage_name == bottleneck_stage and not st.finished:
                 stage_text.stylize("bold red")
                 pressure_text.stylize("bold red")
 
@@ -367,7 +382,6 @@ class LiveUI(BaseUI):
             total = self.model_info.total_vram_mb
 
             if free and total:
-
                 used = total - free
 
                 bar = ProgressBar(
@@ -381,6 +395,17 @@ class LiveUI(BaseUI):
                     f"{self._fmt_mb(used)} / {self._fmt_mb(total)}"
                 )
                 right.add_row("", bar)
+
+                temp_style = "green"
+                if self.model_info.temp > 75:
+                    temp_style = "yellow"
+                if self.model_info.temp > 85:
+                    temp_style = "red"
+
+                right.add_row(
+                    "GPU temp",
+                    Text(f"{self.model_info.temp}°C", style=temp_style)
+                )
 
         grid = Table.grid(expand=True)
         grid.add_column()

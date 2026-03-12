@@ -4,7 +4,7 @@ from app.searchEngines.bookSearch import BaseBookSearchEngine
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, ChunkRepository
-from app.infrastructure.models import Task, Book, BookAction, BookTask, Stages
+from app.infrastructure.models import Task, Book, BookAction, BookTask, Stages, Action
 
 class BookProducer(BaseQueueWorker[BookTask]):
     """
@@ -36,7 +36,8 @@ class BookProducer(BaseQueueWorker[BookTask]):
             yield Task[Book](
                 id=book.id,
                 name=book.file_name,
-                entity=book
+                entity=book,
+                actions=Action.GRAB,
             )
 
     async def process(self, batch: List[Task[Book]], wid: int) -> List[Task[BookTask]]:
@@ -53,7 +54,8 @@ class BookProducer(BaseQueueWorker[BookTask]):
                     Task[BookTask](
                         id=book.id,
                         name=book.file_name,
-                        entity=BookTask(book, data, BookAction.CHUNK)
+                        entity=BookTask(book, data, BookAction.CHUNK),
+                        actions=Action.PARSE,
                     )
                 )
             else:
@@ -67,7 +69,8 @@ class BookProducer(BaseQueueWorker[BookTask]):
                     Task[BookTask](
                         id=book.id,
                         name=book.file_name,
-                        entity=BookTask(book, data, BookAction.BOOK)
+                        entity=BookTask(book, data, BookAction.BOOK),
+                        actions=Action.PARSE,
                     )
                 )
         return tasks

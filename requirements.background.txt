@@ -1,5 +1,6 @@
 #model
 torch
+nvidia-ml-py>=13.590.48
 sentence-transformers>=5.2.0
 datasets>=4.5.0
 accelerate>=1.12.0

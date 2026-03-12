@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import List
 from enum import IntEnum
 from app.common.types import TEntity
@@ -22,6 +23,7 @@ class DbWorker(BaseQueueWorker):
         super().__init__(name=name ,*args, **kwargs)
         self._save = save_func
         self._router = router
+        self._is_save_async = inspect.iscoroutinefunction(self._save)
 
     async def process(self, batch: List[Task], wid: int) -> List[Task]:
         await self._save_batch(batch)
@@ -43,9 +45,9 @@ class DbWorker(BaseQueueWorker):
             for base, entities in groups.values()
         ]
 
-        if asyncio.iscoroutinefunction(self._save):
-            await self._save(self._router, grouped_tasks)
+        if self._is_save_async:
+            await self._save(self._workers_count, self._router, grouped_tasks)
         else:
-            await asyncio.to_thread(self._save, self._router, grouped_tasks)
+            await asyncio.to_thread(self._save, self._workers_count, self._router, grouped_tasks)
 
         return len(batch)

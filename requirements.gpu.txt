@@ -1,11 +1,11 @@
-# PyTorch с поддержкой GTX 1060 (CUDA 11.8)
-#torch==2.2.2+cu118
-#torchvision==0.17.2+cu118
-#torchaudio==2.2.2+cu118
-#--extra-index-url https://download.pytorch.org/whl/cu118
+# PyTorch с поддержкой GTX 1060 (CUDA 12.4)
+# torch==2.6.0+cu124
+# torchvision==0.21.0+cu124
+# torchaudio==2.6.0+cu124
+# --extra-index-url https://download.pytorch.org/whl/cu124
 
-# --- PyTorch GPU для RTX 3060 (CUDA 12.1) ---
-torch>=2.10.0+cu130
-torchvision>=0.25.0+cu130
-torchaudio>=2.10.0+cu130
+# --- PyTorch GPU для RTX 3060 (CUDA 13.0) ---
+torch==2.10.0+cu130
+torchvision==0.25.0+cu130
+torchaudio==2.10.0+cu130
 --extra-index-url https://download.pytorch.org/whl/cu130

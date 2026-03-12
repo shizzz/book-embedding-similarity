@@ -8,18 +8,17 @@ from app.infrastructure.db.repositories import ChunkRepository
 from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Channel, Stages, Dataset
 
 ROUTES = {
-    Action.BOOK: {Stages.DB},
     Action.EMBEDDING: {Stages.EMBEDDING},
-    Action.BOTH: {Stages.EMBEDDING, Stages.DB},
-    Action.NONE: {},
+    Action.DB: {Stages.DB},
+    Action.NONE: set(),
 }
 
-class Chunker(BaseQueueWorker[BookTask]):
+class Parser(BaseQueueWorker[BookTask]):
     def __init__(
             self, 
             router: DBRouter,
             search_engine: BaseBookSearchEngine,
-            name: str = Stages.CHUNK,
+            name: str = Stages.PARSER,
             *args, 
             **kwargs
         ):
@@ -34,9 +33,9 @@ class Chunker(BaseQueueWorker[BookTask]):
 
     async def process(self, batch: List[Task[BookTask]], wid: int) -> List[Task]:
         result: List[Task] = []
-        action = Action.BOTH
 
         for task in batch:
+            chunk_actions = [Action.EMBEDDING]
             parsed = None
             book = task.entity.book
             chunks: List[Chunk] = []
@@ -55,46 +54,48 @@ class Chunker(BaseQueueWorker[BookTask]):
                     id=book.id,
                     name=book.file_name,
                     entity=book,
-                    action=Action.BOOK,
+                    actions=Action.DB,
                     dataset=Dataset.BOOK,
                 )
                 result.append(book_task)
 
                 if len(chunks or []) > 0:
+                    chunk_actions.append(Action.DB)
                     for chunk in chunks:
                         chunk.book_id = book.id
                         chunk.chunk_id = await self._reserve_id()
 
-
-            if book.empty:
-                result.append(
-                    Task(
-                        id=0, 
-                        name="Done",
-                        entity=None, 
-                        action=Action.NONE,
+            if task.entity.data is None:      
+                if book.empty:
+                    result.append(
+                        Task(
+                            id=0, 
+                            name="Done",
+                            entity=None, 
+                            actions=Action.NONE,
+                        )
                     )
-                )
-                continue
+                    continue
 
-            if task.entity.data is None:
                 if book.id in self._chunk_to_book_id:
                     chunks = await self._enrich_from_db(book)
-                    action = Action.EMBEDDING
             
             for chunk in chunks:
                 chunk_task = Task(
                     id=chunk.chunk_id,
                     name=book.file_name,
                     entity=chunk,
-                    action=action,
+                    actions=chunk_actions,
                     dataset=Dataset.CHUNK,
                 )
                 result.append(chunk_task)
         return result
 
     def route(self, task: Task, channels: list[Channel]) -> list[Channel]:
-        allowed = ROUTES.get(task.action, set())
+        allowed = set()
+        for action in task.actions:
+            allowed |= ROUTES.get(action, set())
+
         return [ch for ch in channels if ch.downstream in allowed]
 
     async def _enrich_from_db(self, book: Book) -> List[Chunk]:
