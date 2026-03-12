@@ -1,3 +1,5 @@
+from typing import Generator
+from app.infrastructure.models import Embedding
 from app.infrastructure.db.repositories import EmbeddingsRepository
 
 class EmbeddingsBatchIterable:
@@ -17,7 +19,7 @@ class EmbeddingsBatchIterable:
             self._total = self.repo.count()
         return (self._total + self.batch_size - 1) // self.batch_size
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[Embedding, None]:
         yield from self.repo.get_all_batch(self.batch_size, self.order_by)
 
     def count(self):

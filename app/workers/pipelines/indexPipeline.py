@@ -27,7 +27,7 @@ class IndexPipeline(Pipeline):
 
         emb_stage = EmbeddingProducer(
             router=self._router,
-            batch_size=1000,
+            batch_size=10,
             input_channel=self._input_channel,
             output_channels=emb_channels,
             stats=self._stats,
@@ -39,7 +39,7 @@ class IndexPipeline(Pipeline):
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.DOCUMENT:
             merged_channel = Channel(f"{Stages.INDEX}_{IndexLevel.DOCUMENT.value}", asyncio.Queue(100))
             merge_stage = EmbeddingMeger(
-                batch_size=100,
+                batch_size=500,
                 input_channel=emb_channel_document,
                 output_channels=[merged_channel],
                 stats=self._stats,
@@ -50,7 +50,7 @@ class IndexPipeline(Pipeline):
 
             doc_index_stage = Indexer(
                 level=IndexLevel.DOCUMENT,
-                batch_size=1000,
+                batch_size=5000,
                 input_channel=merged_channel,
                 output_channels=self._output_channels,
                 stats=self._stats,
@@ -62,7 +62,7 @@ class IndexPipeline(Pipeline):
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.CHUNK:
             chunk_index_stage = Indexer(
                 level=IndexLevel.CHUNK,
-                batch_size=1000,
+                batch_size=5000,
                 input_channel=emb_channel_index,
                 output_channels=self._output_channels,
                 stats=self._stats,

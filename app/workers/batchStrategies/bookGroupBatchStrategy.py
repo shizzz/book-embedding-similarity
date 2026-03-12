@@ -6,14 +6,12 @@ class BookEmbeddingBatchStrategy(BaseBatchStrategy):
 
     def __init__(self, books: int):
         self.books = books
-
         self.current_book_id = None
         self.current_book: list[Task] = []
-
         self.books_buffer: list[Task] = []
 
     def info(self):
-        return str(self.current_book_id)
+        return str(self.books)
 
     def collect(self, task: Task[Embedding]) -> list[Task] | None:
         book_id = task.entity.book_id

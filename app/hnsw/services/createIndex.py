@@ -37,7 +37,7 @@ class BookEmbeddingIndexer:
 
         # --- accumulate embeddings ---
         for batch in self.ui.tqdm(
-            EmbeddingsBatchIterable(repo, self.batch_size),
+            EmbeddingsBatchIterable(repo, self.batch_size, ["book_id", "chunk_id"]),
             desc="Слияние embeddings (DOCUMENT)"
         ):
             for r in batch:
@@ -106,7 +106,7 @@ class BookEmbeddingIndexer:
         index = faiss.IndexIDMap(base_index)
 
         # --- добавляем все embeddings ---
-        for batch in self.ui.tqdm(EmbeddingsBatchIterable(repo, self.batch_size), desc="Добавление в HNSW индекс CHUNK"):
+        for batch in self.ui.tqdm(EmbeddingsBatchIterable(repo, self.batch_size, ["book_id", "chunk_id"]), desc="Добавление в HNSW индекс CHUNK"):
             batch_vectors = []
             batch_ids = []
 

@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Any, List
+from typing import List
 from app.workers.batchStrategies import BookEmbeddingBatchStrategy
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.models import Task, Action, Embedding, BookTask, Stages
