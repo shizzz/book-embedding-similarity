@@ -32,7 +32,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._workers: List[asyncio.Task] = []
         self._flush_lock = asyncio.Lock()
 
-        self.input_channel = input_channel if input_channel else Channel("self", asyncio.Queue(100))
+        self.input_channel = input_channel if input_channel else Channel("self", asyncio.Queue(10))
         self.logger = logger or self.get_logger(self.name)
 
         self.batch_strategy_factory = (
@@ -62,7 +62,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             self._strategies[i] = self.batch_strategy_factory()
             self._workers.append(asyncio.create_task(self._worker(i)))
 
-        self.stats.update_stage_info(self.name, self._strategies[i].info())
+        await self.stats.update_stage_info(self.name, self._strategies[i].info())
 
     async def wait(self):
         # ждём producer
