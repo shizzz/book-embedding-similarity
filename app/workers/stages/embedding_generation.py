@@ -4,7 +4,7 @@ import numpy as np
 from collections import defaultdict
 from app.model import Model
 from app.parsers.chunk import ChunkStrategyFactory
-from app.workers.batchStrategies import CharBatchStrategy
+from app.workers.batchStrategies import CharFuncBatchStrategy
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
@@ -25,7 +25,7 @@ class EmbeddingWorker(BaseQueueWorker):
         ):
         super().__init__(
             name=name,
-            batch_strategy=lambda: CharBatchStrategy(self._batch_char_limit),
+            batch_strategy=lambda: CharFuncBatchStrategy(self._batch_char_limit),
             *args, 
             **kwargs
         )

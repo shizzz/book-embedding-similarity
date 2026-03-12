@@ -6,6 +6,7 @@ from app.settings import ProcessConfig
 from app.ui.live_ui import LiveUI
 from app.workers.sources import ConsoleHandler
 from app.workers.stats import PipelineStats
+from app.workers.pipelines import Pipeline
 from app.infrastructure.db import DBRouter
 
 class BaseWorker(ABC):
@@ -30,7 +31,7 @@ class BaseWorker(ABC):
         self._configure_logger()
 
         self.router = DBRouter()
-        self.pool: List[object] = []
+        self.pipelines: List[Pipeline] = []
         self._ui_task: Optional[asyncio.Task] = None
 
     def _configure_logger(self) -> None:
@@ -51,9 +52,9 @@ class BaseWorker(ABC):
             self._ui_task = asyncio.create_task(self.refresh_ui_loop())
 
         try:
-            if self.pool:
-                await asyncio.gather(*(worker.start() for worker in self.pool))
-                await asyncio.gather(*(worker.wait() for worker in self.pool))
+            if self.pipelines:
+                await asyncio.gather(*(t for p in self.pipelines for t in p.get_start_tasks()))
+                await asyncio.gather(*(t for p in self.pipelines for t in p.get_wait_tasks()))
 
             if self.ui is not None:
                 await self.ui.update()

@@ -41,7 +41,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             else lambda: CountBatchStrategy(batch_size)
         )
 
-        self._puller_tasks: List[asyncio.Task] = []
+        self._strategies: dict[int, BaseBatchStrategy] = {}
 
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count)
@@ -57,19 +57,24 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
         # старт worker'ов
         for i in range(self._workers_count):
+            self._strategies[i] = self.batch_strategy_factory()
             self._workers.append(asyncio.create_task(self._worker(i)))
 
     async def wait(self):
         # ждём producer
         await self.input_channel.upstream_done.wait()
         await self.input_channel.queue.join()
+
         # отменяем workers
-        for w in self._puller_tasks:
+        for w in self._workers:
             w.cancel()
-        await self.flush()
+
+        await self._flush()
         await asyncio.gather(*self._workers, return_exceptions=True)
+
         for ch in self.output_channels:
             await ch.done()
+        await self.fin()
         await self.stats.finish(self.name)
         self.logger.info(f"{self.name} worker is DONE")
 
@@ -84,41 +89,24 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         await self.input_channel.done()
 
     async def _worker(self, wid: int):
-        buffer = []
-        batch_strategy = self.batch_strategy_factory()
+        strategy = self._strategies[wid]
 
-        async def callback(task: Task):
-            buffer.append(task)
-            batch_strategy.on_add(task)
+        while True:
+            task = None
+            try:
+                task = await self.input_channel.queue.get()
+            except asyncio.CancelledError:
+                break
 
             try:
-                if batch_strategy.should_flush(buffer):
-                    await self._process_batch(buffer, wid)
-                    buffer.clear()
-                    batch_strategy.reset()
+                batch = strategy.collect(task)
+                if batch:
+                    await self._process_batch(batch, wid)
             except Exception as e:
                 await self.stats.error(self.name)
                 self.logger.exception(e)
             finally:
                 self.input_channel.queue.task_done()
-
-        async def puller():
-            while True:
-                task = None
-                task = await self.input_channel.queue.get()
-                await callback(task)
-
-        puller_task = asyncio.create_task(puller())
-        self._puller_tasks.append(puller_task)
-
-        try:
-            await puller_task
-        except asyncio.CancelledError:
-            pass
-
-        if buffer:
-            await self._process_batch(buffer, wid)
-            buffer.clear()
 
     async def _process_batch(self, batch: List[Task], wid: int):
         results = await self.process(batch, wid)
@@ -132,13 +120,22 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.post_process(r)
             await self.dispatch(r)
 
+    async def dispatch(self, result: Task):
+        targets = self.route(result, self.output_channels)
+        for channel in targets:
+            await self.stats.queue_size(channel.downstream, channel.queue.qsize())
+            await self.stats.edge_dispatch(self.name, channel.downstream)
+            await channel.queue.put(result.clone())
+
+    async def _flush(self):
+        for wid, strategy in self._strategies.items():
+            batch = strategy.flush()
+            if batch:
+                await self._process_batch(batch, wid)
+
     # -------------------------------
     # Методы, которые нужно реализовать
     # -------------------------------
-    async def flush(self):
-        """Для чистки в конретных реализациях"""
-        pass
-
     async def produce(self):
         """Для stages без input queue"""
         yield  # async generator
@@ -149,16 +146,12 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
     async def post_process(self, result: Task):
         """Опционально сохраняем в БД"""
         pass
+    
+    async def fin(self):
+        pass
 
     def route(self, item, channels: list[Channel]) -> list[Channel]:
         return channels
-
-    async def dispatch(self, result: Task):
-        targets = self.route(result, self.output_channels)
-        for channel in targets:
-            await self.stats.queue_size(channel.downstream, channel.queue.qsize())
-            await self.stats.edge_dispatch(self.name, channel.downstream)
-            await channel.queue.put(result.clone())
             
     def get_logger(self, name: str = "app") -> logging.Logger:
         logger = logging.getLogger(name)

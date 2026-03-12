@@ -31,12 +31,9 @@ class BookProducer(BaseQueueWorker[BookTask]):
         self._file_to_id = self._book_repo.get_file_to_id()     
         self._chunk_to_book_id = self._chunk_repo.get_ids()
 
-    def has_input(self) -> bool:
-        return False
-
     async def produce(self):
         async for book in self._engine.search_books():
-            yield Task(
+            yield Task[Book](
                 id=book.id,
                 name=book.file_name,
                 entity=book
@@ -53,7 +50,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
                     data = await self._engine.get_book_data(book)
                 
                 tasks.append(
-                    Task(
+                    Task[BookTask](
                         id=book.id,
                         name=book.file_name,
                         entity=BookTask(book, data, BookAction.CHUNK)
@@ -67,7 +64,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
                     continue
 
                 tasks.append(
-                    Task(
+                    Task[BookTask](
                         id=book.id,
                         name=book.file_name,
                         entity=BookTask(book, data, BookAction.BOOK)

@@ -1,19 +1,25 @@
-class BaseBatchStrategy:
+from app.infrastructure.models import Task
 
-    def should_flush(self, batch) -> bool:
+class BaseBatchStrategy:
+    """Базовая стратегия для накопления batch"""
+
+    def info(self):
         """
-        Возвращает True если batch нужно отправить в process
+        Получить информацию о стратегии
         """
         raise NotImplementedError
 
-    def on_add(self, task):
+    def collect(self, task) -> list[Task] | None:
         """
-        вызывается при добавлении task в batch (опционально)
+        Добавляет task в стратегию.
+        Если batch готов к отправке, возвращает его (list[Task]).
+        Иначе возвращает None.
         """
-        pass
+        raise NotImplementedError
 
-    def reset(self):
+    def flush(self) -> list[Task] | None:
         """
-        сброс состояния после flush
+        Отдаёт все накопленные задачи и сбрасывает состояние.
+        Если batch пустой — возвращает None
         """
-        pass
+        raise NotImplementedError
