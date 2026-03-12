@@ -53,8 +53,17 @@ class BaseWorker(ABC):
 
         try:
             if self.pipelines:
-                await asyncio.gather(*(t for p in self.pipelines for t in p.get_start_tasks()))
-                await asyncio.gather(*(t for p in self.pipelines for t in p.get_wait_tasks()))
+                await asyncio.gather(*(pipeline.setup_stages() for pipeline in self.pipelines))
+                
+                # Сначала стартовые задачи всех pipeline
+                start_tasks = [t for p in self.pipelines for t in p.get_start_tasks()]
+                if start_tasks:
+                    await asyncio.gather(*start_tasks)
+
+                # Потом задачи ожидания/с зависимостью
+                wait_tasks = [t for p in self.pipelines for t in p.get_wait_tasks()]
+                if wait_tasks:
+                    await asyncio.gather(*wait_tasks)
 
             if self.ui is not None:
                 await self.ui.update()

@@ -2,39 +2,68 @@ from .base_batch_strategy import BaseBatchStrategy
 from app.infrastructure.models import Task, Embedding
 
 class BookEmbeddingBatchStrategy(BaseBatchStrategy):
-    """Формирует batch по book_id. Batch для одной книги."""
+    """Собирает batch из N книг"""
 
-    def __init__(self):
+    def __init__(self, books: int):
+        self.books = books
+
         self.current_book_id = None
-        self.buffer: list = []
+        self.current_book: list[Task] = []
+
+        self.books_buffer: list[Task] = []
 
     def info(self):
         return str(self.current_book_id)
 
     def collect(self, task: Task[Embedding]) -> list[Task] | None:
-        """
-        Добавляет task в стратегию.
-        Если пришла задача для новой книги — отдаёт предыдущий batch.
-        """
-        if not self.buffer:
-            self.current_book_id = task.entity.book_id
-            self.buffer.append(task)
+        book_id = task.entity.book_id
+
+        if not self.current_book:
+            self.current_book_id = book_id
+            self.current_book.append(task)
             return None
 
-        if task.entity.book_id != self.current_book_id:
-            batch = self.buffer
-            self.buffer = [task]
-            self.current_book_id = task.entity.book_id
+        # книга продолжается
+        if book_id == self.current_book_id:
+            self.current_book.append(task)
+            return None
+
+        # книга закончилась
+        self.books_buffer.extend(self.current_book)
+
+        self.current_book = [task]
+        self.current_book_id = book_id
+
+        # накопили нужное количество книг
+        if len(self.books_buffer) and self._books_count() >= self.books:
+            batch = self.books_buffer
+            self.books_buffer = []
             return batch
 
-        self.buffer.append(task)
         return None
 
     def flush(self) -> list[Task] | None:
-        """Отдаёт оставшийся batch, если он есть"""
-        if self.buffer:
-            batch = self.buffer
-            self.buffer = []
-            self.current_book_id = None
+        if self.current_book:
+            self.books_buffer.extend(self.current_book)
+            self.current_book = []
+
+        if self.books_buffer:
+            batch = self.books_buffer
+            self.books_buffer = []
             return batch
+
         return None
+
+    def _books_count(self) -> int:
+        """Сколько книг сейчас в books_buffer"""
+        if not self.books_buffer:
+            return 0
+
+        last = None
+        count = 0
+        for t in self.books_buffer:
+            if t.entity.book_id != last:
+                count += 1
+                last = t.entity.book_id
+
+        return count

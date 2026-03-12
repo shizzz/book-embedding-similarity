@@ -39,14 +39,31 @@ class ModelRepository:
         """
         with self.router.meta() as conn:
             cursor = conn.cursor()
+            
+            # Try to get the first active model
             cursor.execute(
                 """
                 SELECT uid
                 FROM models
                 WHERE name = ? AND active = 1
+                ORDER BY uid
                 LIMIT 1
                 """,
                 (name,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+            
+            # If no active model, return the first one regardless of active status
+            cursor.execute(
+                """
+                SELECT uid
+                FROM models
+                WHERE active = 1
+                ORDER BY uid
+                LIMIT 1
+                """,
             )
             row = cursor.fetchone()
             return row[0] if row else None

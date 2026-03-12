@@ -8,6 +8,7 @@ class Action(IntEnum):
     GRAB = auto()
     PARSE = auto()
     EMBEDDING = auto()
+    INDEX = auto()
     DB = auto()
     NONE = auto()
 

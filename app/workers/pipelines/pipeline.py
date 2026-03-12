@@ -24,7 +24,7 @@ class Pipeline(ABC):
         self._logger = logger
         self._input_channel = input_channel
         self._output_channels = output_channels
-        self._upstream_done = asyncio.Event()
+        self._upstream_done = upstream_done
 
         if self._upstream_done and self._input_channel:
             raise ValueError(
@@ -35,26 +35,18 @@ class Pipeline(ABC):
 
     def get_start_tasks(self) -> list:
         if self._upstream_done is None:
-            [self._exec_start()]
-        else:
-            return []
+            return [worker.start() for worker in self.pool]
+        return []
 
     def get_wait_tasks(self) -> list:
         if self._upstream_done is None:
-            [self._exec_wait()]
-        else:
-            return [self._exec_with_upstream()]
-
-    async def _exec_start(self):
-        await asyncio.gather(*(worker.start() for worker in self.pool))
-
-    async def _exec_wait(self):
-        await asyncio.gather(*(worker.wait() for worker in self.pool))
+            return [worker.wait() for worker in self.pool]
+        return [self._exec_with_upstream()]
 
     async def _exec_with_upstream(self):
         await self._upstream_done.wait()
-        await self._exec_start()
-        await self._exec_wait()
+        await asyncio.gather(*(worker.start() for worker in self.pool))
+        await asyncio.gather(*(worker.wait() for worker in self.pool))
 
     @abstractmethod
     async def setup_stages(self) -> None:

@@ -5,6 +5,7 @@ __all__ = [
     "GenerateEmbeddingsWorker",
     "GenerateSimilarWorker",
     "SimilarSearchWorker",
+    "GenerateIndexWorker",
 ]
 
 __getattr__, __dir__, __all__ = lazy.attach(
@@ -13,11 +14,13 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "generate_embeddings",
         "generate_similar",
         "similar_search",
+        "generate_index",
     ],
     submod_attrs={
         "generate_embeddings": ["GenerateEmbeddingsWorker"],
         "generate_similar": ["GenerateSimilarWorker"],
         "similar_search": ["SimilarSearchWorker"],
+        "generate_index": ["GenerateIndexWorker"],
     }
 )
 
@@ -26,3 +29,4 @@ if TYPE_CHECKING:
     from .generate_embeddings import GenerateEmbeddingsWorker
     from .generate_similar import GenerateSimilarWorker
     from .similar_search import SimilarSearchWorker
+    from .generate_index import GenerateIndexWorker

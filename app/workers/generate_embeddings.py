@@ -1,4 +1,6 @@
 import logging
+from app.infrastructure.db import router
+from app.workers import stats
 from app.workers.pipelines import EmbeddingPipeline
 from app.workers.base import BaseWorker
 from app.workers.sources.databaseReporter import DatabaseReporter
@@ -12,6 +14,10 @@ class GenerateEmbeddingsWorker(BaseWorker):
         self.ui.report(report)
 
     async def setup_stages(self):
-        embPipeline = EmbeddingPipeline()
+        embPipeline = EmbeddingPipeline(
+            router=self.router,
+            stats=self.stats,
+            logger=self.logger,
+        )
         self.model_uid = embPipeline.model.info.uid
         self.pipelines.append(embPipeline)

@@ -28,7 +28,6 @@ class Parser(BaseQueueWorker[BookTask]):
         self._repo = ChunkRepository(router)
         self._chunk_id = self._repo.get_max_id()
         self._chunk_id_lock = asyncio.Lock()
-        self._batch: List[Task[List[Chunk]]] = []
         self._chunk_to_book_id = self._repo.get_ids()
 
     async def process(self, batch: List[Task[BookTask]], wid: int) -> List[Task]:

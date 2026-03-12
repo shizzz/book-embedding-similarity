@@ -4,7 +4,7 @@ from ..router import DBRouter
 from .model import ModelRepository
 from app.settings import ProcessConfig
 
-GET_QUERY: str = "SELECT id, book_id, data, shape, type FROM embeddings"
+GET_QUERY: str = "SELECT id, book_id, chunk_id, seq, data, shape, type FROM embeddings"
 
 class EmbeddingsRepository:
     def __init__(self, router: DBRouter, model_uid: str = None):
@@ -21,7 +21,13 @@ class EmbeddingsRepository:
             rows = conn.execute("SELECT DISTINCT chunk_id FROM embeddings").fetchall()
             return {r[0] for r in rows}
 
-    def get_all_batch(self, batch_size: int = 1):
+    def get_all_batch(self, batch_size: int = 1, order_by: list[str] = None):
+        order_by = order_by or []
+        order_clause = ""
+        if order_by:
+            # Sanitize column names if necessary to prevent SQL injection
+            order_clause = " ORDER BY " + ", ".join(order_by)
+
         with self.router.embeddings(self.model_uid) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM embeddings")
@@ -29,7 +35,7 @@ class EmbeddingsRepository:
 
             for offset in range(0, total, batch_size):
                 cursor.execute(
-                    f"{GET_QUERY} LIMIT ? OFFSET ?",
+                    f"{GET_QUERY}{order_clause} LIMIT ? OFFSET ?",
                     (batch_size, offset)
                 )
                 rows = cursor.fetchall()
