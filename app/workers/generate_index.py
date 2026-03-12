@@ -15,10 +15,10 @@ class GenerateIndexWorker(BaseWorker):
         pass
 
     async def setup_stages(self):
-        embPipeline = IndexPipeline(
+        indexPipeline = IndexPipeline(
             IndexConfig.BUILD_INDEX_LEVEL,
             router=self.router,
             stats=self.stats,
             logger=self.logger,
         )
-        self.pipelines.append(embPipeline)
+        self.pipelines.append(indexPipeline)

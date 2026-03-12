@@ -19,10 +19,10 @@ class IndexPipeline(Pipeline):
     async def setup_stages(self) -> None:
         emb_channels: list[Channel] = []
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.DOCUMENT:
-            emb_channel_document = Channel(Stages.MERGER, asyncio.Queue(maxsize=100))
+            emb_channel_document = Channel(Stages.MERGER, asyncio.Queue(maxsize=10000))
             emb_channels.append(emb_channel_document)
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.CHUNK:
-            emb_channel_index = Channel(f"{Stages.INDEX}_{IndexLevel.CHUNK.value}", asyncio.Queue(maxsize=100))
+            emb_channel_index = Channel(f"{Stages.INDEX}_{IndexLevel.CHUNK.value}", asyncio.Queue(maxsize=10000))
             emb_channels.append(emb_channel_index)
 
         emb_stage = EmbeddingProducer(
@@ -37,7 +37,7 @@ class IndexPipeline(Pipeline):
         self.pool.append(emb_stage)
 
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.DOCUMENT:
-            merged_channel = Channel(f"{Stages.INDEX}_{IndexLevel.DOCUMENT.value}", asyncio.Queue(100))
+            merged_channel = Channel(f"{Stages.INDEX}_{IndexLevel.DOCUMENT.value}", asyncio.Queue(10000))
             merge_stage = EmbeddingMeger(
                 batch_size=500,
                 input_channel=emb_channel_document,

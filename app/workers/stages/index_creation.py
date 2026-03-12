@@ -86,7 +86,11 @@ class Indexer(BaseQueueWorker[Embedding]):
             await self.stats.set_total(self.name, total)
 
     async def fin(self):
-        faiss.write_index(self.index, str(PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level}.faiss"))
-        self._index = self.index
+        path = PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level}.faiss"
+        tmp = path.with_suffix(".tmp")
+
+        faiss.write_index(self.index, str(tmp))
+        tmp.replace(path)
+        
         if self.logger:
-            self.logger.info(f"{self.level} индекс построен: {len(self._count)} книг, dim={self.embedding_dim}")
+            self.logger.info(f"{self.level} индекс построен: {self._count} книг, dim={self.embedding_dim}")
