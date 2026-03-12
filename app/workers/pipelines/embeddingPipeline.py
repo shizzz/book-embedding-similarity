@@ -21,12 +21,11 @@ class EmbeddingPipeline(Pipeline):
         **kwargs
     ):
         super().__init__(name="embeddings", *args, **kwargs)
-        self.ui.model_info = self.model.info
 
         self.model = Model(EMB_THREADS)
         self.search_engine = BookSearchEngineFactory().create(BookSearchEngineFactory.INPIX, self._stats)
 
-        Migrator(self.router).migrate_all([self.model.info.uid])
+        Migrator(self._router).migrate_all([self.model.info.uid])
         ModelRepository(self._router).get_or_create(self.model.info.uid, self.model.info.model_name)
 
         self._savers = {

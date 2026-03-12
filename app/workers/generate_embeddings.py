@@ -20,4 +20,5 @@ class GenerateEmbeddingsWorker(BaseWorker):
             logger=self.logger,
         )
         self.model_uid = embPipeline.model.info.uid
+        self.ui.model_info = embPipeline.model.info
         self.pipelines.append(embPipeline)
