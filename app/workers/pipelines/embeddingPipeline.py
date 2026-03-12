@@ -36,7 +36,7 @@ class EmbeddingPipeline(Pipeline):
         }
 
     async def setup_stages(self) -> None:
-        channel_book = Channel(Stages.CHUNK, asyncio.Queue(maxsize=50))
+        channel_book = Channel(Stages.PARSER, asyncio.Queue(maxsize=50))
         channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(100))
         channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
 
@@ -70,7 +70,6 @@ class EmbeddingPipeline(Pipeline):
             input_channel=channel_chunks,
             output_channels=[channel_db, *(self._output_channels or [])],
             stats=self.stats,
-            batch_size=128,
             workers=EMB_THREADS,
             logger = self.logger, 
         )
@@ -97,12 +96,15 @@ class EmbeddingPipeline(Pipeline):
     def _save_embeddings(self, emb: List[Embedding], tx: DBTransaction):
         EmbeddingsRepository(self.router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
 
-    def _save(self, router: DBRouter, tasks: List[BatchTask[TEntity]]):
-        with router.transaction(self.model.info.uid) as tx:
+    def _save(self, threads: int, router: DBRouter, tasks: List[BatchTask[TEntity]]):
+        with router.transaction() as tx:
             for task in tasks:
                 saver = self._savers[task.dataset]
-                saver(saver, task.entity, tx)
+                saver(task.entity, tx)
     
-    async def _save_async(self, router: DBRouter, tasks: List[BatchTask[TEntity]]):
-        async with router.lock_all(self.model.info.uid) as tx:
-            await asyncio.to_thread(self._save, router, tasks)
+    async def _save_async(self, threads: int, router: DBRouter, tasks: List[BatchTask[TEntity]]):
+        if threads > 1:
+            async with router.lock_all(self.model.info.uid):
+                await asyncio.to_thread(self._save, threads, router, tasks)
+        else:
+            await asyncio.to_thread(self._save, threads, router, tasks)
