@@ -96,7 +96,8 @@ class LiveUI(BaseUI):
             else:
                 progress = "-"
 
-            stage_text = Text(stage_name)
+            stage_str = f"{stage_name} ({st.batch_size})" if st.batch_size else stage_name
+            stage_text = Text(stage_str)
 
             status = "✓" if st.finished else "RUN"
 

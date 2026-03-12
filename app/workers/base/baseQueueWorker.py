@@ -62,6 +62,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             self._strategies[i] = self.batch_strategy_factory()
             self._workers.append(asyncio.create_task(self._worker(i)))
 
+        self.stats.update_stage_info(self.name, self._strategies[i].info())
+
     async def wait(self):
         # ждём producer
         await self.input_channel.upstream_done.wait()

@@ -13,6 +13,11 @@ class PipelineStats(Stats):
         st.start()
         self.stages[name] = st
 
+    async def update_stage_info(self, name: str, batch_size: int):
+        stage = self.stages.get(name)
+        stage.batch_size = batch_size
+        pass
+
     async def unregister_stage(self, name: str, workers: int = 1):
         stage = self.stages.get(name)
         if not stage:

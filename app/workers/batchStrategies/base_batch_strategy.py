@@ -3,7 +3,7 @@ from app.infrastructure.models import Task
 class BaseBatchStrategy:
     """Базовая стратегия для накопления batch"""
 
-    def info(self):
+    def info(self) -> str:
         """
         Получить информацию о стратегии
         """

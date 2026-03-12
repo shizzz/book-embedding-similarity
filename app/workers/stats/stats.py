@@ -11,6 +11,9 @@ class Stats(ABC):
     async def register_stage(self, name: str, workers: int = 1, queue_max_size: int = 0):
         pass
     
+    async def update_stage_info(self, name: str, batch_size: int):
+        pass
+    
     async def unregister_stage(self, name: str, workers: int = 1):
         pass
 

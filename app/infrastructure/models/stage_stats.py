@@ -14,6 +14,7 @@ class StageStats:
         self.start_time: float | None = None
         self.finished: bool = False
         self.speed_value: float = 0
+        self.batch_size: str = None
 
     def start(self):
         self.start_time = time.time()
