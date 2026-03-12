@@ -24,10 +24,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
         self._book_repo = BookRepository(router)
         self._chunk_repo = ChunkRepository(router)
         self._book_id = BookRepository(router).get_max_id()
-        self._batch: List[Task[BookTask]] = []
-        self._c = 0
 
-        self.count_task = asyncio.create_task(self.count_total())
         self._file_to_id = self._book_repo.get_file_to_id()     
         self._chunk_to_book_id = self._chunk_repo.get_ids()
 
@@ -37,7 +34,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
                 id=book.id,
                 name=book.file_name,
                 entity=book,
-                actions=Action.GRAB,
+                routes=Action.GRAB,
             )
 
     async def process(self, batch: List[Task[Book]], wid: int) -> List[Task[BookTask]]:
@@ -55,7 +52,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
                         id=book.id,
                         name=book.file_name,
                         entity=BookTask(book, data, BookAction.CHUNK),
-                        actions=Action.PARSE,
+                        routes=Action.PARSE,
                     )
                 )
             else:
@@ -70,7 +67,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
                         id=book.id,
                         name=book.file_name,
                         entity=BookTask(book, data, BookAction.BOOK),
-                        actions=Action.PARSE,
+                        routes=Action.PARSE,
                     )
                 )
         return tasks

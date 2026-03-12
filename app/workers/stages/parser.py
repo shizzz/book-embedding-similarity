@@ -54,7 +54,7 @@ class Parser(BaseQueueWorker[BookTask]):
                     id=book.id,
                     name=book.file_name,
                     entity=book,
-                    actions=Action.DB,
+                    routes=Action.DB,
                     dataset=Dataset.BOOK,
                 )
                 result.append(book_task)
@@ -72,7 +72,7 @@ class Parser(BaseQueueWorker[BookTask]):
                             id=0, 
                             name="Done",
                             entity=None, 
-                            actions=Action.NONE,
+                            routes=Action.NONE,
                         )
                     )
                     continue
@@ -85,7 +85,7 @@ class Parser(BaseQueueWorker[BookTask]):
                     id=chunk.chunk_id,
                     name=book.file_name,
                     entity=chunk,
-                    actions=chunk_actions,
+                    routes=chunk_actions,
                     dataset=Dataset.CHUNK,
                 )
                 result.append(chunk_task)
@@ -93,7 +93,7 @@ class Parser(BaseQueueWorker[BookTask]):
 
     def route(self, task: Task, channels: list[Channel]) -> list[Channel]:
         allowed = set()
-        for action in task.actions:
+        for action in task.routes:
             allowed |= ROUTES.get(action, set())
 
         return [ch for ch in channels if ch.downstream in allowed]

@@ -26,22 +26,22 @@ class Task(Generic[TEntity]):
     id: int
     name: str
     entity: TEntity
-    actions: list[Action] = field(default_factory=list)
+    routes: list[Action] = field(default_factory=list)
     dataset: Optional[Dataset] = None
 
     done: int = 1
     db_queue_count: int = 0
 
     def __post_init__(self):
-        if isinstance(self.actions, Action):
-            self.actions = [self.actions]
+        if isinstance(self.routes, Action):
+            self.routes = [self.routes]
 
     def clone(self, *, entity: Optional[TEntity] = None) -> "Task[TEntity]":
         return Task(
             id=self.id,
             name=self.name,
             entity=entity if entity is not None else self.entity,
-            actions=self.actions,
+            routes=self.routes,
             dataset=self.dataset,
             done=self.done,
             db_queue_count=self.db_queue_count,

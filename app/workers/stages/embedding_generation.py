@@ -124,7 +124,7 @@ class EmbeddingWorker(BaseQueueWorker):
                 emb.id,
                 ",".join(map(str, (emb.book_id, emb.chunk_id, emb.seq))),
                 entity=emb,
-                actions=Action.DB,
+                routes=Action.DB,
                 dataset=Dataset.EMBEDDING,
             )
 

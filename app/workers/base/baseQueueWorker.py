@@ -55,6 +55,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
             await self.input_channel.add_upstream()
             asyncio.create_task(self._produce())
 
+        asyncio.create_task(self.count_total())
+        
         # старт worker'ов
         for i in range(self._workers_count):
             self._strategies[i] = self.batch_strategy_factory()
@@ -147,6 +149,10 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
     async def post_process(self, result: Task):
         """Опционально сохраняем в БД"""
+        pass
+
+    async def count_total(self) -> None:
+        """Опционально считаем total для stats"""
         pass
     
     async def fin(self):
