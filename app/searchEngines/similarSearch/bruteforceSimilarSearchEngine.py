@@ -2,7 +2,7 @@ import heapq
 import numpy as np
 from typing import List
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.utils import EmbeddingsBatchIterable
+from app.infrastructure.db.iterables import EmbeddingsBatchIterable
 from .similarSearchEngine import SimilarSearchEngine
 from app.infrastructure.models import ChunkType, SearchResult
 

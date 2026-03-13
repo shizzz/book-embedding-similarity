@@ -1,4 +1,4 @@
-from enum import IntEnum, StrEnum
+from enum import IntEnum, StrEnum, auto
 
 class ChunkType(IntEnum):
     TITLE = 0
@@ -8,7 +8,24 @@ class ChunkType(IntEnum):
 class Stages(StrEnum):
     BOOK_SEARCH = "BookSearchProducer"
     PARSER = "Parser"
+    SEARCH = "Search"
     MERGER = "Merger"
+    SIMILAR = "Similar"
     INDEX = "Index"
     EMBEDDING = "Embedding"
     DB = "DB"
+
+class BookSearchEngineType(IntEnum):
+    ZIP = auto()
+    INPIX = auto()
+    DB = auto()
+
+    def __str__(self):
+        return self.name
+
+class SimilarSearchEngineType(StrEnum):
+    INDEX = "index"
+    BRUTEFORCE = "bruteforce"
+
+    def __str__(self):
+        return self.name

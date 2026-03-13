@@ -17,6 +17,7 @@ class Dataset(IntEnum):
     EMBEDDING = auto()
     AUTHOR = auto()
     CHUNK = auto()
+    SIMILAR = auto()
 
 class BookAction(IntEnum):
     BOOK = auto()
@@ -29,7 +30,6 @@ class Task(Generic[TEntity]):
     entity: TEntity
     routes: list[Action] = field(default_factory=list)
     dataset: Optional[Dataset] = None
-
     done: int = 1
     db_queue_count: int = 0
 

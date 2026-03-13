@@ -56,12 +56,6 @@ class HybridEmbeddingProvider(EmbeddingProvider):
             if eid in self._cache_meta:
                 result[eid] = self._cache_meta[eid]
 
-        # data cache (meta извлекается)
-        for eid in embedding_ids:
-            if eid not in result and eid in self._cache_data:
-                _, book_id, type_ = self._cache_data[eid]
-                result[eid] = (None, book_id, type_)
-
         missing = [eid for eid in embedding_ids if eid not in result]
 
         if missing:

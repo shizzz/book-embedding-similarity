@@ -163,6 +163,10 @@ class BookRegistry:
     @property
     def texts(self):
         yield from (book.text for book in self.books)
+        
+    @property
+    def ids(self) -> list[int]:
+        return [book.id for book in self.books if book.id is not None]
 
     def get(self, book_id: int) -> Optional["Book"]:
         return self._book_map.get(book_id)

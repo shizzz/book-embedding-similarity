@@ -1,8 +1,8 @@
 from typing import List
-from app.utils import EmbeddingsBatchIterable
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
+from app.infrastructure.db.iterables import EmbeddingsBatchIterable
 from app.infrastructure.models import Task, Embedding, Stages, Action
 
 REPO_BATCH_SIZE: int = 1000

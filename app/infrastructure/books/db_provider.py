@@ -4,7 +4,7 @@ from app.infrastructure.models import Book
 from app.infrastructure.providers.bookProvider import BookProvider
 
 class DBBookProvider(BookProvider):
-    SQLITE_MAX_VARS = 1000
+    SQLITE_MAX_VARS = 30000
 
     def __init__(self, router: DBRouter):
         self._repo = BookRepository(router)

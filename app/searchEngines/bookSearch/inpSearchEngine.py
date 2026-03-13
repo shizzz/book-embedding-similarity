@@ -9,8 +9,6 @@ from .bookSearchEngine import BaseBookSearchEngine
 from app.settings import PathsConfig
 
 class InpBookSearchEngine(BaseBookSearchEngine):
-    TYPE: str = "inpix"
-
     def __init__(self, folder: str, stats: Stats = None):
         super().__init__(folder, stats)
 

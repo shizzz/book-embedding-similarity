@@ -1,29 +1,25 @@
-from typing import Literal
 from faiss import IndexIDMap
 from app.hnsw import IndexManager
 from app.hnsw.rerankers import LightGBMReranker
 from app.infrastructure.db import DBRouter
+from app.infrastructure.models import SimilarSearchEngineType
 from .similarSearchEngine import SimilarSearchEngine
 from .indexSimilarSearchEngine import IndexSimilarSearchEngine
 from .bruteforceSimilarSearchEngine import BruteforceSimilarSearchEngine
 from app.settings import IndexLevel, SearchIndexLevel, IndexConfig
 
 class SimilarSearchEngineFactory:
-    INDEX = "index" 
-    BRUTEFORCE = "bruteforce"
-    EngineType = Literal["index", "bruteforce"]
-
     @classmethod
     def create(
         cls,
-        mode: EngineType,
+        mode: SimilarSearchEngineType,
         router: DBRouter,
         limit: int,
         exclude_same_authors: bool,
         step_percent: int = 5,
         logger=None,
     ) -> SimilarSearchEngine:
-        if mode == SimilarSearchEngineFactory.INDEX:
+        if mode == SimilarSearchEngineType.INDEX:
             hnsw = IndexManager(logger=logger)
 
             chunk_index = None
@@ -47,7 +43,7 @@ class SimilarSearchEngineFactory:
                 logger=logger
             )
 
-        elif mode == SimilarSearchEngineFactory.BRUTEFORCE:
+        elif mode == SimilarSearchEngineType.BRUTEFORCE:
             return BruteforceSimilarSearchEngine(
                 reranker=LightGBMReranker(),
                 router=router,

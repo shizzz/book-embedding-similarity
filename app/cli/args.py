@@ -1,4 +1,5 @@
 import argparse
+from app.infrastructure.models import SimilarSearchEngineType
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -50,9 +51,9 @@ def get_args() -> argparse.Namespace:
     )
     sim_generate_parser.add_argument(
         "--batch", 
-        type=str, 
+        type=int, 
         help="Количество одновременно обрабатываемых книг",
-        required=True
+        required=False
     )
 
     # similar get
@@ -62,7 +63,7 @@ def get_args() -> argparse.Namespace:
     )
     sim_get_parser.add_argument(
         "--mode",
-        choices=["index", "bruteforce"],
+        choices=[SimilarSearchEngineType.INDEX, SimilarSearchEngineType.BRUTEFORCE],
         required=True,
         help="Режим: index или bruteforce"
     )

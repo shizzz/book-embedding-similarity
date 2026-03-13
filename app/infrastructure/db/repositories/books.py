@@ -36,32 +36,32 @@ class BookRepository:
     def __init__(self, router: DBRouter):
         self.router = router
 
-    def get_all(self, empty: bool = None) -> Any:
-        with self.router.transaction():
-            conn = self.router.meta()
-            query = GET_QUERY
-            params = ()
+    def get_all_batch(self, batch_size: int = 1, empty: bool = None, order_by: list[str] = None):
+        order_by = order_by or []
+        params = []
+        order_clause = ""
+        where_clause = ""
 
-            if empty is not None:
-                query += " WHERE b.empty = ?"
-                params = (int(empty),)
+        if empty is not None:
+            where_clause = " WHERE b.empty = ? "
+            params.append(int(empty))
 
-            cursor = conn.execute(query, params)
-            for row in cursor:
-                yield tuple(row)
+        if order_by:
+            order_clause = " ORDER BY " + ", ".join(order_by)
 
-    async def load_books_after(self, last_id: int, limit: int) -> dict[str, int]:
         with self.router.meta() as conn:
-            query = """
-                SELECT id, title, path
-                FROM books
-                WHERE id > %s
-                ORDER BY id
-                LIMIT %s
-            """
+            total = self.count(empty, conn)
+            cursor = conn.cursor()
 
-            rows = conn.execute("SELECT id, book FROM books").fetchall()
-            return {row[1]: row[0] for row in rows}
+            for offset in range(0, total, batch_size):
+                cursor.execute(
+                    f"{GET_FULL_QUERY}{where_clause}{order_clause} LIMIT ? OFFSET ?",
+                    (*params, batch_size, offset)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    break
+                yield [Book.from_row(r) for r in rows]
 
     def get_by_ids(self, ids: list[int]) -> dict[int, dict]:
         if not ids:
@@ -175,6 +175,19 @@ class BookRepository:
             ]
         )
 
-    def count(self) -> int:
-        with self.router.meta() as conn:
-            return conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]
+    def _count(self, conn, empty: bool = None) -> int:
+        query = "SELECT COUNT(*) FROM books"
+        params = ()
+
+        if empty is not None:
+            query += " WHERE empty = ?"
+            params = (int(empty),)
+
+        return conn.execute(query, params).fetchone()[0]
+        
+    def count(self, empty: bool = None, conn = None):
+        if conn:
+            return self._count(conn, empty)
+        else:
+            with self.router.meta() as conn:
+                 return self._count(conn, empty)

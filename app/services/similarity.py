@@ -4,7 +4,7 @@ import traceback
 from typing import Optional, List, Tuple
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import SimilarRepository
-from app.infrastructure.models import Book
+from app.infrastructure.models import Book, SimilarSearchEngineType
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 
@@ -52,7 +52,7 @@ class Similarity:
 
         try:
             engine = SimilarSearchEngineFactory.create(
-                mode=SimilarSearchEngineFactory.INDEX, 
+                mode=SimilarSearchEngineType.INDEX, 
                 router=self.router,
                 limit=limit, 
                 exclude_same_authors=exclude_same_author, 

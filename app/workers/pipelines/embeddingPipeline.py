@@ -4,7 +4,7 @@ from app.model import Model
 from app.common.types import TEntity
 from app.infrastructure.db import Migrator, DBRouter, DBTransaction
 from app.infrastructure.db.repositories import ModelRepository, BookRepository, ChunkRepository, EmbeddingsRepository, AuthorRepository
-from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, Embedding, BatchTask
+from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, Embedding, BatchTask, BookSearchEngineType
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.workers.stages import BookProducer, Parser, DbWorker, EmbeddingWorker
 from .pipeline import Pipeline
@@ -23,7 +23,7 @@ class EmbeddingPipeline(Pipeline):
         super().__init__(name="embeddings", *args, **kwargs)
 
         self.model = Model(EMB_THREADS)
-        self.search_engine = BookSearchEngineFactory().create(BookSearchEngineFactory.INPIX, self._stats)
+        self.search_engine = BookSearchEngineFactory().create(BookSearchEngineType.INPIX, self._stats)
 
         Migrator(self._router).migrate_all([self.model.info.uid])
         ModelRepository(self._router).get_or_create(self.model.info.uid, self.model.info.model_name)

@@ -5,6 +5,7 @@ __all__ = [
     "Pipeline",
     "EmbeddingPipeline",
     "IndexPipeline",
+    "SimilarSearchPipeline",
 ]
 
 __getattr__, __dir__, __all__ = lazy.attach(
@@ -13,11 +14,13 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "pipeline",
         "embeddingPipeline",
         "indexPipeline",
+        "similarSearchPipeline",
     ],
     submod_attrs={
         "pipeline": ["Pipeline"],
         "embeddingPipeline": ["EmbeddingPipeline"],
         "indexPipeline": ["IndexPipeline"],
+        "similarSearchPipeline": ["SimilarSearchPipeline"],
     }
 )
 
@@ -26,3 +29,4 @@ if TYPE_CHECKING:
     from .pipeline import Pipeline
     from .embeddingPipeline import EmbeddingPipeline
     from .indexPipeline import IndexPipeline
+    from .similarSearchPipeline import SimilarSearchPipeline

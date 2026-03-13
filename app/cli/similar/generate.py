@@ -6,11 +6,5 @@ def run(args):
     db_queue_batch_size = 20000
     queue_size = 0
 
-    worker = GenerateSimilarWorker(
-        # title="Generate similar", 
-        # batch_size=batch_size,
-        # queue_size=queue_size,
-        # db_queue_batch_size=db_queue_batch_size,
-        # db_queue_max_size=queue_size
-    )
+    worker = GenerateSimilarWorker(None)
     asyncio.run(worker.run())

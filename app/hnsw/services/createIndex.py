@@ -3,8 +3,8 @@ import numpy as np
 from typing import Optional, Dict
 from app.infrastructure.db import DBRouter
 from app.ui import BaseUI
-from app.utils import EmbeddingsBatchIterable
 from app.infrastructure.db.repositories import EmbeddingsRepository, ModelRepository
+from app.infrastructure.db.iterables import EmbeddingsBatchIterable
 from app.settings import PathsConfig, ProcessConfig, IndexConfig, IndexLevel
 
 class BookEmbeddingIndexer:

@@ -6,7 +6,7 @@ from app.infrastructure.providers import EmbeddingProvider
 from app.infrastructure.models import ChunkType
 
 class DBEmbeddingProvider(EmbeddingProvider):
-    SQLITE_MAX_VARS = 1000
+    SQLITE_MAX_VARS = 30000
 
     def __init__(self, router: DBRouter):
         self._repo = EmbeddingsRepository(router)

@@ -1,6 +1,4 @@
 import logging
-from app.infrastructure.db import router
-from app.workers import stats
 from app.workers.pipelines import EmbeddingPipeline
 from app.workers.base import BaseWorker
 from app.workers.sources.databaseReporter import DatabaseReporter

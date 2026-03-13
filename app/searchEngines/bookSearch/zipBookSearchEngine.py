@@ -6,8 +6,6 @@ from .bookSearchEngine import BaseBookSearchEngine
 
 
 class ZipBookSearchEngine(BaseBookSearchEngine):
-    TYPE: str = "zip"
-
     def __init__(self, folder: str, stats: Stats = None):
         super().__init__(folder, stats)
 
