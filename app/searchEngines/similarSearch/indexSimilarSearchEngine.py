@@ -74,7 +74,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         distances, embedding_ids_results = self._search_index(query_embeddings_np, self._chunk_index, k_chunks)
 
         flat_ids = {int(eid) for row in embedding_ids_results for eid in row if eid != -1}
-        embedding_meta = self._emb_provider.get_by_ids(list(flat_ids))
+        embedding_meta = self._emb_provider.get_by_ids_meta(list(flat_ids))
 
         pair_matches, pair_chunks = defaultdict(list), defaultdict(list)
 

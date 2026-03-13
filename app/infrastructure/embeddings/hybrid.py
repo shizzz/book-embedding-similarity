@@ -1,40 +1,71 @@
 import numpy as np
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from app.infrastructure.db import DBRouter
 from app.infrastructure.providers import EmbeddingProvider
 from app.infrastructure.models import ChunkType
 from .db_provider import DBEmbeddingProvider
 
 class HybridEmbeddingProvider(EmbeddingProvider):
+
     def __init__(
         self,
         db_router: DBRouter,
-        cache_data: Dict[int, Tuple[np.ndarray, int, int]] | None = None
+        cache_data: Dict[int, Tuple[np.ndarray, int, int]] | None = None,
+        cache_meta: Dict[int, Tuple[None, int, int]] | None = None
     ):
-        # Провайдер БД
         self._db_provider = DBEmbeddingProvider(db_router)
 
-        # Кэш
         self._cache_data = cache_data or {}
-        self._book_index = defaultdict(list)
-        for emb_id, (_, book_id) in self._cache_data.items():
-            self._book_index[book_id].append(emb_id)
+        self._cache_meta = cache_meta or {}
+
+        # book_id -> type -> [embedding_ids]
+        self._book_index = defaultdict(lambda: defaultdict(list))
+
+        for emb_id, (_, book_id, type_) in self._cache_data.items():
+            self._book_index[book_id][type_].append(emb_id)
 
     def get_by_ids(
         self,
         embedding_ids: List[int]
     ) -> Dict[int, Tuple[np.ndarray, int, int]]:
-        result = {}
 
-        # 1. Сначала проверяем кэш
-        cache_hits = {eid: self._cache_data[eid] for eid in embedding_ids if eid in self._cache_data}
-        result.update(cache_hits)
+        result = {
+            eid: self._cache_data[eid]
+            for eid in embedding_ids
+            if eid in self._cache_data
+        }
 
-        # 2. Недостающие берем из БД
-        missing_ids = [eid for eid in embedding_ids if eid not in result]
-        if missing_ids:
-            db_hits = self._db_provider.get_by_ids(missing_ids)
+        missing = [eid for eid in embedding_ids if eid not in result]
+
+        if missing:
+            db_hits = self._db_provider.get_by_ids(missing)
+            result.update(db_hits)
+
+        return result
+
+    def get_by_ids_meta(
+        self,
+        embedding_ids: List[int]
+    ) -> Dict[int, Tuple[None, int, int]]:
+
+        result: Dict[int, Tuple[None, int, int]] = {}
+
+        # meta cache
+        for eid in embedding_ids:
+            if eid in self._cache_meta:
+                result[eid] = self._cache_meta[eid]
+
+        # data cache (meta извлекается)
+        for eid in embedding_ids:
+            if eid not in result and eid in self._cache_data:
+                _, book_id, type_ = self._cache_data[eid]
+                result[eid] = (None, book_id, type_)
+
+        missing = [eid for eid in embedding_ids if eid not in result]
+
+        if missing:
+            db_hits = self._db_provider.get_by_ids_meta(missing)
             result.update(db_hits)
 
         return result
@@ -42,20 +73,37 @@ class HybridEmbeddingProvider(EmbeddingProvider):
     def get_by_book_ids(
         self,
         book_ids: List[int],
-        type: ChunkType = None
+        type: Optional[ChunkType] = None
     ) -> Dict[int, Tuple[np.ndarray, int, int]]:
+
         result = {}
+        cached_books = set()
 
-        # 1. Сначала кэш
         for book_id in book_ids:
-            for emb_id in self._book_index.get(book_id, []):
-                emb = self._cache_data[emb_id]
-                if emb[2] == type or type is None:
-                    result[emb_id] = self._cache_data[emb_id]
 
-        # 2. Проверяем, какие книги отсутствуют
-        cached_book_ids = {self._cache_data[eid][1] for eid in result}
-        missing_books = [bid for bid in book_ids if bid not in cached_book_ids]
+            if book_id not in self._book_index:
+                continue
+
+            if type is None:
+                emb_ids = (
+                    eid
+                    for ids in self._book_index[book_id].values()
+                    for eid in ids
+                )
+            else:
+                emb_ids = self._book_index[book_id].get(type, [])
+
+            found = False
+
+            for emb_id in emb_ids:
+                result[emb_id] = self._cache_data[emb_id]
+                found = True
+
+            if found:
+                cached_books.add(book_id)
+
+        missing_books = [bid for bid in book_ids if bid not in cached_books]
+
         if missing_books:
             db_hits = self._db_provider.get_by_book_ids(missing_books, type)
             result.update(db_hits)

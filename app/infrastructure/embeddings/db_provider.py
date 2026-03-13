@@ -26,6 +26,17 @@ class DBEmbeddingProvider(EmbeddingProvider):
 
         return result
 
+    def get_by_ids_meta(
+        self,
+        embedding_ids: List[int]
+    ) -> Dict[int, Tuple[None, int, int]]:
+        result = {}
+
+        for chunk in self._chunks(embedding_ids, self.SQLITE_MAX_VARS):
+            result.update(self._repo.get_by_ids_meta(chunk))
+
+        return result
+
     def get_by_book_ids(
         self,
         book_ids: List[int],

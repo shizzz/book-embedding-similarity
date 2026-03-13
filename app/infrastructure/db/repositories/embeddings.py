@@ -6,6 +6,7 @@ from .model import ModelRepository
 from app.settings import ProcessConfig
 
 GET_QUERY: str = "SELECT id, book_id, chunk_id, seq, data, shape, type FROM embeddings"
+GET_QUERY_META: str = "SELECT id, book_id, chunk_id, seq, shape, type FROM embeddings"
 
 class EmbeddingsRepository:
     def __init__(self, router: DBRouter, model_uid: str = None):
@@ -73,6 +74,33 @@ class EmbeddingsRepository:
                 type
             )
             for embedding_id, book_id, chunk_id, seq, data, shape, type in rows
+        }
+
+    def get_by_ids_meta(
+        self,
+        embedding_ids: list[int] = None
+    ) -> dict[int, tuple[None, int, int]]:
+        """
+        Возвращает:
+            embedding_id -> (vector, book_id, type)
+        """
+        if embedding_ids == []:
+            return {}
+
+        with self.router.embeddings(self.model_uid) as conn:
+            if embedding_ids is None:
+                query = GET_QUERY_META
+                params = ()
+            else:
+                placeholders = ",".join("?" for _ in embedding_ids)
+                query = f"{GET_QUERY_META} WHERE id IN ({placeholders}) "
+                params = embedding_ids
+
+            rows = conn.execute(query, params).fetchall()
+
+        return {
+            embedding_id: (None, book_id, type)
+            for embedding_id, book_id, chunk_id, seq, shape, type in rows
         }
 
     def get_by_book_ids(
