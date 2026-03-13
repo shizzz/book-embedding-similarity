@@ -7,9 +7,13 @@ import os
 # ==== ENUMS ===============
 # ==========================
 class IndexLevel(str, Enum):
+    CHUNK = "chunk" #: генерируем индекс для всех имеющихся текстовых кусков
+    DOCUMENT = "document" #: при создании индекса, сливаем все текстовые куски в один mean вектор
+    BOTH = "both"  #: генерировать оба
+
+class SearchIndexLevel(str, Enum):
     CHUNK = "chunk"  #: выполняем поиск каждого куска отдельно
     DOCUMENT = "document"  #: сливаем куски в один
-    BOTH = "both"  #: сначала поиск по DOCUMENT, потом фильтр CHUNK
 
 class KnownModels(str, Enum):
     all_MiniLM_L6_v2 = "all-MiniLM-L6-v2"  #: Очень плохой результат, но хорошо для тестов
@@ -79,7 +83,8 @@ class ChunkingConfig:
 # ==========================
 @dataclass(frozen=True)
 class IndexConfig:
-    BUILD_INDEX_LEVEL=os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()  #: Тип поиска по индексам
+    BUILD_INDEX_LEVEL=os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()  #: Тип создаваемого индекса
+    SEARCH_INDEX_LEVEL=os.getenv("SEARCH_INDEX_LEVEL", SearchIndexLevel.CHUNK.value).lower()  #: Тип создаваемого индекса
     HNSW_MMAP=bool(os.getenv("HNSW_MMAP", False))  #: Не загружаем индекс в память, читаем с диска
     HNSW_M=int(os.getenv("HNSW_M", 32))  #: Максимальное количество связей (соседей) на уровне графа
     HNSW_EF_CONSTRUCTION=int(os.getenv("HNSW_EF_CONSTRUCTION", 200))  #: Размер списка кандидатов при построении графа

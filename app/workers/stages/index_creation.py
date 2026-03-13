@@ -86,7 +86,7 @@ class Indexer(BaseQueueWorker[Embedding]):
             await self.stats.set_total(self.name, total)
 
     async def fin(self):
-        path = PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level}.faiss"
+        path = PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level.value}.faiss"
         tmp = path.with_suffix(".tmp")
 
         faiss.write_index(self.index, str(tmp))

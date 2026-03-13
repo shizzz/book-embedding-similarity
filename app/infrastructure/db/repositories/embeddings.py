@@ -1,5 +1,6 @@
 import numpy as np
 from ...models.embedding import Embedding
+from ...models.chunk import ChunkType
 from ..router import DBRouter
 from .model import ModelRepository
 from app.settings import ProcessConfig
@@ -47,6 +48,10 @@ class EmbeddingsRepository:
         self,
         embedding_ids: list[int] = None
     ) -> dict[int, tuple[np.ndarray, int, int]]:
+        """
+        Возвращает:
+            embedding_id -> (vector, book_id, type)
+        """
         if embedding_ids == []:
             return {}
 
@@ -67,32 +72,42 @@ class EmbeddingsRepository:
                 book_id,
                 type
             )
-            for embedding_id, book_id, data, shape, type in rows
+            for embedding_id, book_id, chunk_id, seq, data, shape, type in rows
         }
 
     def get_by_book_ids(
         self,
-        book_ids: list[int]
+        book_ids: list[int],
+        type: ChunkType = None
     ) -> dict[int, tuple[np.ndarray, int, int]]:
         """
         Возвращает:
-            embedding_id -> (vector, book_id)
+            embedding_id -> (vector, book_id, type)
         """
         if not book_ids:
             return {}
 
-        placeholders = ",".join("?" for _ in book_ids)
+        params = []
+
+        if type is None:
+            where = ""
+        else:
+            where = f" [type] == ? AND "
+            params.append(type)
+
+        if book_ids is None:
+            query = f"{GET_QUERY} WHERE {where}"
+        else:
+            placeholders = ",".join("?" for _ in book_ids)
+            query = f"{GET_QUERY} WHERE {where} book_id IN ({placeholders}) "
+            params.extend(book_ids)
 
         with self.router.embeddings(self.model_uid) as conn:
-            cursor = conn.execute(
-                f"{GET_QUERY} WHERE book_id IN ({placeholders})",
-                book_ids
-            )
-            rows = cursor.fetchall()
+            rows = conn.execute(query, params).fetchall()
 
         result: dict[int, tuple[np.ndarray, int]] = {}
 
-        for embedding_id, book_id, data, shape, type in rows:
+        for embedding_id, book_id, chunk_id, seq, data, shape, type in rows:
             vec = data
             if shape:
                 vec = vec.reshape((shape,))
