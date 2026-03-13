@@ -49,9 +49,9 @@ def run(args):
 
 def get_book_info(book_file: str) -> Optional[Book]:
     book_row = BookRepository(router).get_by_file(book_file)
-    if not book_row:
-        return None
-    return Book.from_row(book_row)
+    if book_row:
+        return book_row
+    return None
 
 def get_similar_books(source_book_id: int) -> List[tuple]:
     similars = SimilarRepository(router).get(source_book_id, limit=100)

@@ -29,8 +29,8 @@ class RerankerFeatureExtractor:
         desc_cosine, desc_dot, has_desc = sim(pair.source_description_emb, pair.candidate_description_emb)
 
         # автор
-        source_set = {x.strip() for x in (pair.source.author or "").split(",") if x.strip()}
-        candidate_set = {x.strip() for x in (pair.candidate.author or "").split(",") if x.strip()}
+        source_set = {x.strip() for x in (pair.source.author or "").split("||") if x.strip()}
+        candidate_set = {x.strip() for x in (pair.candidate.author or "").split("||") if x.strip()}
         same_author = 1 if source_set & candidate_set else 0
 
         # серия

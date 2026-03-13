@@ -25,11 +25,13 @@ def print_similar_books(
 
     similars_converted = to_similar_list(similars)
 
+    i: int = 0
     for similar in similars_converted:
+        i+=1
         percent = similar.score * 100
         url = make_lib_url(similar.candidate.file_name)
 
-        print(f"{percent:6.2f},{similar.candidate.file_name},{similar.candidate.title},{url}")
+        print(f"{percent:6.2f},{i},{similar.candidate.file_name},{similar.candidate.title},{similar.candidate.author},{url}")
 
 async def run(mode: str, file: str):
     start = time.perf_counter()

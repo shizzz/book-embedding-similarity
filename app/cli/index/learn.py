@@ -8,7 +8,8 @@ def run(args):
     ui = LiveUI(
         max_workers = 0,
         title = "Train LightGBMReranker",
-        show_table = False
+        show_table = False,
+        stats = None
     )
     ui.init()
 

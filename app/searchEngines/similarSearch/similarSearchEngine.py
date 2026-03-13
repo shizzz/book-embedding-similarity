@@ -58,8 +58,8 @@ class SimilarSearchEngine:
 
             # 2. фильтр по авторам
             if getattr(self, "_exclude_same_authors", False):
-                source_set = {a.strip() for a in (pair.source.author or "").split(",") if a.strip()}
-                candidate_set = {a.strip() for a in (pair.candidate.author or "").split(",") if a.strip()}
+                source_set = {a.strip() for a in (pair.source.author or "").split("||") if a.strip()}
+                candidate_set = {a.strip() for a in (pair.candidate.author or "").split("||") if a.strip()}
                 if source_set & candidate_set:
                     continue
 
