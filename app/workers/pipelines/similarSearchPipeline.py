@@ -11,8 +11,8 @@ from .pipeline import Pipeline
 THREADS: int = 1
 TOP_K: int = 100
 EXCLUDE_SAME_AUTHOR: bool = False
-SEARCH_BATCH_SIZE: int = 1
-DB_BATCH_SIZE: int = 100
+SEARCH_BATCH_SIZE: int = 100
+DB_BATCH_SIZE: int = 1000
 
 class SimilarSearchPipeline(Pipeline):
     def __init__(
@@ -70,11 +70,12 @@ class SimilarSearchPipeline(Pipeline):
         )
         self.pool.append(db_stage)
     
-    def _save(self, threads: int, router: DBRouter, tasks: List[BatchTask[List[Tuple[float, int, int]]]]):
+    def _save(self, threads: int, router: DBRouter, tasks: List[BatchTask[Tuple[float, int, int]]]):
         for task in tasks:
-            self._repo.save(task.entity)
+            for e in task.entity:
+                self._repo.save(e)
 
-    async def _save_async(self, threads: int, router: DBRouter, tasks: List[BatchTask[List[Tuple[float, int, int]]]]):
+    async def _save_async(self, threads: int, router: DBRouter, tasks: List[BatchTask[Tuple[float, int, int]]]):
         if threads > 1:
             async with router.meta_lock():
                 await asyncio.to_thread(self._save, threads, router, tasks)
