@@ -4,6 +4,7 @@ import numpy as np
 from .book import Book
 from .feedback import Feedback
 from .constants import ChunkType
+from .search_result import SearchResult
 
 @dataclass
 class BookPair:
@@ -21,17 +22,26 @@ class BookPair:
 
     # --- конвертер из Feedback ---
     @classmethod
-    def fromFeedback(cls, fb: Feedback, books: dict[int, Book], embeddings: dict[int, dict[ChunkType, np.ndarray]]):
+    def fromFeedback(
+        cls, 
+        fb: Feedback, 
+        books: dict[int, Book], 
+        embeddings: dict[int, dict[ChunkType, np.ndarray]]
+    ):
         src = books.get(fb.source_id)
         cand = books.get(fb.candidate_id)
+
         if not src or not cand:
             return None
+        
         src_map = embeddings.get(fb.source_id) or {}
         cand_map = embeddings.get(fb.candidate_id) or {}
         src_emb = src_map.get(ChunkType.TEXT)
         cand_emb = cand_map.get(ChunkType.TEXT)
+
         if src_emb is None or cand_emb is None:
             return None
+        
         return cls(
             source=src,
             candidate=cand,
@@ -46,17 +56,26 @@ class BookPair:
 
     # --- конвертер из похожих кандидатов (FAISS/HNSW) ---
     @classmethod
-    def fromSearch(cls, source_id: int, candidate_id: int, score: float, books: dict[int, Book], embeddings: dict[int, dict[ChunkType, np.ndarray]], meta: dict = None):
-        src = books.get(source_id)
-        cand = books.get(candidate_id)
+    def fromSearch(
+        cls, 
+        searchResult: SearchResult,
+        books: dict[int, Book], 
+        embeddings: dict[int, dict[ChunkType, np.ndarray]]
+    ):
+        src = books.get(searchResult.Source)
+        cand = books.get(searchResult.Candidate)
+
         if not src or not cand:
             return None
-        src_map = embeddings.get(source_id) or {}
-        cand_map = embeddings.get(candidate_id) or {}
+        
+        src_map = embeddings.get(searchResult.Source) or {}
+        cand_map = embeddings.get(searchResult.Candidate) or {}
         src_emb = src_map.get(ChunkType.TEXT)
         cand_emb = cand_map.get(ChunkType.TEXT)
+
         if src_emb is None or cand_emb is None:
             return None
+        
         return cls(
             source=src,
             candidate=cand,
@@ -66,8 +85,7 @@ class BookPair:
             candidate_title_emb=cand_map.get(ChunkType.TITLE),
             source_description_emb=src_map.get(ChunkType.DESCRIPTION),
             candidate_description_emb=cand_map.get(ChunkType.DESCRIPTION),
-            score=score,
-            meta=meta or {}
+            score=searchResult.Score
         )
 
     def asdict(self) -> dict:

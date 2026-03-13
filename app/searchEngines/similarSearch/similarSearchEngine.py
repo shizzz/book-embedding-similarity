@@ -111,16 +111,7 @@ class SimilarSearchEngine:
         matches = self.find_similar_books(sources, self._limit)
         books, embeddings = self._data_loader.load_search(matches)
         pairs = [
-            BookPair.fromSearch(
-                source_id=m.Source,
-                candidate_id=m.Candidate,
-                score=m.Score,
-                books=books,
-                embeddings=embeddings,
-                meta={
-                    "matched_chunks": m.ChunkIds
-                }
-            )
+            BookPair.fromSearch(m, books, embeddings)
             for m in matches
         ]
         filtered = self.bulk_filter_candidates(pairs)
