@@ -71,23 +71,46 @@ class LiveUI(BaseUI):
         table.add_column("Pressure")
 
         stages = self.pipeline_stats.stages
+        stage_items = list(stages.items())
 
+        # -------------------------
         # определяем bottleneck
+        # -------------------------
         bottleneck_stage = None
-        max_score = 0
 
-        for stage_name, st in stages.items():
-            if st.finished:
-                continue
-            queue_ratio = st.queue / st.queue_max_size if st.queue_max_size else 0
-            pressure = st.queue / max(st.speed_value, 1)
-            score = pressure * (1 + queue_ratio)
+        # проверяем starvation (все очереди ниже пустые)
+        downstream_empty = True
+        for _, st in stage_items[1:]:
+            if st.queue > 0 and not st.finished:
+                downstream_empty = False
+                break
 
-            if not st.finished and score > max_score:
-                max_score = score
-                bottleneck_stage = stage_name
+        if downstream_empty:
+            # bottleneck первый незавершённый stage
+            for stage_name, st in stage_items:
+                if not st.finished:
+                    bottleneck_stage = stage_name
+                    break
+        else:
+            max_pressure = -1
 
-        for stage_name, st in stages.items():
+            for stage_name, st in stage_items:
+                if st.finished:
+                    continue
+
+                if st.speed_value <= 0:
+                    pressure = float("inf")
+                else:
+                    pressure = st.queue / st.speed_value
+
+                if pressure > max_pressure:
+                    max_pressure = pressure
+                    bottleneck_stage = stage_name
+
+        # -------------------------
+        # строим таблицу
+        # -------------------------
+        for stage_name, st in stage_items:
             if st.total:
                 pct = st.processed / st.total
                 filled = int(pct * 20)
@@ -101,7 +124,11 @@ class LiveUI(BaseUI):
 
             status = "✓" if st.finished else "RUN"
 
-            pressure_value = st.queue / max(st.speed_value, 1)
+            if st.speed_value <= 0:
+                pressure_value = 0
+            else:
+                pressure_value = st.queue / st.speed_value
+
             pressure_str = f"{pressure_value:.1f}"
             pressure_text = Text(pressure_str)
 
@@ -127,6 +154,7 @@ class LiveUI(BaseUI):
             )
 
         table.caption = f"Runtime: {self.pipeline_stats.runtime}"
+
         return table
     
     def _make_edges_table(self):
