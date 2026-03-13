@@ -9,7 +9,7 @@ from app.infrastructure.models import BookPair
 from app.infrastructure.embeddings import HybridEmbeddingProvider
 from app.infrastructure.books import HybridBookProvider
 from app.settings import ChunkingConfig
-
+from app.infrastructure.models import SearchResult
 
 class SimilarSearchEngine:
     def __init__(
@@ -41,16 +41,7 @@ class SimilarSearchEngine:
         book_ids: List[int],
         desired_books: int = 100,
         top_k_agg: int = 5
-    ) -> List[Dict[str, Any]]:
-        """
-        Должен вернуть список словарей формата:
-        {
-            "source_id": int,
-            "candidate_id": int,
-            "score": float,
-            "matched_chunks": [...]
-        }
-        """
+    ) -> List[SearchResult]:
         raise NotImplementedError
 
     def bulk_filter_candidates(self, pairs: List[BookPair]) -> List[BookPair]:
@@ -121,21 +112,22 @@ class SimilarSearchEngine:
         books, embeddings = self._data_loader.load_search(matches)
         pairs = [
             BookPair.fromSearch(
-                source_id=m["source_id"],
-                candidate_id=m["candidate_id"],
-                score=m["score"],
+                source_id=m.Source,
+                candidate_id=m.Candidate,
+                score=m.Score,
                 books=books,
                 embeddings=embeddings,
                 meta={
-                    "matched_chunks": m["matched_chunks"]
+                    "matched_chunks": m.ChunkIds
                 }
             )
             for m in matches
         ]
+        filtered = self.bulk_filter_candidates(pairs)
         return [
             (pair.score, pair.source.id, pair.candidate.id)
             for pair in sorted(
-                (p for p in self.apply_reranker(self.bulk_filter_candidates(pairs)) if p.score > 0),
+                (p for p in self.apply_reranker(filtered) if p.score > 0),
                 key=lambda p: p.score,
                 reverse=True
             )[:self._limit]

@@ -11,6 +11,7 @@ from .report import Report
 from .stage_stats import StageStats
 from .channel import Channel
 from .parse_result import ParseResult
+from .search_result import SearchResult
 
 __all__ = [
     "Book",
@@ -35,5 +36,6 @@ __all__ = [
     "Channel",
     "SaveTarget",
     "Stages",
-    "ParseResult"
+    "ParseResult",
+    "SearchResult"
 ]

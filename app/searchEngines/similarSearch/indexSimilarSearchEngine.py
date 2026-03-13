@@ -4,7 +4,7 @@ from faiss import IndexIDMap
 from typing import List
 from .similarSearchEngine import SimilarSearchEngine
 from app.settings import SearchIndexLevel
-from app.infrastructure.models import ChunkType
+from app.infrastructure.models import ChunkType, SearchResult
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
     def __init__(self, document_index: IndexIDMap, chunk_index: IndexIDMap, level: SearchIndexLevel, *args, **kwargs):
@@ -37,21 +37,28 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         distances, ids = index.search(query_embeddings_np, top_k)
         return distances, ids
 
-    def _search_document_level(self, book_ids: List[int], desired_books: int, top_k_agg: int = None):
+    def _search_document_level(self, book_ids: List[int], desired_books: int, top_k_agg: int = None) -> List[SearchResult]:
         s_emb, s_idx = self._get_mean(book_ids)
 
         k = int(desired_books * self.overfetch_factor)
         distances, ids = self._search_index(s_emb, self._document_index, k)
-        result = []
+        result: List[SearchResult] = []
 
         for q_idx, row in enumerate(ids):
             source_id = s_idx[q_idx]
             for match_idx, candidate_book_id in enumerate(row):
                 if candidate_book_id == -1 or candidate_book_id in book_ids: continue
-                result.append({"source_id": source_id, "candidate_id": int(candidate_book_id), "score": float(distances[q_idx, match_idx]), "matched_chunks":[]})
+                result.append(
+                    SearchResult(
+                        Source=source_id,
+                        Candidate=int(candidate_book_id),
+                        Score=float(distances[q_idx, match_idx])
+                    )
+                )
+        result.sort(key=lambda x: x.Score, reverse=True)
         return result
 
-    def _search_chunk_level(self, book_ids: List[int], desired_books: int, top_k_agg: int = 5):
+    def _search_chunk_level(self, book_ids: List[int], desired_books: int, top_k_agg: int = 5) -> List[SearchResult]:
         data = self._emb_provider.get_by_book_ids(book_ids, ChunkType.TEXT)
         if not data: return []
 
@@ -87,23 +94,23 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
                 pair_matches[(source_id, candidate_book_id)].append(score)
                 pair_chunks[(source_id, candidate_book_id)].append(candidate_embedding_id)
 
-        candidates = []
+        candidates: List[SearchResult] = []
 
         for (source_id, candidate_id), scores in pair_matches.items():
             top_scores = sorted(scores, reverse=True)[:top_k_agg]
             agg_score = float(np.mean(top_scores)) * (len(top_scores) / top_k_agg)
 
-            candidates.append({
-                "source_id": source_id,
-                "candidate_id": candidate_id,
-                "score": agg_score,
-                "matched_chunks": pair_chunks[(source_id, candidate_id)][:top_k_agg]
-            })
+            candidates.append(SearchResult(
+                Source=source_id,
+                Candidate=candidate_id,
+                Score=agg_score,
+                ChunkIds=pair_chunks[(source_id, candidate_id)][:top_k_agg]
+            ))
 
-        candidates.sort(key=lambda x: x["score"], reverse=True)
+        candidates.sort(key=lambda x: x.Score, reverse=True)
         return candidates
 
-    def find_similar_books(self, book_ids: List[int], desired_books: int = 100, top_k_agg: int = 5):
+    def find_similar_books(self, book_ids: List[int], desired_books: int = 100, top_k_agg: int = 5) -> List[SearchResult]:
         if not book_ids: return []
         search_method = self._level_search_map.get(self._level)
         if not search_method: raise NotImplementedError(f"Search for level {self._level} is not implemented")

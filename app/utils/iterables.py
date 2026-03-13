@@ -19,7 +19,7 @@ class EmbeddingsBatchIterable:
             self._total = self.repo.count()
         return (self._total + self.batch_size - 1) // self.batch_size
 
-    def __iter__(self) -> Generator[Embedding, None]:
+    def __iter__(self) -> Generator[list[Embedding], None]:
         yield from self.repo.get_all_batch(self.batch_size, self.order_by)
 
     def count(self):

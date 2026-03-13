@@ -2,6 +2,7 @@ import numpy as np
 from app.infrastructure.models import Feedbacks, Book, ChunkType
 from app.infrastructure.providers import EmbeddingProvider, BookProvider
 from .bookEmbeddingService import BookEmbeddingService
+from app.infrastructure.models import SearchResult
 
 class PairDataLoader:
     def __init__(
@@ -29,10 +30,10 @@ class PairDataLoader:
         }
         return self._load(book_ids)
 
-    def load_search(self, candidates: list[dict]) -> tuple[dict[int, Book], dict[int, dict[ChunkType, np.ndarray]]]:
+    def load_search(self, candidates: list[SearchResult]) -> tuple[dict[int, Book], dict[int, dict[ChunkType, np.ndarray]]]:
         book_ids = {
-            c["source_id"] for c in candidates
+            c.Source for c in candidates
         } | {
-            c["candidate_id"] for c in candidates
+            c.Candidate for c in candidates
         }
         return self._load(book_ids)
