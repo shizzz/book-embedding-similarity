@@ -4,6 +4,14 @@ class ModelRepository:
     def __init__(self, router: DBRouter):
         self.router = router
 
+    def get_uids(self) -> list[str]:
+        with self.router.meta() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT uid FROM models")
+            rows = cursor.fetchall()
+            return [row[0] for row in rows]
+
     def get_or_create(self, uid: str, name: str) -> int:
         with self.router.meta() as conn:
             cursor = conn.cursor()

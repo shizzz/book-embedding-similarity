@@ -2,24 +2,27 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from app.workers.base import BaseQueueWorker
 from app.workers.stats import PipelineStats
 from app.infrastructure.db import DBRouter
 from app.infrastructure.models import Channel
+from ..base.baseQueueWorker import BaseQueueWorker
+from ..base.saveRegistry import SaveRegistry
 
 class Pipeline(ABC):
     def __init__(
         self,
         name: str,
         router: DBRouter,
+        registry: SaveRegistry,
         stats: PipelineStats,
         logger: logging.Logger,
         input_channel: Optional[Channel] = None,
         output_channels: Optional[List[Channel]] = None,
-        upstream_done: Optional[asyncio.Event()] = None,
+        upstream_done: Optional[asyncio.Event] = None,
     ):
         self.name = name
         self._router = router
+        self._registry = registry
         self._stats = stats
         self._logger = logger
         self._input_channel = input_channel

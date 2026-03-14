@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Tuple
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import SimilarRepository
-from app.infrastructure.models import Channel, Stages, BookSearchEngineType, SimilarSearchEngineType, BatchTask
+from app.infrastructure.models import Channel, Stages, BookSearchEngineType, SimilarSearchEngineType, BatchTask, Dataset
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.workers.stages import BookProducer, SimilarStage, DbWorker
@@ -33,7 +33,6 @@ class SimilarSearchPipeline(Pipeline):
 
     async def setup_stages(self) -> None:
         channel_book = Channel(Stages.SIMILAR, asyncio.Queue(maxsize=SEARCH_BATCH_SIZE))
-        channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=DB_BATCH_SIZE))
 
         book_stage = BookProducer(
             router=self._router,
@@ -50,7 +49,7 @@ class SimilarSearchPipeline(Pipeline):
         similar_stage = SimilarStage(
             engine=self.similar_search_engine,
             input_channel=channel_book,
-            output_channels=[channel_db],
+            output_channels=[*(self._output_channels or [])],
             stats=self._stats,
             batch_size=SEARCH_BATCH_SIZE,
             workers=THREADS,
@@ -58,26 +57,12 @@ class SimilarSearchPipeline(Pipeline):
         )
         self.pool.append(similar_stage)
 
-        db_stage = DbWorker(
-            router=self._router,
-            save_func=self._save_async,
-            input_channel=channel_db,
-            output_channels=self._output_channels,
-            stats=self._stats,
-            batch_size=DB_BATCH_SIZE,
-            workers=THREADS,
-            logger = self._logger, 
-        )
-        self.pool.append(db_stage)
+        self._registry.register(Dataset.SIMILAR, self._save)
     
-    def _save(self, threads: int, router: DBRouter, tasks: List[BatchTask[Tuple[float, int, int]]]):
+    async def _save(self, tasks: List[List[Tuple[float, int, int]]], tx):
+        batch = []
         for task in tasks:
-            for e in task.entity:
-                self._repo.save(e)
-
-    async def _save_async(self, threads: int, router: DBRouter, tasks: List[BatchTask[Tuple[float, int, int]]]):
-        if threads > 1:
-            async with router.meta_lock():
-                await asyncio.to_thread(self._save, threads, router, tasks)
-        else:
-            await asyncio.to_thread(self._save, threads, router, tasks)
+            batch.extend(task)
+        if batch:
+            async with self._router.meta_lock():
+                    self._repo.save(batch)

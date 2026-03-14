@@ -35,7 +35,8 @@ class SimilarStage(BaseQueueWorker[Similar]):
             entity=result,
             dataset=Dataset.SIMILAR,
             routes=Action.DB,
-            done=len(ids)
+            done=len(ids),
+            cost=len(result) * 24,
         )]
     
     async def _reserve_id(self) -> int:

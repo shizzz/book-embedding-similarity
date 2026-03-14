@@ -1,10 +1,8 @@
-import asyncio
-import inspect
 from typing import List
 from enum import IntEnum
 from app.common.types import TEntity
 from app.infrastructure.models import Stages, BatchTask
-from app.workers.base import BaseQueueWorker
+from app.workers.base import BaseQueueWorker, SaveRegistry
 from app.infrastructure.db import DBRouter
 from app.infrastructure.models import Task
 
@@ -15,19 +13,28 @@ class DbWorker(BaseQueueWorker):
     def __init__(
             self,
             router: DBRouter,
-            save_func,
+            registry: SaveRegistry,
             name: str = Stages.DB,
             *args, 
             **kwargs
         ):
         super().__init__(name=name ,*args, **kwargs)
-        self._save = save_func
+        self._registry = registry
         self._router = router
-        self._is_save_async = inspect.iscoroutinefunction(self._save)
 
     async def process(self, batch: List[Task], wid: int) -> List[Task]:
         await self._save_batch(batch)
         return batch
+    
+    async def _save(self, router: DBRouter, tasks: list[BatchTask[TEntity]]):
+        with router.transaction() as tx:
+            for task in tasks:
+                saver = self._registry.get(task.dataset)
+
+                if saver is None:
+                    raise RuntimeError(f"No saver for {task.dataset}")
+
+                await saver(task.entity, tx)
 
     async def _save_batch(self, batch: List[Task]) -> int:
         groups: dict[IntEnum | None, tuple[Task, list]] = {}
@@ -45,9 +52,6 @@ class DbWorker(BaseQueueWorker):
             for base, entities in groups.values()
         ]
 
-        if self._is_save_async:
-            await self._save(self._workers_count, self._router, grouped_tasks)
-        else:
-            await asyncio.to_thread(self._save, self._workers_count, self._router, grouped_tasks)
+        await self._save(self._router, grouped_tasks)
 
         return len(batch)

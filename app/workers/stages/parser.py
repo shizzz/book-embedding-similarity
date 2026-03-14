@@ -55,6 +55,7 @@ class Parser(BaseQueueWorker[BookTask]):
                     entity=book,
                     routes=Action.DB,
                     dataset=Dataset.BOOK,
+                    cost=100,
                 )
                 result.append(book_task)
 
@@ -86,6 +87,7 @@ class Parser(BaseQueueWorker[BookTask]):
                     entity=chunk,
                     routes=chunk_actions,
                     dataset=Dataset.CHUNK,
+                    cost=len(chunk.text) * 2,
                 )
                 result.append(chunk_task)
         return result

@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from typing import List, Tuple, Dict, Any
+from collections import defaultdict
 from app.hnsw.rerankers import Reranker
 from app.hnsw.services import RerankerFeatureExtractor
 from app.infrastructure.db import DBRouter
@@ -115,11 +116,17 @@ class SimilarSearchEngine:
             for m in matches
         ]
         filtered = self.bulk_filter_candidates(pairs)
+        by_source = defaultdict(list)
+        for pair in self.apply_reranker(filtered):
+            if pair.score > 0:
+                by_source[pair.source.id].append(pair)
+
+        top_pairs = []
+        for src_id, pairs in by_source.items():
+            top_pairs.extend(sorted(pairs, key=lambda p: p.score, reverse=True)[:self._limit])
+        top_pairs = sorted(top_pairs, key=lambda p: p.score, reverse=True)
+
         return [
             (pair.score, pair.source.id, pair.candidate.id)
-            for pair in sorted(
-                (p for p in self.apply_reranker(filtered) if p.score > 0),
-                key=lambda p: p.score,
-                reverse=True
-            )[:self._limit]
+            for pair in top_pairs
         ]

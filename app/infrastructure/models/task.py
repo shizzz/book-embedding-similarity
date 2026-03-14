@@ -30,6 +30,7 @@ class Task(Generic[TEntity]):
     entity: TEntity
     routes: list[Action] = field(default_factory=list)
     dataset: Optional[Dataset] = None
+    cost: Optional[int] = 10
     done: int = 1
     db_queue_count: int = 0
 

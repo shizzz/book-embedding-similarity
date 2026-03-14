@@ -111,7 +111,16 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         return candidates
 
     def find_similar_books(self, book_ids: List[int], desired_books: int = 100, top_k_agg: int = 5) -> List[SearchResult]:
-        if not book_ids: return []
+        if not book_ids:
+            return []
+
         search_method = self._level_search_map.get(self._level)
-        if not search_method: raise NotImplementedError(f"Search for level {self._level} is not implemented")
-        return search_method(book_ids, desired_books, top_k_agg)
+        if not search_method:
+            raise NotImplementedError(f"Search for level {self._level} is not implemented")
+
+        results = []
+        for book_id in book_ids:
+            res = search_method([book_id], desired_books, top_k_agg)
+            results.extend(res)
+
+        return results

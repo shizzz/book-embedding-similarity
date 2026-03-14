@@ -1,18 +1,16 @@
 import asyncio
 from typing import List
 from app.model import Model
-from app.common.types import TEntity
-from app.infrastructure.db import Migrator, DBRouter, DBTransaction
+from app.infrastructure.db import Migrator, DBTransaction
 from app.infrastructure.db.repositories import ModelRepository, BookRepository, ChunkRepository, EmbeddingsRepository, AuthorRepository
-from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, Embedding, BatchTask, BookSearchEngineType
+from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, Embedding, BookSearchEngineType
 from app.searchEngines.bookSearch import BookSearchEngineFactory
-from app.workers.stages import BookProducer, Parser, DbWorker, EmbeddingWorker
+from app.workers.stages import BookProducer, Parser, EmbeddingWorker
 from .pipeline import Pipeline
 
 BOOK_THREADS: int = 1
 CHUNK_THREADS: int = 4
 EMB_THREADS: int = 4
-DB_THREADS: int = 1
 
 class EmbeddingPipeline(Pipeline):
     def __init__(
@@ -28,16 +26,9 @@ class EmbeddingPipeline(Pipeline):
         Migrator(self._router).migrate_all([self.model.info.uid])
         ModelRepository(self._router).get_or_create(self.model.info.uid, self.model.info.model_name)
 
-        self._savers = {
-            Dataset.BOOK: self._save_books,
-            Dataset.CHUNK: self._save_chunks,
-            Dataset.EMBEDDING: self._save_embeddings,
-        }
-
     async def setup_stages(self) -> None:
         channel_book = Channel(Stages.PARSER, asyncio.Queue(maxsize=50))
         channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(100))
-        channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
 
         book_stage = BookProducer(
             router=self._router,
@@ -55,7 +46,7 @@ class EmbeddingPipeline(Pipeline):
             router=self._router,
             search_engine=self.search_engine,
             input_channel=channel_book,
-            output_channels=[channel_chunks, channel_db],
+            output_channels=[channel_chunks, *self._output_channels],
             stats=self._stats,
             batch_size=64,
             workers=CHUNK_THREADS,
@@ -67,43 +58,26 @@ class EmbeddingPipeline(Pipeline):
             model=self.model,
             router=self._router,
             input_channel=channel_chunks,
-            output_channels=[channel_db, *(self._output_channels or [])],
+            output_channels=[*(self._output_channels or [])],
             stats=self._stats,
             workers=EMB_THREADS,
             logger = self._logger, 
         )
         self.pool.append(embedding_stage)
 
-        db_stage = DbWorker(
-            router=self._router,
-            save_func=self._save_async,
-            input_channel=channel_db,
-            stats=self._stats,
-            batch_size=256,
-            workers=DB_THREADS,
-            logger = self._logger, 
-        )
-        self.pool.append(db_stage)
+        self._registry.register(Dataset.BOOK, self._save_books)
+        self._registry.register(Dataset.CHUNK, self._save_chunks)
+        self._registry.register(Dataset.EMBEDDING, self._save_embeddings)
 
-    def _save_books(self, books: List[Book], tx: DBTransaction):
-        BookRepository(self._router).save_bulk(books, conn=tx.meta())
-        AuthorRepository(self._router).save_bulk(books, conn=tx.meta())
+    async def _save_books_async(self, books: List[Book], tx: DBTransaction):
+        async with self._router.meta_lock():
+            BookRepository(self._router).save_bulk(books, conn=tx.meta())
+            AuthorRepository(self._router).save_bulk(books, conn=tx.meta())
 
-    def _save_chunks(self, chunks: List[Chunk], tx: DBTransaction):
-        ChunkRepository(self._router).save_bulk(chunks, conn_meta=tx.meta(), conn_chunks=tx.chunks())
+    async def _save_chunks_async(self, chunks: List[Chunk], tx: DBTransaction):
+        async with self._router.chunks_lock():
+            ChunkRepository(self._router).save_bulk(chunks, conn_meta=tx.meta(), conn_chunks=tx.chunks())
 
-    def _save_embeddings(self, emb: List[Embedding], tx: DBTransaction):
-        EmbeddingsRepository(self._router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
-
-    def _save(self, threads: int, router: DBRouter, tasks: List[BatchTask[TEntity]]):
-        with router.transaction() as tx:
-            for task in tasks:
-                saver = self._savers[task.dataset]
-                saver(task.entity, tx)
-    
-    async def _save_async(self, threads: int, router: DBRouter, tasks: List[BatchTask[TEntity]]):
-        if threads > 1:
-            async with router.lock_all(self.model.info.uid):
-                await asyncio.to_thread(self._save, threads, router, tasks)
-        else:
-            await asyncio.to_thread(self._save, threads, router, tasks)
+    async def _save_embeddings_async(self, emb: List[Embedding], tx: DBTransaction):
+        async with self._router.embeddings_lock(self.model.info.uid):
+            EmbeddingsRepository(self._router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))

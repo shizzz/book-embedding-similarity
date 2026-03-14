@@ -126,6 +126,7 @@ class EmbeddingWorker(BaseQueueWorker):
                 entity=emb,
                 routes=Action.DB,
                 dataset=Dataset.EMBEDDING,
+                cost=emb.data.nbytes
             )
 
             tasks.append(task)

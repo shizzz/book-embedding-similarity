@@ -8,6 +8,7 @@ from app.workers.sources import ConsoleHandler
 from app.workers.stats import PipelineStats
 from app.workers.pipelines import Pipeline
 from app.infrastructure.db import DBRouter
+from .saveRegistry import SaveRegistry
 
 class BaseWorker(ABC):
     """
@@ -31,6 +32,7 @@ class BaseWorker(ABC):
         self._configure_logger()
 
         self.router = DBRouter()
+        self.registry = SaveRegistry()
         self.pipelines: List[Pipeline] = []
         self._ui_task: Optional[asyncio.Task] = None
 
