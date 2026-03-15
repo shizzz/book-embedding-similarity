@@ -1,3 +1,4 @@
+import asyncio
 import numpy as np
 import faiss
 from typing import List
@@ -37,25 +38,24 @@ class Indexer(BaseQueueWorker[Embedding]):
         base_index.hnsw.efSearch = IndexConfig.HNSW_EF_SEARCH
         self.index = faiss.IndexIDMap(base_index)
 
+    async def before_start(self):
+        if self.index is None:
+            self.embedding_dim = self._emb_repo.get_shape()
+            await asyncio.to_thread(self.create_index, self.embedding_dim)
+
     async def process(self, batch: List[Task[Embedding]], wid: int) -> List[Task]:
         ids = []
         vectors = []
         result: List[Task[int]] = []
 
+        # собираем данные синхронно (быстро)
         for b in batch:
-            if self.embedding_dim is None:
-                self.embedding_dim = b.entity.shape
-                self.create_index(self.embedding_dim)
-
-            # if b.entity.data.shape[0] != self.embedding_dim:
-            #     raise ValueError(f"Chunk {b.entity.id} имеет dim={b.entity.data.shape[0]}, ожидается {self.embedding_dim}")
             vectors.append(b.entity.data)
 
             if self.level == IndexLevel.DOCUMENT:
                 entity_id = b.entity.book_id
             elif self.level == IndexLevel.CHUNK:
                 entity_id = FaissId.pack(b.entity.book_id, b.entity.id)
-
             else:
                 raise TypeError("Unknown index type")
 
@@ -70,9 +70,13 @@ class Indexer(BaseQueueWorker[Embedding]):
                 )
             )
 
-        ids_np = np.array(ids, dtype=np.int64)
-        vectors_np = np.vstack(vectors)
-        self.index.add_with_ids(vectors_np, ids_np)
+        # переводим в numpy массивы (может быть тяжело, лучше в поток)
+        ids_np, vectors_np = await asyncio.to_thread(
+            lambda: (np.array(ids, dtype=np.int64), np.vstack(vectors))
+        )
+
+        # добавление в faiss индекс (тяжелая синхронная операция)
+        await asyncio.to_thread(self.index.add_with_ids, vectors_np, ids_np)
         self._count += len(ids)
 
         return result

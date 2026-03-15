@@ -49,6 +49,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         for ch in self.output_channels:
              await self.stats.register_edge(self.name, ch.edge_name)
              await ch.add_upstream()
+             
+        await self.before_start()
 
         # старт producer если нет input
         if not self.has_input():
@@ -157,6 +159,9 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         """Опционально считаем total для stats"""
         pass
     
+    async def before_start(self):
+        pass
+
     async def fin(self):
         pass
 

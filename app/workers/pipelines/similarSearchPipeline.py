@@ -29,7 +29,6 @@ class SimilarSearchPipeline(Pipeline):
             exclude_same_authors=EXCLUDE_SAME_AUTHOR,
             logger=self._logger,
         )
-        self._repo = SimilarRepository(self._router)
 
     async def setup_stages(self) -> None:
         channel_book = Channel(Stages.SIMILAR, asyncio.Queue(maxsize=SEARCH_BATCH_SIZE))
@@ -57,12 +56,15 @@ class SimilarSearchPipeline(Pipeline):
         )
         self.pool.append(similar_stage)
 
-        self._registry.register(Dataset.SIMILAR, self._save)
+        self._registry.register(Dataset.SIMILAR, self._save_async)
     
-    async def _save(self, tasks: List[List[Tuple[float, int, int]]], tx):
-        batch = []
-        for task in tasks:
-            batch.extend(task)
-        if batch:
-            async with self._router.meta_lock():
-                    self._repo.save(batch)
+    async def _save_async(self, router: DBRouter, tasks: List[List[Tuple[float, int, int]]], tx):
+        def save(router: DBRouter, tasks: List[List[Tuple[float, int, int]]]):
+            batch = []
+            for task in tasks:
+                batch.extend(task)
+            if batch:
+                SimilarRepository(router).save(batch)
+
+        async with router.meta_lock():
+            asyncio.to_thread(save, router, tasks)

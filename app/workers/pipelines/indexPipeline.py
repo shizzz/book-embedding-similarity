@@ -5,6 +5,7 @@ from app.settings import IndexLevel
 from .pipeline import Pipeline
 
 THREADS: int = 1
+INDEX_THREADS: int = 1
 
 class IndexPipeline(Pipeline):
     def __init__(
@@ -55,7 +56,7 @@ class IndexPipeline(Pipeline):
                 input_channel=merged_channel,
                 output_channels=self._output_channels,
                 stats=self._stats,
-                workers=THREADS,
+                workers=INDEX_THREADS,
                 logger = self._logger, 
             )
             self.pool.append(doc_index_stage)
@@ -68,7 +69,7 @@ class IndexPipeline(Pipeline):
                 input_channel=emb_channel_index,
                 output_channels=self._output_channels,
                 stats=self._stats,
-                workers=THREADS,
+                workers=INDEX_THREADS,
                 logger = self._logger, 
             )
             self.pool.append(chunk_index_stage)

@@ -1,7 +1,7 @@
 import asyncio
 from typing import List
 from app.model import Model
-from app.infrastructure.db import Migrator, DBTransaction
+from app.infrastructure.db import Migrator, DBRouter
 from app.infrastructure.db.repositories import ModelRepository, BookRepository, ChunkRepository, EmbeddingsRepository, AuthorRepository
 from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, Embedding, BookSearchEngineType
 from app.searchEngines.bookSearch import BookSearchEngineFactory
@@ -65,19 +65,31 @@ class EmbeddingPipeline(Pipeline):
         )
         self.pool.append(embedding_stage)
 
-        self._registry.register(Dataset.BOOK, self._save_books)
-        self._registry.register(Dataset.CHUNK, self._save_chunks)
-        self._registry.register(Dataset.EMBEDDING, self._save_embeddings)
+        self._registry.register(Dataset.BOOK, self._save_books_async)
+        self._registry.register(Dataset.CHUNK, self._save_chunks_async)
+        self._registry.register(Dataset.EMBEDDING, self._save_embeddings_async)
 
-    async def _save_books_async(self, books: List[Book], tx: DBTransaction):
-        async with self._router.meta_lock():
-            BookRepository(self._router).save_bulk(books, conn=tx.meta())
-            AuthorRepository(self._router).save_bulk(books, conn=tx.meta())
+    async def _save_books_async(self, router: DBRouter, books: List[Book]):
+        def save(router: DBRouter, books: List[Book]):
+            with router.transaction as tx:
+                BookRepository(router).save_bulk(books, conn=tx.meta())
+                AuthorRepository(router).save_bulk(books, conn=tx.meta())
 
-    async def _save_chunks_async(self, chunks: List[Chunk], tx: DBTransaction):
-        async with self._router.chunks_lock():
-            ChunkRepository(self._router).save_bulk(chunks, conn_meta=tx.meta(), conn_chunks=tx.chunks())
+        async with router.meta_lock():
+            asyncio.to_thread(save, router, books)
 
-    async def _save_embeddings_async(self, emb: List[Embedding], tx: DBTransaction):
-        async with self._router.embeddings_lock(self.model.info.uid):
-            EmbeddingsRepository(self._router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
+    async def _save_chunks_async(self, router: DBRouter, chunks: List[Chunk]):
+        def save(router: DBRouter, chunks: List[Book]):
+            with router.transaction as tx:
+                ChunkRepository(router).save_bulk(chunks, conn_meta=tx.meta(), conn_chunks=tx.chunks())
+
+        async with router.chunks_lock():
+            asyncio.to_thread(save, router, chunks)
+
+    async def _save_embeddings_async(self, router: DBRouter, emb: List[Embedding]):
+        def save(router: DBRouter, emb: List[Book]):
+            with router.transaction as tx:
+                EmbeddingsRepository(router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
+
+        async with router.embeddings_lock(self.model.info.uid):
+            asyncio.to_thread(save, router, emb)

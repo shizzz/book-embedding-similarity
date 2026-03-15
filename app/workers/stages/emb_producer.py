@@ -2,10 +2,9 @@ from typing import List
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.infrastructure.db.iterables import EmbeddingsBatchIterable
-from app.infrastructure.models import Task, Embedding, Stages, Action
+from app.infrastructure.models import Task, Embedding, Stages, Action, ChunkType
 
-REPO_BATCH_SIZE: int = 1000
+REPO_BATCH_SIZE: int = 10000
 
 class EmbeddingProducer(BaseQueueWorker[Embedding]):
     """
@@ -19,11 +18,10 @@ class EmbeddingProducer(BaseQueueWorker[Embedding]):
             **kwargs
         ):
         super().__init__(name=name, *args, **kwargs)
-        self._book_repo = EmbeddingsRepository(router)
-        self._source = EmbeddingsBatchIterable(self._book_repo, REPO_BATCH_SIZE, ["book_id", "chunk_id"])
+        self._repo = EmbeddingsRepository(router)
 
     async def produce(self):
-        for batch in self._source:
+        for batch in self._repo.get_all(ChunkType.TEXT, REPO_BATCH_SIZE):
             for e in batch:
                 yield Task[Embedding](
                     id=e.id,
@@ -36,7 +34,7 @@ class EmbeddingProducer(BaseQueueWorker[Embedding]):
         return batch
 
     async def count_total(self) -> None:
-        total = self._source.count()
+        total = self._repo.count()
         await self.stats.set_total(self.name, total)
     
     def reserve_id(self) -> int:

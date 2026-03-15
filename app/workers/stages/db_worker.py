@@ -27,14 +27,13 @@ class DbWorker(BaseQueueWorker):
         return batch
     
     async def _save(self, router: DBRouter, tasks: list[BatchTask[TEntity]]):
-        with router.transaction() as tx:
-            for task in tasks:
-                saver = self._registry.get(task.dataset)
+        for task in tasks:
+            saver = self._registry.get(task.dataset)
 
-                if saver is None:
-                    raise RuntimeError(f"No saver for {task.dataset}")
+            if saver is None:
+                raise RuntimeError(f"No saver for {task.dataset}")
 
-                await saver(task.entity, tx)
+            await saver(router, task.entity)
 
     async def _save_batch(self, batch: List[Task]) -> int:
         groups: dict[IntEnum | None, tuple[Task, list]] = {}
