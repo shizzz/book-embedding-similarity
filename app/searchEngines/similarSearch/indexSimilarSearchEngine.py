@@ -4,6 +4,7 @@ from faiss import IndexIDMap
 from typing import List
 from .similarSearchEngine import SimilarSearchEngine
 from app.settings import SearchIndexLevel
+from app.hnsw import FaissId
 from app.infrastructure.models import ChunkType, SearchResult
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
@@ -37,78 +38,114 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         distances, ids = index.search(query_embeddings_np, top_k)
         return distances, ids
 
-    def _search_document_level(self, book_ids: List[int], desired_books: int, top_k_agg: int = None) -> List[SearchResult]:
+    def _search_document_level(
+        self,
+        book_ids: List[int],
+        desired_books: int,
+        top_k_agg: int = None
+    ) -> List[SearchResult]:
         s_emb, s_idx = self._get_mean(book_ids)
-
         k = int(desired_books * self.overfetch_factor)
-        distances, ids = self._search_index(s_emb, self._document_index, k)
-        result: List[SearchResult] = []
 
+        distances, ids = self._search_index(
+            s_emb,
+            self._document_index,
+            k
+        )
+
+        per_source = defaultdict(list)
         for q_idx, row in enumerate(ids):
             source_id = s_idx[q_idx]
+
             for match_idx, candidate_book_id in enumerate(row):
-                if candidate_book_id == -1 or candidate_book_id in book_ids: continue
-                result.append(
+                if candidate_book_id == -1 or candidate_book_id == source_id:
+                    continue
+
+                per_source[source_id].append(
                     SearchResult(
                         Source=source_id,
                         Candidate=int(candidate_book_id),
                         Score=float(distances[q_idx, match_idx])
                     )
                 )
-        result.sort(key=lambda x: x.Score, reverse=True)
-        return result
 
-    def _search_chunk_level(self, book_ids: List[int], desired_books: int, top_k_agg: int = 5) -> List[SearchResult]:
+        results = []
+
+        for source_id, items in per_source.items():
+            items.sort(key=lambda x: x.Score, reverse=True)
+            results.extend(items[:desired_books])
+
+        return results
+
+    def _search_chunk_level(
+        self,
+        book_ids: List[int],
+        desired_books: int,
+        top_k_agg: int = 5
+    ) -> List[SearchResult]:
         data = self._emb_provider.get_by_book_ids(book_ids, ChunkType.TEXT)
-        if not data: return []
+        if not data:
+            return []
 
-        query_embeddings, query_embedding_ids, source_book_ids = [], [], []
-        for emb_id, (vec, book_id, _) in data.items():
+        query_embeddings = []
+        query_books = []
+
+        for _, (vec, book_id, _) in data.items():
             query_embeddings.append(vec)
-            query_embedding_ids.append(emb_id)
-            source_book_ids.append(book_id)
+            query_books.append(book_id)
 
         query_embeddings_np = np.array(query_embeddings)
 
-        k_chunks = int(desired_books * self.avg_chunks_per_book * self.overfetch_factor)
-        distances, embedding_ids_results = self._search_index(query_embeddings_np, self._chunk_index, k_chunks)
+        k_chunks = int(
+            desired_books *
+            self.avg_chunks_per_book *
+            self.overfetch_factor
+        )
 
-        flat_ids = {int(eid) for row in embedding_ids_results for eid in row if eid != -1}
-        embedding_meta = self._emb_provider.get_by_ids(list(flat_ids))
+        distances, ids = self._search_index(
+            query_embeddings_np,
+            self._chunk_index,
+            k_chunks
+        )
 
-        pair_matches, pair_chunks = defaultdict(list), defaultdict(list)
+        unpack = FaissId.unpack
+        pair_scores = defaultdict(list)
+        pair_chunks = defaultdict(list)
 
-        for q_idx, query_embedding_id in enumerate(query_embedding_ids):
-            source_id = source_book_ids[q_idx]
+        for q_idx, row in enumerate(ids):
+            source_book = query_books[q_idx]
 
-            for match_idx, candidate_embedding_id in enumerate(embedding_ids_results[q_idx]):
-                if candidate_embedding_id == -1: continue
+            for r_idx, faiss_id in enumerate(row):
+                if faiss_id == -1:
+                    continue
 
-                candidate_embedding_id = int(candidate_embedding_id)
-                meta = embedding_meta.get(candidate_embedding_id)
-                if not meta: continue
+                candidate_book, chunk_id = unpack(int(faiss_id))
+                if candidate_book == source_book:
+                    continue
 
-                _, candidate_book_id, _ = meta
-                score = float(distances[q_idx, match_idx])
+                score = float(distances[q_idx, r_idx])
+                key = (source_book, candidate_book)
 
-                pair_matches[(source_id, candidate_book_id)].append(score)
-                pair_chunks[(source_id, candidate_book_id)].append(candidate_embedding_id)
+                pair_scores[key].append(score)
+                pair_chunks[key].append(chunk_id)
 
-        candidates: List[SearchResult] = []
+        results: List[SearchResult] = []
 
-        for (source_id, candidate_id), scores in pair_matches.items():
+        for (source, candidate), scores in pair_scores.items():
             top_scores = sorted(scores, reverse=True)[:top_k_agg]
             agg_score = float(np.mean(top_scores)) * (len(top_scores) / top_k_agg)
 
-            candidates.append(SearchResult(
-                Source=source_id,
-                Candidate=candidate_id,
-                Score=agg_score,
-                ChunkIds=pair_chunks[(source_id, candidate_id)][:top_k_agg]
-            ))
+            results.append(
+                SearchResult(
+                    Source=source,
+                    Candidate=candidate,
+                    Score=agg_score,
+                    ChunkIds=pair_chunks[(source, candidate)][:top_k_agg]
+                )
+            )
 
-        candidates.sort(key=lambda x: x.Score, reverse=True)
-        return candidates
+        results.sort(key=lambda x: x.Score, reverse=True)
+        return results
 
     def find_similar_books(self, book_ids: List[int], desired_books: int = 100, top_k_agg: int = 5) -> List[SearchResult]:
         if not book_ids:
@@ -116,11 +153,8 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
         search_method = self._level_search_map.get(self._level)
         if not search_method:
-            raise NotImplementedError(f"Search for level {self._level} is not implemented")
+            raise NotImplementedError(
+                f"Search for level {self._level} is not implemented"
+            )
 
-        results = []
-        for book_id in book_ids:
-            res = search_method([book_id], desired_books, top_k_agg)
-            results.extend(res)
-
-        return results
+        return search_method(book_ids, desired_books, top_k_agg)

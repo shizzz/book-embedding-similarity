@@ -83,8 +83,8 @@ class ChunkingConfig:
 # ==========================
 @dataclass(frozen=True)
 class IndexConfig:
-    BUILD_INDEX_LEVEL=os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()  #: Тип создаваемого индекса
-    SEARCH_INDEX_LEVEL=os.getenv("SEARCH_INDEX_LEVEL", SearchIndexLevel.CHUNK.value).lower()  #: Тип создаваемого индекса
+    BUILD_INDEX_LEVEL:IndexLevel=os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()  #: Тип создаваемого индекса
+    SEARCH_INDEX_LEVEL:SearchIndexLevel=os.getenv("SEARCH_INDEX_LEVEL", SearchIndexLevel.CHUNK.value).lower()  #: Тип создаваемого индекса
     HNSW_MMAP=bool(os.getenv("HNSW_MMAP", False))  #: Не загружаем индекс в память, читаем с диска
     HNSW_M=int(os.getenv("HNSW_M", 32))  #: Максимальное количество связей (соседей) на уровне графа
     HNSW_EF_CONSTRUCTION=int(os.getenv("HNSW_EF_CONSTRUCTION", 200))  #: Размер списка кандидатов при построении графа

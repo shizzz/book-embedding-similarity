@@ -1,6 +1,7 @@
 import numpy as np
 import faiss
 from typing import List
+from app.hnsw import FaissId
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, EmbeddingsRepository
 from app.workers.base import BaseQueueWorker
@@ -53,7 +54,8 @@ class Indexer(BaseQueueWorker[Embedding]):
             if self.level == IndexLevel.DOCUMENT:
                 entity_id = b.entity.book_id
             elif self.level == IndexLevel.CHUNK:
-                entity_id = b.entity.id
+                entity_id = FaissId.pack(b.entity.book_id, b.entity.id)
+
             else:
                 raise TypeError("Unknown index type")
 
