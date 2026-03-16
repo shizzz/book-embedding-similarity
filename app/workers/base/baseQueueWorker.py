@@ -47,6 +47,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         await self.stats.register_stage(self.name, self._workers_count, self.input_channel.queue.maxsize)
 
         for ch in self.output_channels:
+             await self.stats.register_stage(ch.edge_name, 0, ch.queue.maxsize)
              await self.stats.register_edge(self.name, ch.edge_name)
              await ch.add_upstream()
              

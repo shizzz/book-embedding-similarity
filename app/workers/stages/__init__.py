@@ -5,6 +5,7 @@ __all__ = [
     "BookProducer",
     "Parser",
     "DbWorker",
+    "DbChunkProducer",
     "EmbeddingWorker",
     "EmbeddingProducer",
     "EmbeddingMeger",
@@ -19,6 +20,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "book_search_producer",
         "parser",
         "db_worker",
+        "db_chunk_producer",
         "embedding_generation",
         "emb_producer",
         "merge_embedding",
@@ -30,6 +32,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "book_search_producer": ["BookProducer"],
         "parser": ["Parser"],
         "db_worker": ["DbWorker"],
+        "db_chunk_producer": ["DbChunkProducer"],
         "embedding_generation": ["EmbeddingWorker"],
         "emb_producer": ["EmbeddingProducer"],
         "merge_embedding": ["EmbeddingMeger"],
@@ -45,6 +48,7 @@ if TYPE_CHECKING:
     from .parser import Parser
     from .db_worker import DbWorker
     from .embedding_generation import EmbeddingWorker
+    from .db_chunk_producer import DbChunkProducer
     from .emb_producer import EmbeddingProducer
     from .merge_embedding import EmbeddingMeger
     from .index_creation import Indexer

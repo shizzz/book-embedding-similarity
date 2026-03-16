@@ -2,7 +2,8 @@ import lazy_loader as lazy
 from typing import TYPE_CHECKING
 
 __all__ = [
-    "GenerateEmbeddingsWorker",
+    "GenerateEmbeddings",
+    "GenerateAll",
     "GenerateSimilarWorker",
     "SimilarSearchWorker",
     "GenerateIndexWorker",
@@ -12,12 +13,14 @@ __getattr__, __dir__, __all__ = lazy.attach(
     __name__,
     submodules=[
         "generate_embeddings",
+        "generate_all",
         "generate_similar",
         "similar_search",
         "generate_index",
     ],
     submod_attrs={
-        "generate_embeddings": ["GenerateEmbeddingsWorker"],
+        "generate_embeddings": ["GenerateEmbeddings"],
+        "generate_all": ["GenerateAll"],
         "generate_similar": ["GenerateSimilarWorker"],
         "similar_search": ["SimilarSearchWorker"],
         "generate_index": ["GenerateIndexWorker"],
@@ -26,7 +29,8 @@ __getattr__, __dir__, __all__ = lazy.attach(
 
 # --- для IDE подсветки и автокомплита ---
 if TYPE_CHECKING:
-    from .generate_embeddings import GenerateEmbeddingsWorker
+    from .generate_embeddings import GenerateEmbeddings
+    from .generate_all import GenerateAll
     from .generate_similar import GenerateSimilarWorker
     from .similar_search import SimilarSearchWorker
     from .generate_index import GenerateIndexWorker

@@ -1,10 +1,27 @@
 from typing import List
+from typing import Generator
 from app.infrastructure.db import DBRouter
 from ...models.chunk import Chunk
 
 class ChunkRepository:
     def __init__(self, router: DBRouter):
         self.router = router
+        
+    def get_all(self, batch_size: int = 100) -> Generator[list[Chunk], None, None]:
+        with self.router.chunks() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, book_id, data, [length], [type]
+                FROM chunks
+                ORDER BY [length] DESC
+                """)
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+                yield [Chunk.from_chunks_row(row) for row in rows]
 
     def get_ids(self) -> set[int]:
         with self.router.meta() as conn:
@@ -92,3 +109,7 @@ class ChunkRepository:
             else:
                 start_id = row["seq"] + 1
             return start_id
+        
+    def count(self) -> int:
+        with self.router.chunks() as conn:
+            return conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
