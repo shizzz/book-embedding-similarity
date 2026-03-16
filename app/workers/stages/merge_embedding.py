@@ -28,8 +28,6 @@ class EmbeddingMeger(BaseQueueWorker[BookTask]):
             if shape is None:
                 shape = r.entity.shape
             vec = r.entity.data
-            if vec.dtype != np.float32:
-                vec = vec.astype(np.float32)
             grouped.setdefault(r.entity.book_id, []).append(vec)
 
         for book_id, vectors in grouped.items():

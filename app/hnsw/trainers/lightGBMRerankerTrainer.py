@@ -6,8 +6,8 @@ from app.settings import PathsConfig
 
 class LightGBMRerankerTrainer(RerankerTrainer):
     def train(self, X, y, groups):
-        X_np = np.array(X, dtype=np.float32)
-        y_np = np.array(y, dtype=np.int32)
+        X_np = np.array(X)
+        y_np = np.array(y)
 
         order = np.argsort(groups)
         X_np = X_np[order]

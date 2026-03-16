@@ -58,6 +58,8 @@ class ProcessConfig:
     SIMILARS_PER_BOOK=int(os.getenv("SIMILARS_PER_BOOK", 100))  #: Количество похожих книг, генерируемых воркером
     DATABASE_QUEUE_BATCH_SIZE=int(os.getenv("DATABASE_QUEUE_BATCH_SIZE", 20000))  #: Размер батча для массового сохранения в БД
     MODEL_NAME=os.getenv("MODEL_NAME", KnownModels.all_MiniLM_L6_v2.value)  #: Наименование модели
+    MODEL_EMBEDDING_DTYPE = os.getenv("MODEL_EMBEDDING_DTYPE", "float32")  # float16 | float32
+    STORAGE_EMBEDDING_DTYPE = os.getenv("STORAGE_EMBEDDING_DTYPE", "float32")  # float16 | float32
 
 # ==========================
 # ==== CHUNKING / TEXT =====

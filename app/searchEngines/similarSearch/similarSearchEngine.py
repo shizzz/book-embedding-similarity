@@ -91,7 +91,7 @@ class SimilarSearchEngine:
         if not X:
             return pairs
 
-        X_np = np.array(X, dtype=np.float32)
+        X_np = np.array(X)
 
         try:
             preds = self._reranker.predict(X_np)

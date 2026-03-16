@@ -41,7 +41,7 @@ class BookEmbeddingIndexer:
             desc="Слияние embeddings (DOCUMENT)"
         ):
             for r in batch:
-                vec = r.data.astype(np.float32)
+                vec = r.data
                 if self.embedding_dim is None:
                     self.embedding_dim = vec.shape[0]
                 elif vec.shape[0] != self.embedding_dim:
@@ -111,7 +111,7 @@ class BookEmbeddingIndexer:
             batch_ids = []
 
             for r in batch:
-                vec = r.data.astype(np.float32)
+                vec = r.data
                 if vec.shape[0] != self.embedding_dim:
                     raise ValueError(f"Chunk {r.chunk_id} имеет неправильную размерность {vec.shape[0]}, ожидается {self.embedding_dim}")
 

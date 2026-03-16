@@ -23,14 +23,14 @@ class Model:
         self._calc_info()
     
     def _load(self, model_path: str):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        torch_dtype = torch.float16 if ProcessConfig.MODEL_EMBEDDING_DTYPE == "float16" else torch.float32
 
         if os.path.exists(model_path):
             self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, truncation=False)
-            self.model = AutoModel.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float32)
+            self.model = AutoModel.from_pretrained(model_path, device_map="auto", dtype=torch_dtype)
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(self.name, use_fast=True, truncation=False)
-            self.model = AutoModel.from_pretrained(self.name, device_map="auto", torch_dtype=torch.float32)
+            self.model = AutoModel.from_pretrained(self.name, device_map="auto", dtype=torch_dtype)
 
             self.tokenizer.save_pretrained(model_path)
             self.model.save_pretrained(model_path)

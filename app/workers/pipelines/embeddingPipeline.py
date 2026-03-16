@@ -58,6 +58,7 @@ class EmbeddingPipeline(Pipeline):
 
         embedding_stage = TokenizerStage(
             model=self.model,
+            router=self._router,
             input_channel=channel_tokens,
             output_channels=[channel_emb],
             stats=self._stats,

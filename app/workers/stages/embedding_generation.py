@@ -29,17 +29,16 @@ class EmbeddingWorker(BaseQueueWorker):
         )
 
         self._model = model 
+        self._device = next(model.parameters()).device
         self._transformer_batch_size = model.info.st_batch_size
         
         self._repo = EmbeddingsRepository(router, model.info.uid)
         self._emb_id = self._repo.get_max_id()       
         self._emb_id_lock = asyncio.Lock()
-        self._emb_to_chunk_id = self._repo.get_ids()
         self._current_batch_size = int(self._transformer_batch_size)
 
     async def process(self, batch: List[Task[TokenChunk]], wid: int) -> List[Task[Embedding]] | None:
-        # фильтруем уже обработанные TokenChunk по chunk_id
-        chunks = [t.entity for t in batch if t.entity.chunk_id not in self._emb_to_chunk_id]
+        chunks = [t.entity for t in batch]
         if not chunks:
             return None
 
@@ -56,49 +55,37 @@ class EmbeddingWorker(BaseQueueWorker):
 
     @staticmethod
     def _mean_pooling(last_hidden_state, attention_mask):
-        """
-        Mean pooling с учётом attention_mask
-        """
-        mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-        summed = torch.sum(last_hidden_state * mask, dim=1)
-        counts = torch.clamp(mask.sum(dim=1), min=1e-9)
+        mask = attention_mask.unsqueeze(-1)
+        summed = (last_hidden_state * mask).sum(dim=1)
+        counts = mask.sum(dim=1).clamp(min=1e-9)
         return summed / counts
 
     def _embedding_process(self, batch: List[TokenChunk]) -> np.ndarray:
-        """
-        batch: список TokenChunk с уже готовыми токенами
-        """
         model = self._model.model
         tokenizer = self._model.tokenizer
-        device = next(model.parameters()).device
+        device = self._device
 
-        # Максимальная длина токенов в batch для padding
         max_len = max(len(tc.tokens) for tc in batch)
 
-        # Формируем input_ids и attention_mask
         input_ids = []
         attention_mask = []
 
         for tc in batch:
             ids = tc.tokens
             pad_len = max_len - len(ids)
+
             input_ids.append(ids + [tokenizer.pad_token_id] * pad_len)
             attention_mask.append([1] * len(ids) + [0] * pad_len)
 
-        # Преобразуем в тензоры и на GPU/CPU
-        input_ids = torch.tensor(input_ids, device=device)
-        attention_mask = torch.tensor(attention_mask, device=device)
+        input_ids = torch.as_tensor(input_ids, device=device)
+        attention_mask = torch.as_tensor(attention_mask, device=device)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-
-            # Mean pooling с учетом attention_mask
             pooled = self._mean_pooling(outputs.last_hidden_state, attention_mask)
-
-            # L2 нормализация (как в SentenceTransformer)
             pooled = torch.nn.functional.normalize(pooled, p=2, dim=1)
 
-        return pooled.cpu().numpy().astype(np.float32, copy=False)
+        return pooled.cpu().numpy()
 
     async def _assign_embeddings(
         self, embeddings: np.ndarray, chunks: List[TokenChunk]
