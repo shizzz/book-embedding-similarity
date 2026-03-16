@@ -19,18 +19,17 @@ class Model:
         model_path = Model.get_model_dir()
         model_dir.mkdir(parents=True, exist_ok=True)
 
+        self.dtype = torch.float16 if ProcessConfig.MODEL_EMBEDDING_DTYPE == "float16" else torch.float32
         self._load(model_path)
         self._calc_info()
     
     def _load(self, model_path: str):
-        torch_dtype = torch.float16 if ProcessConfig.MODEL_EMBEDDING_DTYPE == "float16" else torch.float32
-
         if os.path.exists(model_path):
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, truncation=False)
-            self.model = AutoModel.from_pretrained(model_path, device_map="auto", dtype=torch_dtype)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, truncation=False, dtype=self.dtype)
+            self.model = AutoModel.from_pretrained(model_path, device_map="auto", dtype=self.dtype)
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.name, use_fast=True, truncation=False)
-            self.model = AutoModel.from_pretrained(self.name, device_map="auto", dtype=torch_dtype)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.name, use_fast=True, truncation=False, dtype=self.dtype)
+            self.model = AutoModel.from_pretrained(self.name, device_map="auto", dtype=self.dtype)
 
             self.tokenizer.save_pretrained(model_path)
             self.model.save_pretrained(model_path)

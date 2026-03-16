@@ -29,7 +29,7 @@ class EmbeddingWorker(BaseQueueWorker):
         )
 
         self._model = model 
-        self._device = next(model.parameters()).device
+        self._device = next(model.model.parameters()).device
         self._transformer_batch_size = model.info.st_batch_size
         
         self._repo = EmbeddingsRepository(router, model.info.uid)
@@ -55,7 +55,7 @@ class EmbeddingWorker(BaseQueueWorker):
 
     @staticmethod
     def _mean_pooling(last_hidden_state, attention_mask):
-        mask = attention_mask.unsqueeze(-1)
+        mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)
         summed = (last_hidden_state * mask).sum(dim=1)
         counts = mask.sum(dim=1).clamp(min=1e-9)
         return summed / counts
@@ -63,7 +63,7 @@ class EmbeddingWorker(BaseQueueWorker):
     def _embedding_process(self, batch: List[TokenChunk]) -> np.ndarray:
         model = self._model.model
         tokenizer = self._model.tokenizer
-        device = self._device
+        dtype = self._model.dtype
 
         max_len = max(len(tc.tokens) for tc in batch)
 
@@ -77,8 +77,8 @@ class EmbeddingWorker(BaseQueueWorker):
             input_ids.append(ids + [tokenizer.pad_token_id] * pad_len)
             attention_mask.append([1] * len(ids) + [0] * pad_len)
 
-        input_ids = torch.as_tensor(input_ids, device=device)
-        attention_mask = torch.as_tensor(attention_mask, device=device)
+        input_ids = torch.as_tensor(input_ids, device=self._device)
+        attention_mask = torch.as_tensor(attention_mask, device=self._device)
 
         with torch.inference_mode():
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
