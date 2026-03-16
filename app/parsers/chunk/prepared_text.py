@@ -4,9 +4,9 @@ if TYPE_CHECKING:
     from chunk_strategy import ChunkStrategy
 
 class PreparedText:
-    def __init__(self, strategy: ChunkStrategy, text: str):
+    def __init__(self, strategy: ChunkStrategy, tokens: list[int]):
         self.strategy = strategy
-        self.text = text
+        self.tokens = tokens
 
-    def split(self, max_chars: int, min_chars: int, overlap: int, single_chunk_mode: bool):
-        return self.strategy.split(self.text, max_chars, min_chars, overlap, single_chunk_mode)
+    def split(self, max_tokens: int, min_tokens: int, overlap: int, single_chunk_mode: bool):
+        return self.strategy.split(self.tokens, max_tokens, min_tokens, overlap, single_chunk_mode)

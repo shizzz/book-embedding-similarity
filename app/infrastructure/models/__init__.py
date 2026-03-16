@@ -12,6 +12,7 @@ from .stage_stats import StageStats
 from .channel import Channel
 from .parse_result import ParseResult
 from .search_result import SearchResult
+from .tokenChunk import TokenChunk
 
 __all__ = [
     "Book",
@@ -39,5 +40,6 @@ __all__ = [
     "BookSearchEngineType",
     "SimilarSearchEngineType",
     "ParseResult",
-    "SearchResult"
+    "SearchResult",
+    "TokenChunk"
 ]

@@ -10,6 +10,7 @@ class Stages(StrEnum):
     PARSER = "Parser"
     SEARCH = "Search"
     MERGER = "Merger"
+    TOKENIZER = "Tokenizer"
     SIMILAR = "Similar"
     INDEX = "Index"
     EMBEDDING = "Embedding"

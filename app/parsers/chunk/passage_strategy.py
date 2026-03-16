@@ -1,37 +1,38 @@
 from .chunk_strategy import ChunkStrategy
-
+from typing import List
 
 class PassageStrategy(ChunkStrategy):
     prefix = "passage: "
 
-    def split(self, text, max_chars, min_chars, overlap, single_chunk_mode):
-        n = len(text)
+    def split(
+        self,
+        tokens: List[int],
+        max_tokens: int,
+        min_tokens: int,
+        overlap: int,
+        single_chunk_mode: bool
+    ) -> List[List[int]]:
+        n = len(tokens)
+        if n == 0:
+            return []
 
-        if n <= max_chars:
-            if n < min_chars and not single_chunk_mode:
+        # если текст меньше max_tokens, возвращаем один chunk с префиксом
+        if n <= max_tokens:
+            if n < min_tokens and not single_chunk_mode:
                 return []
-            return [text]
+            return [self.prefix_tokens + tokens]
 
-        # минимальное количество чанков
-        chunks = (n + max_chars - 1) // max_chars
+        # разбиваем на шаги с overlap
+        step = max_tokens - overlap
+        chunks = []
 
-        # равномерный размер
-        chunk_size = (n + chunks - 1) // chunks
+        for start in range(0, n, step):
+            end = min(start + max_tokens, n)
+            sub_tokens = tokens[start:end]
 
-        parts = []
-
-        for i in range(chunks):
-            start = i * chunk_size
-            end = min(start + chunk_size, n)
-
-            if overlap and i > 0:
-                start = max(0, start - overlap)
-
-            sub = text[start:end]
-
-            if len(sub) < min_chars and not single_chunk_mode:
+            if len(sub_tokens) < min_tokens and not single_chunk_mode:
                 continue
 
-            parts.append(sub)
+            chunks.append(self.prefix_tokens + sub_tokens)
 
-        return parts
+        return chunks

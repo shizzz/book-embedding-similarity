@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncGenerator
 from app.workers.stats import Stats
-from app.infrastructure.models import Book
+from app.infrastructure.models import Book, BookSearchEngineType
 from .bookSearchEngine import BaseBookSearchEngine
 
 
@@ -25,7 +25,7 @@ class ZipBookSearchEngine(BaseBookSearchEngine):
             for file_name, archive_name in books:
                 yield Book(
                     file_name=file_name,
-                    source_type=self.TYPE,
+                    source_type=BookSearchEngineType.ZIP,
                     source_link=f"{archive_name}/{file_name}"
                 )
 

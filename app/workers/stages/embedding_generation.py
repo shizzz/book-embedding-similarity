@@ -1,14 +1,12 @@
 import asyncio
 import torch
 import numpy as np
-from collections import defaultdict
 from app.model import Model
-from app.parsers.chunk import ChunkStrategyFactory
-from app.workers.batchStrategies import CharFuncBatchStrategy
+from app.workers.batchStrategies import TokenChunkBatchStrategy
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.infrastructure.models import Task, Chunk, Embedding, Action, Stages, Dataset
+from app.infrastructure.models import Task, TokenChunk, Embedding, Action, Stages, Dataset
 from typing import List
 
 class EmbeddingWorker(BaseQueueWorker):
@@ -25,16 +23,13 @@ class EmbeddingWorker(BaseQueueWorker):
         ):
         super().__init__(
             name=name,
-            batch_strategy=lambda: CharFuncBatchStrategy(self._batch_char_limit),
+            batch_strategy=lambda: TokenChunkBatchStrategy(self._batch_char_limit),
             *args, 
             **kwargs
         )
 
         self._model = model 
-        self._max_chars = model.info.st_chunk_size
-        self._overlap = model.info.st_overlap
         self._transformer_batch_size = model.info.st_batch_size
-        self._min_chars = max(100, int(self._max_chars * 0.15))
         
         self._repo = EmbeddingsRepository(router, model.info.uid)
         self._emb_id = self._repo.get_max_id()       
@@ -42,87 +37,90 @@ class EmbeddingWorker(BaseQueueWorker):
         self._emb_to_chunk_id = self._repo.get_ids()
         self._current_batch_size = int(self._transformer_batch_size)
 
-    async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[Embedding]] | None:
-        chunks = [task.entity for task in batch if task.entity.chunk_id not in self._emb_to_chunk_id]   
-        if len(chunks) > 0:
-            texts, meta = self._collect_chunks(chunks)
-            embeddings = await asyncio.to_thread(self._embedding_process, texts)
- 
-            return await self._assign_embeddings(embeddings, meta)
-        return None
+    async def process(self, batch: List[Task[TokenChunk]], wid: int) -> List[Task[Embedding]] | None:
+        # фильтруем уже обработанные TokenChunk по chunk_id
+        chunks = [t.entity for t in batch if t.entity.chunk_id not in self._emb_to_chunk_id]
+        if not chunks:
+            return None
+
+        # embeddings делаем на GPU напрямую
+        embeddings = await asyncio.to_thread(self._embedding_process, chunks)
+        return await self._assign_embeddings(embeddings, chunks)
     
     @staticmethod
-    def batch_char_limit(chars: int, size: int) -> int:
-        return chars * size
+    def batch_char_limit(chars: int, batch: int) -> int:
+        return int(chars * batch)
 
     def _batch_char_limit(self):
-        return EmbeddingWorker.batch_char_limit(int(self._model.info.st_chunk_size - self._model.info.st_overlap), self._current_batch_size)
+        return EmbeddingWorker.batch_char_limit(self._model.info.tokens_per_batch, self.batch_size)
 
-    def _embedding_process(self, batch: List[str]) -> np.ndarray:
-        while True:
-            try:
-                embeddings = self._model.transformer.encode(
-                    batch,
-                    batch_size=self._current_batch_size,
-                    convert_to_numpy=True,
-                    normalize_embeddings=True,
-                    show_progress_bar=False
-                )
-                return embeddings.astype(np.float32, copy=False)
-            except torch.cuda.OutOfMemoryError:
-                if self._current_batch_size == 1:
-                    # Нечего делить — падаем окончательно
-                    self.logger.error(f"Batch of size 1 still OOM at index")
-                    raise
-                
-                self.logger.warning(f"OOM at batch {self._current_batch_size}, уменьшаем размер батча")
-                self._current_batch_size -= 1
-                self._model.info.st_batch_size = self._current_batch_size
-                torch.cuda.empty_cache()
+    @staticmethod
+    def _mean_pooling(last_hidden_state, attention_mask):
+        """
+        Mean pooling с учётом attention_mask
+        """
+        mask = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        summed = torch.sum(last_hidden_state * mask, dim=1)
+        counts = torch.clamp(mask.sum(dim=1), min=1e-9)
+        return summed / counts
 
-    def _collect_chunks(self, chunks: List[Chunk]) -> tuple[List[str], List[tuple[Chunk, int]]]:
-        texts = []
-        meta = []
+    def _embedding_process(self, batch: List[TokenChunk]) -> np.ndarray:
+        """
+        batch: список TokenChunk с уже готовыми токенами
+        """
+        model = self._model.model
+        tokenizer = self._model.tokenizer
+        device = next(model.parameters()).device
 
-        for chunk in chunks:
-            if not chunk.text:
-                continue
-            
-            strategy = ChunkStrategyFactory().create(chunk.type)
-            parts = strategy.prepare(chunk.text).split(
-                max_chars=self._max_chars,
-                min_chars=self._min_chars,
-                overlap=self._overlap,
-                single_chunk_mode=False
-            )
+        # Максимальная длина токенов в batch для padding
+        max_len = max(len(tc.tokens) for tc in batch)
 
-            for idx, part in enumerate(parts):
-                texts.append(part)
-                meta.append((chunk, idx))
+        # Формируем input_ids и attention_mask
+        input_ids = []
+        attention_mask = []
 
-        return texts, meta
+        for tc in batch:
+            ids = tc.tokens
+            pad_len = max_len - len(ids)
+            input_ids.append(ids + [tokenizer.pad_token_id] * pad_len)
+            attention_mask.append([1] * len(ids) + [0] * pad_len)
 
-    async def _assign_embeddings(self, embeddings: np.ndarray, meta: List[tuple[Chunk, int]]) -> List[Task[Embedding]]:
-        tasks: List[Task] = []
+        # Преобразуем в тензоры и на GPU/CPU
+        input_ids = torch.tensor(input_ids, device=device)
+        attention_mask = torch.tensor(attention_mask, device=device)
 
-        chunk_seq_counter = defaultdict(int)
-        for emb_vector, (chunk, _) in zip(embeddings, meta):
-            seq = chunk_seq_counter[(chunk.book_id, chunk.chunk_id)]
-            chunk_seq_counter[(chunk.book_id, chunk.chunk_id)] += 1
+        with torch.no_grad():
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+
+            # Mean pooling с учетом attention_mask
+            pooled = self._mean_pooling(outputs.last_hidden_state, attention_mask)
+
+            # L2 нормализация (как в SentenceTransformer)
+            pooled = torch.nn.functional.normalize(pooled, p=2, dim=1)
+
+        return pooled.cpu().numpy().astype(np.float32, copy=False)
+
+    async def _assign_embeddings(
+        self, embeddings: np.ndarray, chunks: List[TokenChunk]
+    ) -> List[Task[Embedding]]:
+        tasks: List[Task[Embedding]] = []
+
+        for emb_vector, chunk in zip(embeddings, chunks):
+            emb_id = await self._reserve_id()
 
             emb = Embedding(
-                id=await self._reserve_id(),
+                id=emb_id,
                 book_id=chunk.book_id,
                 chunk_id=chunk.chunk_id,
+                seq=chunk.seq,
+                type=chunk.type,
                 data=emb_vector,
                 shape=emb_vector.shape[0],
-                seq=seq,
-                type=chunk.type,
             )
 
             task = Task(
-                emb.id,
-                ",".join(map(str, (emb.book_id, emb.chunk_id, emb.seq))),
+                id=emb.id,
+                name=f"{emb.book_id},{emb.chunk_id},{emb.seq}",
                 entity=emb,
                 routes=Action.DB,
                 dataset=Dataset.EMBEDDING,
@@ -130,6 +128,7 @@ class EmbeddingWorker(BaseQueueWorker):
             )
 
             tasks.append(task)
+
         return tasks
     
     async def _reserve_id(self) -> int:

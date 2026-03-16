@@ -12,8 +12,8 @@ class ChunkStrategyFactory:
     }
 
     @classmethod
-    def create(cls, kind: int) -> ChunkStrategy:
+    def create(cls, kind: int, tokenizer=None) -> ChunkStrategy:
         strategy_cls = cls._strategies.get(kind)
         if not strategy_cls:
             raise ValueError(f"No strategy found for kind '{kind}'")
-        return strategy_cls()
+        return strategy_cls(tokenizer=tokenizer)

@@ -4,7 +4,7 @@ import zipfile
 from datetime import datetime
 from typing import AsyncGenerator
 from app.workers.stats import Stats
-from app.infrastructure.models import Book
+from app.infrastructure.models import Book, BookSearchEngineType
 from .bookSearchEngine import BaseBookSearchEngine
 from app.settings import PathsConfig
 
@@ -141,7 +141,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
                     serie=book["series"],
                     generes=[g.strip() for g in book["genere"].split(":") if g.strip()],
                     year=datetime.fromisoformat(book["date"]).year,
-                    source_type=self.TYPE,
+                    source_type=str(BookSearchEngineType.INPIX),
                     source_link=link
                 )
 

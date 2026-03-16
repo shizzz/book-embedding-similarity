@@ -10,6 +10,7 @@ __all__ = [
     "EmbeddingMeger",
     "Indexer",
     "SimilarStage",
+    "TokenizerStage",
 ]
 
 __getattr__, __dir__, __all__ = lazy.attach(
@@ -23,6 +24,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "merge_embedding",
         "index_creation",
         "similar",
+        "tokenizer",
     ],
     submod_attrs={
         "book_search_producer": ["BookProducer"],
@@ -33,6 +35,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "merge_embedding": ["EmbeddingMeger"],
         "index_creation": ["Indexer"],
         "similar": ["SimilarStage"],
+        "tokenizer": ["TokenizerStage"],
     }
 )
 
@@ -46,3 +49,4 @@ if TYPE_CHECKING:
     from .merge_embedding import EmbeddingMeger
     from .index_creation import Indexer
     from .similar import SimilarStage
+    from .tokenizer import TokenizerStage

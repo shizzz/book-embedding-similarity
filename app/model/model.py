@@ -2,7 +2,7 @@ import os
 import numpy as np
 import hashlib
 import torch
-from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModel
 from app.settings import PathsConfig, ProcessConfig
 
 class Model:
@@ -10,9 +10,7 @@ class Model:
     TOKEN_TO_CHAR = 5 #: ~token count for one char
     OVERLAP_RATIO = 0.12 #: How much text to connect embeddings
     VRAM_USAGE_RATIO = 1 #: Max memory to fill with chunks
-    DEFAULT_BATCH = 8 #: CPU Batch Size 
-
-    transformer: SentenceTransformer
+    DEFAULT_BATCH = 8 #: CPU Batch Size
 
     def __init__(self, threads):
         self.name = ProcessConfig.MODEL_NAME
@@ -21,21 +19,21 @@ class Model:
         model_path = Model.get_model_dir()
         model_dir.mkdir(parents=True, exist_ok=True)
 
-        if os.path.exists(model_path):
-            self.load_local_model(model_path)
-        else:
-            transformer = SentenceTransformer(self.name)
-            transformer.save(str(model_path))
-            del transformer
-            self.load_local_model(model_path)
-
+        self._load(model_path)
         self._calc_info()
     
-    def load_local_model(self, model_path: str):
-        self.transformer = SentenceTransformer(
-            model_name_or_path=str(model_path),
-            #tokenizer_kwargs={"fix_mistral_regex": True}
-        )
+    def _load(self, model_path: str):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        if os.path.exists(model_path):
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, truncation=False)
+            self.model = AutoModel.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float32)
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.name, use_fast=True, truncation=False)
+            self.model = AutoModel.from_pretrained(self.name, device_map="auto", torch_dtype=torch.float32)
+
+            self.tokenizer.save_pretrained(model_path)
+            self.model.save_pretrained(model_path)
 
     @staticmethod
     def get_model_dir():
@@ -48,13 +46,15 @@ class Model:
     def _calc_info(self):
         self.info = ModelInfo()
 
-        max_seq = self.transformer.max_seq_length
-
+        self.info.max_seq_length = min(
+            self.tokenizer.model_max_length,
+            getattr(self.model.config, "max_position_embeddings", 512)
+        )
+        self.info.st_overlap = int(self.info.max_seq_length * self.OVERLAP_RATIO)
         self.info.uid = self._get_model_uid()
         self.info.model_name = self.name
-        self.info.estimate_mem_per_chunk_mb = self._estimate_mem_per_chunk_mb(max_seq)
-        self.info.st_chunk_size = max_seq * self.TOKEN_TO_CHAR
-        self.info.st_overlap = int(self.info.st_chunk_size * self.OVERLAP_RATIO)
+        self.info.estimate_mem_per_token_mb = self._estimate_mem_per_token_mb()
+        self.info.st_chunk_size = self.info.max_seq_length
         self.info.cuda_available = torch.cuda.is_available()
 
         batch_size = None
@@ -66,55 +66,51 @@ class Model:
             self.info.cuda_version = cuda_version
             self.info.gpu_count = gpu_count
             self.info.gpu_name = gpu_name
-            self.info.measure_mem_per_chunk_mb = self._measure_mem_per_chunk()
+            mem_per_token = self.info.estimate_mem_per_token_mb
 
-            mem_per_chunk = self.info.estimate_mem_per_chunk_mb
-            batch_size = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / (mem_per_chunk * self._threads)))
+            self.info.tokens_per_batch = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / (mem_per_token * self._threads)))
+            batch_size = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / (mem_per_token * self.info.max_seq_length * self._threads)))
 
         self.info.st_batch_size = batch_size or self.DEFAULT_BATCH
 
     def _get_model_uid(self) -> str:
         """Возвращает хеш модели (будет меняться при дообучении)"""
-        state_dict = self.transformer.state_dict()
+        state_dict = self.model.state_dict()
         
         data = b"".join([v.cpu().numpy().tobytes() for v in state_dict.values()])
         return hashlib.md5(data).hexdigest()
     
-    def _estimate_mem_per_chunk_mb(self, seq_len_tokens: int) -> float:
+    def _estimate_mem_per_token_mb(self, for_training: bool = False) -> float:
         """
-        Универсальная оценка памяти на chunk на GPU.
-        Работает для любых transformer моделей.
+        Оценка памяти на один токен на GPU для transformer модели.
+        
+        for_training: True — учитываются градиенты (для обучения)
         """
-        model = self.transformer._first_module().auto_model
-        config = model.config
-
+        config = self.model.config
         hidden = config.hidden_size
         layers = config.num_hidden_layers
 
-        # определяем precision
-        dtype = next(model.parameters()).dtype
+        dtype = next(self.model.parameters()).dtype
         bytes_per_param = 2 if dtype in (torch.float16, torch.bfloat16) else 4
 
-        # attention + intermediates coefficient
-        K = 1.87
+        # 1. Скрытые состояния на всех слоях
+        mem_hidden = hidden * layers * bytes_per_param
 
-        mem_bytes = seq_len_tokens * hidden * layers * bytes_per_param * K
+        # 2. KV кэш для внимания (key + value)
+        # shape: 2 * hidden * layers (для одного токена)
+        mem_kv = 2 * hidden * layers * bytes_per_param
 
-        return mem_bytes / (1024 ** 2)  
-    
-    def _measure_mem_per_chunk(self):
-        torch.cuda.empty_cache()
-        torch.cuda.reset_peak_memory_stats()
+        # 3. Градиенты (если обучение) — обычно столько же, сколько тензоры
+        mem_grad = mem_hidden + mem_kv if for_training else 0
 
-        dummy = ["test"] * 32
-        self.transformer.encode(dummy, convert_to_numpy=True)
-        peak = torch.cuda.max_memory_allocated()
+        mem_bytes_per_token = mem_hidden + mem_kv + mem_grad
 
-        return peak / 32 / (1024**2)
+        return mem_bytes_per_token / (1024 ** 2)  # в МБ
     
 class ModelInfo:
     model_name: str = None
     uid: str = None
+    max_seq_length: int
     cuda_available: bool = None
     cuda_version: str = None
     gpu_count: int = None
@@ -122,8 +118,8 @@ class ModelInfo:
     st_chunk_size: int = None
     st_overlap: int = None
     st_batch_size: int = None
-    estimate_mem_per_chunk_mb: int = None
-    measure_mem_per_chunk_mb: int = None
+    estimate_mem_per_token_mb: int = None
+    tokens_per_batch: int = None
     _free_vram_cache: int = None
     _total_vram_mb: int = None
 

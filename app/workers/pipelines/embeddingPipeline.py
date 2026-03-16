@@ -5,11 +5,12 @@ from app.infrastructure.db import Migrator, DBRouter
 from app.infrastructure.db.repositories import ModelRepository, BookRepository, ChunkRepository, EmbeddingsRepository, AuthorRepository
 from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, Embedding, BookSearchEngineType
 from app.searchEngines.bookSearch import BookSearchEngineFactory
-from app.workers.stages import BookProducer, Parser, EmbeddingWorker
+from app.workers.stages import BookProducer, Parser, EmbeddingWorker, TokenizerStage
 from .pipeline import Pipeline
 
 BOOK_THREADS: int = 1
 CHUNK_THREADS: int = 4
+TOKENS_THREADS: int = 4
 EMB_THREADS: int = 4
 
 class EmbeddingPipeline(Pipeline):
@@ -28,7 +29,8 @@ class EmbeddingPipeline(Pipeline):
 
     async def setup_stages(self) -> None:
         channel_book = Channel(Stages.PARSER, asyncio.Queue(maxsize=50))
-        channel_chunks = Channel(Stages.EMBEDDING, asyncio.Queue(100))
+        channel_tokens = Channel(Stages.TOKENIZER, asyncio.Queue(100))
+        channel_emb = Channel(Stages.EMBEDDING, asyncio.Queue(100))
 
         book_stage = BookProducer(
             router=self._router,
@@ -46,7 +48,7 @@ class EmbeddingPipeline(Pipeline):
             router=self._router,
             search_engine=self.search_engine,
             input_channel=channel_book,
-            output_channels=[channel_chunks, *self._output_channels],
+            output_channels=[channel_tokens, *self._output_channels],
             stats=self._stats,
             batch_size=64,
             workers=CHUNK_THREADS,
@@ -54,12 +56,24 @@ class EmbeddingPipeline(Pipeline):
         )
         self.pool.append(chunk_stage)
 
+        embedding_stage = TokenizerStage(
+            model=self.model,
+            input_channel=channel_tokens,
+            output_channels=[channel_emb],
+            stats=self._stats,
+            batch_size=64,
+            workers=TOKENS_THREADS,
+            logger = self._logger, 
+        )
+        self.pool.append(embedding_stage)
+
         embedding_stage = EmbeddingWorker(
             model=self.model,
             router=self._router,
-            input_channel=channel_chunks,
+            input_channel=channel_emb,
             output_channels=[*(self._output_channels or [])],
             stats=self._stats,
+            batch_size=1,
             workers=EMB_THREADS,
             logger = self._logger, 
         )
@@ -71,25 +85,25 @@ class EmbeddingPipeline(Pipeline):
 
     async def _save_books_async(self, router: DBRouter, books: List[Book]):
         def save(router: DBRouter, books: List[Book]):
-            with router.transaction as tx:
+            with router.transaction() as tx:
                 BookRepository(router).save_bulk(books, conn=tx.meta())
                 AuthorRepository(router).save_bulk(books, conn=tx.meta())
 
         async with router.meta_lock():
-            asyncio.to_thread(save, router, books)
+            await asyncio.to_thread(save, router, books)
 
     async def _save_chunks_async(self, router: DBRouter, chunks: List[Chunk]):
         def save(router: DBRouter, chunks: List[Book]):
-            with router.transaction as tx:
+            with router.transaction() as tx:
                 ChunkRepository(router).save_bulk(chunks, conn_meta=tx.meta(), conn_chunks=tx.chunks())
 
         async with router.chunks_lock():
-            asyncio.to_thread(save, router, chunks)
+            await asyncio.to_thread(save, router, chunks)
 
     async def _save_embeddings_async(self, router: DBRouter, emb: List[Embedding]):
         def save(router: DBRouter, emb: List[Book]):
-            with router.transaction as tx:
+            with router.transaction() as tx:
                 EmbeddingsRepository(router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
 
         async with router.embeddings_lock(self.model.info.uid):
-            asyncio.to_thread(save, router, emb)
+            await asyncio.to_thread(save, router, emb)

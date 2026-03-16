@@ -366,9 +366,9 @@ class LiveUI(BaseUI):
         left.add_row("Model", self.model_info.model_name or "-")
         left.add_row("UID", self.model_info.uid or "-")
 
-        overlap_pct = int(self.model_info.st_overlap / self.model_info.st_chunk_size * 100)
+        overlap_pct = int(self.model_info.st_overlap / self.model_info.max_seq_length * 100)
 
-        left.add_row("Chunk size", f"{self.model_info.st_chunk_size}")
+        left.add_row("Chunk size", f"{self.model_info.max_seq_length}")
         left.add_row("Overlap", f"{self.model_info.st_overlap} ({overlap_pct}%)")
 
         batch_style = "green"
@@ -383,15 +383,9 @@ class LiveUI(BaseUI):
         )
 
         left.add_row(
-            "Mem/chunk est",
-            self._fmt_mb(self.model_info.estimate_mem_per_chunk_mb)
+            "Mem/token est",
+            self._fmt_mb(self.model_info.estimate_mem_per_token_mb)
         )
-
-        if self.model_info.measure_mem_per_chunk_mb:
-            left.add_row(
-                "Mem/chunk real",
-                self._fmt_mb(self.model_info.measure_mem_per_chunk_mb)
-            )
 
         # GPU часть
         right = Table.grid(padding=(0, 1))

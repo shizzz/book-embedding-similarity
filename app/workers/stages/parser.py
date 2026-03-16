@@ -8,7 +8,7 @@ from app.infrastructure.db.repositories import ChunkRepository
 from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Channel, Stages, Dataset
 
 ROUTES = {
-    Action.EMBEDDING: {Stages.EMBEDDING},
+    Action.EMBEDDING: {Stages.TOKENIZER},
     Action.DB: {Stages.DB},
     Action.NONE: set(),
 }
