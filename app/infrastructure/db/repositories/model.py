@@ -41,7 +41,7 @@ class ModelRepository:
             
             return cursor.lastrowid
         
-    def get_latest_uid(self, name: str) -> str:
+    def get_latest_uid(self, name: str) -> tuple[str, str]:
         """
         Возвращает последний uid модели по имени, сортируя по дате создания.
         """
@@ -51,7 +51,7 @@ class ModelRepository:
             # Try to get the first active model
             cursor.execute(
                 """
-                SELECT uid
+                SELECT uid, name
                 FROM models
                 WHERE name = ? AND active = 1
                 ORDER BY uid
@@ -61,12 +61,12 @@ class ModelRepository:
             )
             row = cursor.fetchone()
             if row:
-                return row[0]
+                return row[0], row[1]
             
             # If no active model, return the first one regardless of active status
             cursor.execute(
                 """
-                SELECT uid
+                SELECT uid, name
                 FROM models
                 WHERE active = 1
                 ORDER BY uid
@@ -74,4 +74,4 @@ class ModelRepository:
                 """,
             )
             row = cursor.fetchone()
-            return row[0] if row else None
+            return row[0], row[1] if row else None

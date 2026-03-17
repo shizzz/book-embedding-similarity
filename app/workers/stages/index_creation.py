@@ -14,6 +14,7 @@ class Indexer(BaseQueueWorker[Embedding]):
             self,
             router: DBRouter,
             level: IndexLevel,
+            shape: int,
             name: str = Stages.INDEX,
             *args, 
             **kwargs
@@ -21,12 +22,19 @@ class Indexer(BaseQueueWorker[Embedding]):
         super().__init__(name=f"{name}_{level.value}", *args, **kwargs)
 
         self.level = level
-        self.embedding_dim = None
+        self.embedding_dim = shape
         self.index: faiss.IndexIDMap = None
         self._count: int = 0
 
         self._book_repo = BookRepository(router)
         self._emb_repo = EmbeddingsRepository(router)
+
+        if level == IndexLevel.DOCUMENT:
+            self._get_entity_id = lambda emb: emb.book_id
+        elif level == IndexLevel.CHUNK:
+            self._get_entity_id = lambda emb: FaissId.pack(emb.book_id, emb.id)
+        else:
+            raise TypeError("Unknown index type")
 
     def create_index(self, shape: int):
         base_index = faiss.IndexHNSWFlat(
@@ -40,7 +48,6 @@ class Indexer(BaseQueueWorker[Embedding]):
 
     async def before_start(self):
         if self.index is None:
-            self.embedding_dim = self._emb_repo.get_shape()
             await asyncio.to_thread(self.create_index, self.embedding_dim)
 
     async def process(self, batch: List[Task[Embedding]], wid: int) -> List[Task]:
@@ -48,20 +55,17 @@ class Indexer(BaseQueueWorker[Embedding]):
         vectors = []
         result: List[Task[int]] = []
 
+        vectors_append = vectors.append
+        ids_append = ids.append
+        result_append = result.append
+
         # собираем данные синхронно (быстро)
         for b in batch:
-            vectors.append(b.entity.data)
+            vectors_append(b.entity.data)
+            entity_id = self._get_entity_id(b.entity)
+            ids_append(entity_id)
 
-            if self.level == IndexLevel.DOCUMENT:
-                entity_id = b.entity.book_id
-            elif self.level == IndexLevel.CHUNK:
-                entity_id = FaissId.pack(b.entity.book_id, b.entity.id)
-            else:
-                raise TypeError("Unknown index type")
-
-            ids.append(entity_id)
-
-            result.append(
+            result_append(
                 Task(
                     id=entity_id,
                     name=str(entity_id),
@@ -94,6 +98,7 @@ class Indexer(BaseQueueWorker[Embedding]):
     async def fin(self):
         path = PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level.value}.faiss"
         tmp = path.with_suffix(".tmp")
+        path.parent.mkdir(parents=True, exist_ok=True)
 
         faiss.write_index(self.index, str(tmp))
         tmp.replace(path)

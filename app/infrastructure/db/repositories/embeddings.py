@@ -12,7 +12,7 @@ GET_QUERY_META: str = "SELECT id, book_id, chunk_id, seq, shape, type FROM embed
 class EmbeddingsRepository:
     def __init__(self, router: DBRouter, model_uid: str = None):
         self.router = router
-        self.model_uid = model_uid or ModelRepository(router).get_latest_uid(ProcessConfig.MODEL_NAME)
+        self.model_uid = model_uid or ModelRepository(router).get_latest_uid(ProcessConfig.MODEL_NAME)[0]
 
     def get(self, book_id: int) -> list[Embedding]:
         with self.router.embeddings(self.model_uid) as conn:

@@ -7,6 +7,7 @@ from app.infrastructure.models import Task, Action, Embedding, BookTask, Stages
 class EmbeddingMeger(BaseQueueWorker[BookTask]):
     def __init__(
             self, 
+            shape: int,
             name: str = Stages.MERGER,
             batch_size: int = 100,
             *args, 
@@ -18,15 +19,13 @@ class EmbeddingMeger(BaseQueueWorker[BookTask]):
             *args, 
             **kwargs
         )
+        self.embedding_dim = shape
 
     async def process(self, batch: List[Task[Embedding]], wid: int) -> List[Task]:
         result: List[Task[Embedding]] = []
         grouped: dict[int, list[np.ndarray]] = {}
-        shape = None
 
         for r in batch:
-            if shape is None:
-                shape = r.entity.shape
             vec = r.entity.data
             grouped.setdefault(r.entity.book_id, []).append(vec)
 
@@ -40,7 +39,7 @@ class EmbeddingMeger(BaseQueueWorker[BookTask]):
                 entity=Embedding(
                     book_id=book_id,
                     data=merged,
-                    shape=shape,
+                    shape=self.embedding_dim,
                 ),
                 routes=Action.INDEX
             )

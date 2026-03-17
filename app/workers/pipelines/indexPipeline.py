@@ -1,10 +1,11 @@
 import asyncio
+from app.infrastructure.db.repositories import EmbeddingsRepository
 from app.infrastructure.models import Channel, Stages
 from app.workers.stages import EmbeddingProducer, EmbeddingMeger, Indexer
 from app.settings import IndexLevel
 from .pipeline import Pipeline
 
-THREADS: int = 1
+THREADS: int = 2
 INDEX_THREADS: int = 1
 
 class IndexPipeline(Pipeline):
@@ -16,8 +17,10 @@ class IndexPipeline(Pipeline):
     ):
         super().__init__(name="indexer", *args, **kwargs)
         self.level = level
+        self.shape = EmbeddingsRepository(self._router).get_shape()
 
     async def setup_stages(self) -> None:
+
         emb_channels: list[Channel] = []
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.DOCUMENT:
             emb_channel_document = Channel(Stages.MERGER, asyncio.Queue(maxsize=10000))
@@ -41,6 +44,7 @@ class IndexPipeline(Pipeline):
             merged_channel = Channel(f"{Stages.INDEX}_{IndexLevel.DOCUMENT.value}", asyncio.Queue(10000))
             merge_stage = EmbeddingMeger(
                 batch_size=500,
+                shape=self.shape,
                 input_channel=emb_channel_document,
                 output_channels=[merged_channel],
                 stats=self._stats,
@@ -53,6 +57,7 @@ class IndexPipeline(Pipeline):
                 router=self._router,
                 level=IndexLevel.DOCUMENT,
                 batch_size=5000,
+                shape=self.shape,
                 input_channel=merged_channel,
                 output_channels=self._output_channels,
                 stats=self._stats,
@@ -65,7 +70,8 @@ class IndexPipeline(Pipeline):
             chunk_index_stage = Indexer(
                 router=self._router,
                 level=IndexLevel.CHUNK,
-                batch_size=5000,
+                batch_size=20000,
+                shape=self.shape,
                 input_channel=emb_channel_index,
                 output_channels=self._output_channels,
                 stats=self._stats,
