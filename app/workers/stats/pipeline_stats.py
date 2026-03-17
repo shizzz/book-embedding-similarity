@@ -8,10 +8,17 @@ class PipelineStats(Stats):
         self.edges: dict[tuple[str, str], EdgeStats] = {}
 
     async def register_stage(self, name: str, workers: int = 1, queue_max_size: int = 0):
-        st = StageStats(name, workers)
-        st.queue_max_size = queue_max_size
-        st.start()
-        self.stages[name] = st
+        if name in self.stages:
+            # обновляем существующую стадию
+            st = self.stages[name]
+            st.workers = workers
+            st.queue_max_size = queue_max_size
+        else:
+            # создаём новую стадию
+            st = StageStats(name, workers)
+            st.queue_max_size = queue_max_size
+            st.start()
+            self.stages[name] = st
 
     async def update_stage_info(self, name: str, batch_size: int):
         stage = self.stages.get(name)

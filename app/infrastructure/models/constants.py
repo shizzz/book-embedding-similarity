@@ -13,6 +13,7 @@ class Stages(StrEnum):
     TOKENIZER = "Tokenizer"
     SIMILAR = "Similar"
     INDEX = "Index"
+    CHUNK = "Chunk"
     EMBEDDING = "Embedding"
     DB = "DB"
 
