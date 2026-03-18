@@ -7,6 +7,7 @@ def register_books(subparsers):
     books_subparsers = parser.add_subparsers(dest="command", required=True)
 
     register_generate(books_subparsers)
+    register_anonymize(books_subparsers)
 
 def register_generate(subparsers):
     parser = subparsers.add_parser(
@@ -48,4 +49,17 @@ def register_generate(subparsers):
         "--sections-ratio",
         type=float,
         help="Регулирует деление книги на части. Если target-chars больше чем количество символов книги * sections-ratio, chunks будет занижаться"
+    )
+
+def register_anonymize(subparsers):
+    parser = subparsers.add_parser(
+        "anonymize",
+        help="Обезличивание книги"
+    )
+
+    parser.add_argument(
+        "--path",
+        required=True,
+        type=str,
+        help="путь к книге"
     )
