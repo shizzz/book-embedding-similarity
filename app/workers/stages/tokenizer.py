@@ -1,12 +1,12 @@
 import asyncio
-from typing import List
+from typing import List, Dict
 from collections import defaultdict
 from app.model import Model
 from app.parsers.chunk import ChunkStrategyFactory
 from app.workers.base import BaseQueueWorker
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.infrastructure.models import Task, Action, Chunk, TokenChunk, Stages
+from app.infrastructure.models import Task, Action, Chunk, TokenChunk, Stages, ChunkType
 
 class TokenizerStage(BaseQueueWorker[Chunk]):
     def __init__(
@@ -27,6 +27,12 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
         self._repo = EmbeddingsRepository(router, model.info.uid)
         self._emb_to_chunk_id = self._repo.get_ids()
 
+        factory = ChunkStrategyFactory()
+        self._token_strategies: Dict[ChunkType, any] = {
+            chunk_type: factory.create(chunk_type, self._tokenizer)
+            for chunk_type in ChunkType
+        }
+
     async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[TokenChunk]]:
         chunks = [t.entity for t in batch if t.entity.chunk_id not in self._emb_to_chunk_id]
         if not chunks:
@@ -36,7 +42,7 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
         chunk_seq_counter = defaultdict(int)
 
         for chunk in chunks:
-            strategy = ChunkStrategyFactory().create(chunk.type)
+            strategy = self._token_strategies[ChunkType(chunk.type)]
 
             encoded = await asyncio.to_thread(
                 self._tokenizer,

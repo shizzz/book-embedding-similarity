@@ -372,14 +372,9 @@ class LiveUI(BaseUI):
         left.add_row("Overlap", f"{self.model_info.st_overlap} ({overlap_pct}%)")
 
         batch_style = "green"
-        if self.model_info.st_batch_size > 128:
-            batch_style = "yellow"
-        if self.model_info.st_batch_size > 256:
-            batch_style = "red"
-
         left.add_row(
-            "Batch size",
-            Text(str(self.model_info.st_batch_size), style=batch_style)
+            "Batch tokens",
+            Text(str(self.model_info.tokens_per_batch), style=batch_style)
         )
 
         left.add_row(

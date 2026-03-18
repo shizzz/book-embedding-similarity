@@ -27,10 +27,10 @@ class EmbeddingPipeline(Pipeline):
 
     async def setup_stages(self) -> None:
         channel_tokenizer: Channel = None
-        channel_emb = Channel(Stages.EMBEDDING, asyncio.Queue(100))
+        channel_emb = Channel(Stages.EMBEDDING, asyncio.Queue(10))
         
         if self._input_channel is None:
-            channel_tokenizer = Channel(Stages.TOKENIZER, asyncio.Queue(100))
+            channel_tokenizer = Channel(Stages.TOKENIZER, asyncio.Queue(10))
             chunk_stage = DbChunkProducer(
                 router=self._router,
                 output_channels=[channel_tokenizer],

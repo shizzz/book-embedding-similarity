@@ -35,23 +35,116 @@ class EmbeddingWorker(BaseQueueWorker):
         self._repo = EmbeddingsRepository(router, model.info.uid)
         self._emb_id = self._repo.get_max_id()       
         self._emb_id_lock = asyncio.Lock()
-        self._current_batch_size = int(self._transformer_batch_size)
+
+        self._vram_increasing = True
+        self._vram_increase_iter: int = 0
+        self._tokens_lock = asyncio.Lock()
+
+    @staticmethod
+    def batch_char_limit(chars: int, batch: int) -> int:
+        return int(chars * batch)
+
+    def _batch_char_limit(self):
+        return EmbeddingWorker.batch_char_limit(
+            self._model.info.tokens_per_batch, 
+            self.batch_size
+        )
 
     async def process(self, batch: List[Task[TokenChunk]], wid: int) -> List[Task[Embedding]] | None:
         chunks = [t.entity for t in batch]
         if not chunks:
             return None
 
-        # embeddings делаем на GPU напрямую
-        embeddings = await asyncio.to_thread(self._embedding_process, chunks)
+        embeddings = await self._adaptive_embedding_process(chunks)
         return await self._assign_embeddings(embeddings, chunks)
     
-    @staticmethod
-    def batch_char_limit(chars: int, batch: int) -> int:
-        return int(chars * batch)
+    async def _adaptive_embedding_process(self, batch: List[TokenChunk]) -> np.ndarray:
+        divider = 1
 
-    def _batch_char_limit(self):
-        return EmbeddingWorker.batch_char_limit(self._model.info.tokens_per_batch, self.batch_size)
+        while True:
+            try:
+                # делим батч
+                if divider > 1:
+                    split_batches = np.array_split(batch, divider)
+                    results = []
+                    for sub in split_batches:
+                        if len(sub) == 0:
+                            continue
+                        result = await asyncio.to_thread(self._embedding_process, list(sub))
+                        results.append(result)
+                    embeddings = np.vstack(results)
+                else:
+                    embeddings = await asyncio.to_thread(self._embedding_process, batch)
+
+                # успех — проверяем VRAM
+                if self._vram_increasing:
+                    await self._increase_tokens(sum([chunk.length for chunk in batch]))
+
+                return embeddings
+
+            except RuntimeError as e:
+                if "out of memory" not in str(e).lower():
+                    raise
+                torch.cuda.empty_cache()
+
+                divider += 1
+
+                # уменьшаем tokens_per_batch
+                await self._decrease_tokens(sum([chunk.length for chunk in batch]))
+
+                # защита от бесконечного деления
+                if divider > len(batch):
+                    raise RuntimeError("Batch cannot be split further — still OOM")   
+
+    async def _decrease_tokens(self, current_tokens: int):
+        async with self._tokens_lock:
+            if self._model.info.tokens_per_batch <= 1:
+                return
+
+            self._vram_increasing = False
+
+            free = self._model.info.free_vram_mb
+            total = self._model.info.total_vram_mb
+            free_ratio = free / total
+
+            new_val = int(self._model.info.tokens_per_batch * 0.98)
+            new_val = max(1, new_val)
+
+            current_length = self._model.info.tokens_per_batch
+            self._model.info.tokens_per_batch = new_val
+
+            self.logger.warning(
+                    f"OOM with batch {current_tokens} tokens. Decreasing tokens_per_batch: {current_length} -> {new_val} "
+                    f"(free VRAM: {free}MB / {total}MB, ratio: {free_ratio:.2f})"
+                )
+
+    async def _increase_tokens(self, current_length: int):
+        async with self._tokens_lock:
+            self._vram_increase_iter += 1
+            if self._vram_increase_iter < 10:
+                return
+            
+            free = self._model.info.free_vram_mb
+            total = self._model.info.total_vram_mb
+
+            if not free or not total:
+                return
+
+            free_ratio = free / total
+
+            # только если свободной памяти достаточно
+            if free_ratio > self._model.info.free_vram_ratio:
+                # расчет безопасного увеличения с учетом текущего батча
+                proposed = int(self._model.info.tokens_per_batch * 1.01)
+                max_safe = max(current_length, proposed)  # не меньше текущего
+                self._model.info.tokens_per_batch = max_safe
+                self._vram_increase_iter = 0
+                self.logger.info(
+                    f"Increasing tokens_per_batch: {current_length} -> {max_safe} "
+                    f"(free VRAM: {free}MB / {total}MB, ratio: {free_ratio:.2f})"
+                )
+            else:
+                self._vram_increasing = False
 
     @staticmethod
     def _mean_pooling(last_hidden_state, attention_mask):
@@ -63,7 +156,6 @@ class EmbeddingWorker(BaseQueueWorker):
     def _embedding_process(self, batch: List[TokenChunk]) -> np.ndarray:
         model = self._model.model
         tokenizer = self._model.tokenizer
-        dtype = self._model.dtype
 
         max_len = max(len(tc.tokens) for tc in batch)
 

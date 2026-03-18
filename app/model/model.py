@@ -7,9 +7,8 @@ from app.settings import PathsConfig, ProcessConfig
 
 class Model:
     MODEL_DIR = "models"
-    TOKEN_TO_CHAR = 5 #: ~token count for one char
-    OVERLAP_RATIO = 0.12 #: How much text to connect embeddings
-    VRAM_USAGE_RATIO = 1 #: Max memory to fill with chunks
+    OVERLAP_RATIO = 0.1 #: How much text to connect embeddings
+    VRAM_USAGE_RATIO = 0.95 #: Max memory to fill with chunks
     DEFAULT_BATCH = 8 #: CPU Batch Size
 
     def __init__(self, threads):
@@ -52,9 +51,11 @@ class Model:
         self.info.st_overlap = int(self.info.max_seq_length * self.OVERLAP_RATIO)
         self.info.uid = self._get_model_uid()
         self.info.model_name = self.name
-        self.info.estimate_mem_per_token_mb = self._estimate_mem_per_token_mb()
         self.info.st_chunk_size = self.info.max_seq_length
         self.info.cuda_available = torch.cuda.is_available()
+        self.info.vram_usage_ratio = self.VRAM_USAGE_RATIO
+        self.info.free_vram_ratio = 1 - self.VRAM_USAGE_RATIO
+        self.info.estimate_mem_per_token_mb = self._estimate_mem_per_token_mb()
 
         batch_size = None
 
@@ -65,10 +66,9 @@ class Model:
             self.info.cuda_version = cuda_version
             self.info.gpu_count = gpu_count
             self.info.gpu_name = gpu_name
-            mem_per_token = self.info.estimate_mem_per_token_mb
 
-            self.info.tokens_per_batch = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / (mem_per_token * self._threads)))
-            batch_size = max(1, int(self.info.free_vram_mb * self.VRAM_USAGE_RATIO / (mem_per_token * self.info.max_seq_length * self._threads)))
+            max_tokens_total = self.info.free_vram_mb // self.info.estimate_mem_per_token_mb
+            self.info.tokens_per_batch = max(1, int(max_tokens_total // self._threads))
 
         self.info.st_batch_size = batch_size or self.DEFAULT_BATCH
 
@@ -119,6 +119,9 @@ class ModelInfo:
     st_batch_size: int = None
     estimate_mem_per_token_mb: int = None
     tokens_per_batch: int = None
+    vram_usage_ratio: float = 0
+    free_vram_ratio: float = 0
+
     _free_vram_cache: int = None
     _total_vram_mb: int = None
 

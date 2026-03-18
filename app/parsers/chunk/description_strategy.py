@@ -19,16 +19,6 @@ class DescriptionStrategy(ChunkStrategy):
         # если текст меньше max_tokens
         if n <= max_tokens:
             return [self.prefix_tokens + tokens]
-
-        step = max_tokens - overlap
-        chunks = []
-        for start in range(0, n, step):
-            end = min(start + max_tokens, n)
-            sub_tokens = tokens[start:end]
-
-            if len(sub_tokens) < min_tokens and not single_chunk_mode:
-                continue
-
-            chunks.append(self.prefix_tokens + sub_tokens)
-
-        return chunks
+        else:
+            sub_tokens = tokens[0:max_tokens - len(self.prefix_tokens)]
+            return [self.prefix_tokens + sub_tokens]
