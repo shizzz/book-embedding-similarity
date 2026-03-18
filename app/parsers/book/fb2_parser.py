@@ -166,12 +166,6 @@ class FB2BookParser(BookParser):
     def extract_chunks(
         self,
         root: any,
-        target_chars: int = ChunkingConfig.ST_TARGET_CHARS,
-        min_chars: int = ChunkingConfig.ST_MIN_CHARS,
-        max_description_chars: int = ChunkingConfig.ST_MAX_DESCRIPTION_CHARS,
-        sections: int = ChunkingConfig.CHUNKS_PER_BOOK,
-        prefix_buffer: int = ChunkingConfig.PREFIX_BUFFER,
-        sections_ratio: float = ChunkingConfig.SECTIONS_RATIO,
     ) -> tuple[list[Chunk], int]:
         paragraphs = self._extract_paragraphs(root)
         if not paragraphs:
@@ -182,24 +176,24 @@ class FB2BookParser(BookParser):
         title_chunk = self.get_title(root)
         if title_chunk:
             chunks.append(Chunk(text=title_chunk, type=ChunkType.TITLE))
-        desc_chunk = self._get_description_chunk(root, max_description_chars)
+        desc_chunk = self._get_description_chunk(root, self.max_description_chars)
         if desc_chunk:
             chunks.append(desc_chunk)
 
         total_chars = sum(len(p)+2 for p in paragraphs)
 
-        chunk_size, chunk_targets = self._compute_chunks_targets(paragraphs, sections_ratio, total_chars, target_chars, sections)
+        chunk_size, chunk_targets = self._compute_chunks_targets(paragraphs, self.sections_ratio, total_chars, self.target_chars, self.sections)
         used = set()
 
         for idx in chunk_targets:
-            chunk = self._build_chunk_around_target(paragraphs, idx, used, chunk_size, prefix_buffer)
+            chunk = self._build_chunk_around_target(paragraphs, idx, used, chunk_size, self.prefix_buffer)
             if chunk:
                 if len(chunk.text) < chunk_size * 0.5 and chunks:
                     # attach to previous
                     prev = chunks[-1]
                     if prev.type == ChunkType.TEXT:
                         prev.text = prev.text.rstrip() + "\n\n" + chunk.text
-                if len(chunk.text) < min_chars:
+                if len(chunk.text) < self.min_chars:
                     continue
                 else:
                     chunks.append(chunk)
@@ -210,9 +204,9 @@ class FB2BookParser(BookParser):
         if text_chunk_total == 0 and paragraphs:
             all_text = "\n\n".join(paragraphs)
 
-            if len(all_text) >= min_chars:  
-                if len(all_text) > target_chars:
-                    all_text = all_text[:target_chars]
+            if len(all_text) >=self. min_chars:  
+                if len(all_text) > self.target_chars:
+                    all_text = all_text[:self.target_chars]
 
                 chunks.append(
                     Chunk(

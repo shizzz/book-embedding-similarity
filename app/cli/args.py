@@ -1,5 +1,6 @@
 import argparse
 
+from .books.parser import register_books
 from .embedding.parser import register_embedding
 from .similar.parser import register_similar
 from .index.parser import register_index
@@ -13,6 +14,7 @@ def get_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="entity", required=True)
 
+    register_books(subparsers)
     register_embedding(subparsers)
     register_similar(subparsers)
     register_index(subparsers)

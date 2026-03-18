@@ -5,6 +5,9 @@ def main():
     args = get_args()
 
     # Обработка команд
+    if args.entity == "books":
+        from app.cli.books import run
+        run(args)
     if args.entity == "embedding":
         from app.cli.embedding import run
         run(args)

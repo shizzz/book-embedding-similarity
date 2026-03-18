@@ -2,7 +2,7 @@ import asyncio
 from typing import List
 from app.searchEngines.bookSearch import BaseBookSearchEngine
 from app.workers.base import BaseQueueWorker
-from app.parsers.book import BookParserFactory
+from app.parsers.book import BookParserFactory, ParserConfig
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import ChunkRepository
 from app.infrastructure.models import Task, Book, BookTask, Chunk, Action, Channel, Stages, Dataset
@@ -18,6 +18,7 @@ class Parser(BaseQueueWorker[BookTask]):
             self, 
             router: DBRouter,
             search_engine: BaseBookSearchEngine,
+            cnf: ParserConfig,
             name: str = Stages.PARSER,
             *args, 
             **kwargs
@@ -29,6 +30,7 @@ class Parser(BaseQueueWorker[BookTask]):
         self._chunk_id = self._repo.get_max_id()
         self._chunk_id_lock = asyncio.Lock()
         self._chunk_to_book_id = self._repo.get_ids()
+        self._parser_cnf = cnf
 
     async def process(self, batch: List[Task[BookTask]], wid: int) -> List[Task]:
         result: List[Task] = []
@@ -40,7 +42,10 @@ class Parser(BaseQueueWorker[BookTask]):
             chunks: List[Chunk] = []
 
             if task.entity.data:
-                parser = BookParserFactory.create_parser(book.file_name)
+                parser = BookParserFactory.create_parser(
+                    book.file_name,
+                    cnf=self._parser_cnf
+                )
                 parsed = parser.parse(task.entity.data)
                 chunks = parsed.chunks
                 Book.merge_from(book, parsed.book)

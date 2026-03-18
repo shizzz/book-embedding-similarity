@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from app.parsers.book import ParserConfig
 from app.workers.pipelines import BookScanPipeline, EmbeddingPipeline, DbPipeline
 from app.workers.base import BaseWorker
 from app.workers.sources.databaseReporter import DatabaseReporter
@@ -20,6 +21,7 @@ class GenerateAll(BaseWorker):
         book_pipeline = BookScanPipeline(
             router=self.router,
             registry=self.registry,
+            cnf=ParserConfig(),
             stats=self.stats,
             logger=self.logger,
             output_channels = [channel_db, channel_tokens],

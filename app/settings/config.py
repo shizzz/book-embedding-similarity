@@ -66,12 +66,12 @@ class ProcessConfig:
 # ==========================
 @dataclass(frozen=True)
 class ChunkingConfig:
-    CHUNKS_PER_BOOK=int(os.getenv("CHUNKS_PER_BOOK", 7))  #: Целевое количество частей на книгу
+    CHUNKS_PER_BOOK=int(os.getenv("CHUNKS_PER_BOOK", 9))  #: Целевое количество частей на книгу
     PREFIX_BUFFER=int(os.getenv("PREFIX_BUFFER", 15))  #: Размер префикса для генерации
     ST_MIN_CHARS=int(os.getenv("ST_MIN_CHARS", 250))  #: Минимальная длина части книги
-    ST_TARGET_CHARS=int(os.getenv("ST_TARGET_CHARS", 24000))  #: Целевое суммарное количество символов всех частей книги
+    ST_TARGET_CHARS=int(os.getenv("ST_TARGET_CHARS", 16000))  #: Целевое суммарное количество символов всех частей книги
     ST_MAX_TITLE_CHARS=int(os.getenv("ST_MAX_TITLE_CHARS", 300))  #: Максимальное количество символов названия книги
-    ST_MAX_DESCRIPTION_CHARS=int(os.getenv("ST_MAX_DESCRIPTION_CHARS", 4000))  #: Максимальное количество символов описания книги
+    ST_MAX_DESCRIPTION_CHARS=int(os.getenv("ST_MAX_DESCRIPTION_CHARS", 1800))  #: Максимальное количество символов описания книги
     SECTIONS_RATIO=float(os.getenv("SECTIONS_RATIO", 0.6))  #: Регулирует деление книги на части. Если ST_TARGET_CHARS больше чем количество символов книги * SECTIONS_RATIO, CHUNKS_PER_BOOK будет занижаться  
     #: Участвует в поиске по индексу
     #: Если нам нужно получить 100 результатов, это означает, что в индексе нужно найти больше значений

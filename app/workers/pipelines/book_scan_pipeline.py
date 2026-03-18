@@ -1,5 +1,6 @@
 import asyncio
 from typing import List
+from app.parsers.book import ParserConfig
 from app.infrastructure.db import Migrator, DBRouter
 from app.infrastructure.db.repositories import BookRepository, ChunkRepository, AuthorRepository
 from app.infrastructure.models import Channel, Stages, Dataset, Book, Chunk, BookSearchEngineType
@@ -13,13 +14,16 @@ CHUNK_THREADS: int = 4
 class BookScanPipeline(Pipeline):
     def __init__(
         self,
+        cnf: ParserConfig,
         *args, 
         **kwargs
     ):
-        super().__init__(name="embeddings", *args, **kwargs)
+        super().__init__(name="book scanner", *args, **kwargs)
 
         self.search_engine = BookSearchEngineFactory().create(BookSearchEngineType.INPIX, self._stats)
         Migrator(self._router).migrate_all([])
+
+        self._cnf = cnf
 
     async def setup_stages(self) -> None:
         channel_book = Channel(Stages.PARSER, asyncio.Queue(maxsize=50))
@@ -39,8 +43,9 @@ class BookScanPipeline(Pipeline):
         parser_stage = Parser(
             router=self._router,
             search_engine=self.search_engine,
+            cnf=self._cnf,
             input_channel=channel_book,
-            output_channels=[*self._output_channels],
+            output_channels=[*(self._output_channels or [])],
             stats=self._stats,
             batch_size=64,
             workers=CHUNK_THREADS,
