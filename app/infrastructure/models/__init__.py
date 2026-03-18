@@ -6,7 +6,7 @@ from .similar import Similar
 from .embedding import Embedding
 from .embeddingCache import EmbeddingCache
 from .chunk import Chunk
-from .constants import ChunkType, Stages, BookSearchEngineType, SimilarSearchEngineType
+from .constants import ChunkType, Stages, BookSearchEngineType, SimilarSearchEngineType, SearchIndexLevel
 from .report import Report
 from .stage_stats import StageStats
 from .channel import Channel
@@ -39,6 +39,7 @@ __all__ = [
     "Stages",
     "BookSearchEngineType",
     "SimilarSearchEngineType",
+    "SearchIndexLevel",
     "ParseResult",
     "SearchResult",
     "TokenChunk"

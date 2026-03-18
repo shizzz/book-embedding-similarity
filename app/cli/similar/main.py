@@ -6,4 +6,8 @@ def run(args):
     if args.command == "generate":
         generate(args)
     elif args.command == "get":
-        asyncio.run(get(args.mode, args.file))
+        asyncio.run(get(
+            mode=args.mode, 
+            level=args.level, 
+            top=args.top, 
+            file=args.file))

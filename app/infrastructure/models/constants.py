@@ -31,3 +31,10 @@ class SimilarSearchEngineType(StrEnum):
 
     def __str__(self):
         return self.name
+
+class SearchIndexLevel(StrEnum):
+    CHUNK = "chunk"  #: выполняем поиск каждого куска отдельно
+    DOCUMENT = "document"  #: сливаем куски в один
+
+    def __str__(self):
+        return self.name

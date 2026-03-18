@@ -2,31 +2,36 @@ import asyncio
 from typing import List, Tuple
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import SimilarRepository
-from app.infrastructure.models import Channel, Stages, BookSearchEngineType, SimilarSearchEngineType, BatchTask, Dataset
+from app.infrastructure.models import Channel, Stages, BookSearchEngineType, SimilarSearchEngineType, BatchTask, Dataset, SearchIndexLevel
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
-from app.workers.stages import BookProducer, SimilarStage, DbWorker
+from app.workers.stages import BookProducer, SimilarStage
 from .pipeline import Pipeline
 
-THREADS: int = 1
-TOP_K: int = 100
-EXCLUDE_SAME_AUTHOR: bool = False
+THREADS: int = 2
 SEARCH_BATCH_SIZE: int = 100
-DB_BATCH_SIZE: int = 1000
 
 class SimilarSearchPipeline(Pipeline):
     def __init__(
         self,
+        level: SearchIndexLevel,
+        top_k: int,
+        exclude_same_authors: bool,
         *args, 
         **kwargs
     ):
         super().__init__(name="similar", *args, **kwargs)
-        self.book_search_engine = BookSearchEngineFactory().create(BookSearchEngineType.DB, self._stats, self._router)
+        self.book_search_engine = BookSearchEngineFactory().create(
+            BookSearchEngineType.DB,
+            self._stats,
+            self._router
+        )
         self.similar_search_engine = SimilarSearchEngineFactory.create(
             mode=SimilarSearchEngineType.INDEX,
             router=self._router,
-            limit=TOP_K,
-            exclude_same_authors=EXCLUDE_SAME_AUTHOR,
+            limit=top_k,
+            exclude_same_authors=exclude_same_authors,
+            level=level,
             logger=self._logger,
         )
 

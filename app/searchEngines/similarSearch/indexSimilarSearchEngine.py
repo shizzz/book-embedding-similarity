@@ -2,10 +2,9 @@ import numpy as np
 from collections import defaultdict
 from faiss import IndexIDMap
 from typing import List
-from .similarSearchEngine import SimilarSearchEngine
-from app.settings import SearchIndexLevel
 from app.hnsw import FaissId
-from app.infrastructure.models import ChunkType, SearchResult
+from app.infrastructure.models import ChunkType, SearchResult, SearchIndexLevel
+from .similarSearchEngine import SimilarSearchEngine
 
 class IndexSimilarSearchEngine(SimilarSearchEngine):
     def __init__(self, document_index: IndexIDMap, chunk_index: IndexIDMap, level: SearchIndexLevel, *args, **kwargs):
@@ -98,7 +97,6 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
 
         k_chunks = int(
             desired_books *
-            self.avg_chunks_per_book *
             self.overfetch_factor
         )
 

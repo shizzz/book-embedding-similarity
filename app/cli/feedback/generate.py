@@ -1,9 +1,14 @@
-from typing import Optional, List
+import logging
 import openai
+from typing import Optional, List
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
 from app.infrastructure.models import Book
 from app.settings import OtherConfig
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 router = DBRouter()
 
@@ -42,6 +47,8 @@ def run(args):
             if label not in (None, 0):
                 score = label if label == -1 else label / 100
                 save_feedback(source_book.id, candidate_id, score)
+            elif label is None:
+                return
             
         except Exception as e:
             print(f"  Ошибка обработки: {e}")
@@ -89,7 +96,8 @@ def generate_feedback_prompt(source_book: Book, candidate_book: Book) -> str:
 def call_chatgpt(prompt: str) -> int | None:
     client = openai.OpenAI(
         api_key=OtherConfig.OPENAI_API_KEY,
-        base_url="https://api.chatanywhere.tech/v1"
+        base_url="https://api.chatanywhere.tech/v1",
+        timeout=60.0,
     )
     
     try:  

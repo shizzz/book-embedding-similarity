@@ -1,6 +1,7 @@
 import time
 import logging
 from typing import List, Tuple
+from app.infrastructure.models.constants import SearchIndexLevel
 from app.searchEngines.similarSearch import SimilarSearchEngineFactory
 from app.services import SimilarSearchService
 from app.infrastructure.db import DBRouter
@@ -33,9 +34,13 @@ def print_similar_books(
 
         print(f"{percent:6.2f},{i},{similar.candidate.file_name},{similar.candidate.title},{similar.candidate.author},{url}")
 
-async def run(mode: str, file: str):
+async def run(
+    mode: str,
+    file: str,
+    level: SearchIndexLevel,
+    top: int = 100,
+):
     start = time.perf_counter()
-    limit: int = 100
     router = DBRouter()
 
     book_task = BookRepository(router).get_full_by_file(file)
@@ -44,13 +49,14 @@ async def run(mode: str, file: str):
         print(f"Книга {file} не найдена в реестре")
         return
         
-    print(f"Поиск TOP({limit}) книг похожих на \"{book_task.title}\" {book_task.file_name}")
+    print(f"Поиск TOP({top}) книг похожих на \"{book_task.title}\" {book_task.file_name}")
 
     def run_service(mode: str):
         engine = SimilarSearchEngineFactory.create(
             mode=mode,
             router=router,
-            limit=limit, 
+            limit=top,
+            level=level,
             exclude_same_authors=True,
             logger=logger
         )

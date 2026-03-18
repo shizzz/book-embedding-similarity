@@ -11,10 +11,6 @@ class IndexLevel(str, Enum):
     DOCUMENT = "document" #: при создании индекса, сливаем все текстовые куски в один mean вектор
     BOTH = "both"  #: генерировать оба
 
-class SearchIndexLevel(str, Enum):
-    CHUNK = "chunk"  #: выполняем поиск каждого куска отдельно
-    DOCUMENT = "document"  #: сливаем куски в один
-
 class KnownModels(str, Enum):
     all_MiniLM_L6_v2 = "all-MiniLM-L6-v2"  #: Очень плохой результат, но хорошо для тестов
     multilingual_e5_base = "intfloat/multilingual-e5-base"  #: Теоретически оптимальный вариант
@@ -78,7 +74,7 @@ class ChunkingConfig:
     #: Поскольку часть просто отфильтруется
     #: Еще часть отфильтрует ML
     #: Чем хуже ембеддинг, тем больше у нас нагрузка на ML и тем больше должен быть OVERFETCH_FACTOR
-    OVERFETCH_FACTOR=float(os.getenv("OVERFETCH_FACTOR", 25))  #: Количество найденных элементов больше, чем нужно, для фильтра
+    OVERFETCH_FACTOR=float(os.getenv("OVERFETCH_FACTOR", 10))  #: Количество найденных элементов больше, чем нужно, для фильтра
 
 # ==========================
 # ==== INDEX CONFIG ========
@@ -86,7 +82,6 @@ class ChunkingConfig:
 @dataclass(frozen=True)
 class IndexConfig:
     BUILD_INDEX_LEVEL:IndexLevel=os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()  #: Тип создаваемого индекса
-    SEARCH_INDEX_LEVEL:SearchIndexLevel=os.getenv("SEARCH_INDEX_LEVEL", SearchIndexLevel.CHUNK.value).lower()  #: Тип создаваемого индекса
     HNSW_MMAP=bool(os.getenv("HNSW_MMAP", False))  #: Не загружаем индекс в память, читаем с диска
     HNSW_M=int(os.getenv("HNSW_M", 32))  #: Максимальное количество связей (соседей) на уровне графа
     HNSW_EF_CONSTRUCTION=int(os.getenv("HNSW_EF_CONSTRUCTION", 200))  #: Размер списка кандидатов при построении графа

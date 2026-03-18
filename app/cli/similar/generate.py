@@ -1,10 +1,15 @@
 import asyncio
 from app.workers import GenerateSimilarWorker
+from app.infrastructure.models.constants import SearchIndexLevel
 
 def run(args):
-    batch_size = int(args.batch or 10)
-    db_queue_batch_size = 20000
-    queue_size = 0
+    level = args.level or SearchIndexLevel.CHUNK
+    top = args.top or 100
+    exclude_same_authors = args.exclude_same_authors or True
 
-    worker = GenerateSimilarWorker(None)
+    worker = GenerateSimilarWorker(
+        level=level,
+        top_k=top,
+        exclude_same_authors=exclude_same_authors,
+    )
     asyncio.run(worker.run())

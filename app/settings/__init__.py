@@ -1,4 +1,4 @@
-from .config import PathsConfig, ProcessConfig, ChunkingConfig, IndexConfig, OtherConfig, IndexLevel,  SearchIndexLevel
+from .config import PathsConfig, ProcessConfig, ChunkingConfig, IndexConfig, OtherConfig, IndexLevel
 
 __all__ = [
     "PathsConfig",
@@ -6,6 +6,5 @@ __all__ = [
     "ChunkingConfig",
     "IndexConfig",
     "OtherConfig",
-    "IndexLevel",
-    "SearchIndexLevel"
+    "IndexLevel"
 ]
