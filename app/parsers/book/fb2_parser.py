@@ -111,50 +111,50 @@ class FB2BookParser(BookParser):
 
         while current_len < chunk_size and (left >= 0 or right < total_paragraphs):
             added = False
+
+            # внутренняя функция для безопасного добавления параграфа
+            def add_paragraph(idx, direction):
+                nonlocal current_len, added
+                if idx in used:
+                    return
+                p = paragraphs[idx]
+                space_left = chunk_size - current_len - prefix_buffer
+                if space_left <= 0:
+                    return
+                if len(p) > space_left:
+                    # срезаем по словам
+                    cutoff = p.rfind(" ", 0, space_left)
+                    if cutoff <= 0:
+                        cutoff = space_left  # если пробела нет, просто обрезаем по символам
+                    current_chunk.append(p[:cutoff].rstrip())
+                    current_len += len(current_chunk[-1]) + 2
+                    used.add(idx)
+                    added = True
+                    return True  # больше не добавляем с этой стороны
+                else:
+                    current_chunk.append(p)
+                    current_len += len(p) + 2
+                    used.add(idx)
+                    added = True
+                    if direction == "left":
+                        return "left"
+                    else:
+                        return "right"
+
             # левый параграф
-            if left >= 0 and left not in used:
-                p = paragraphs[left]
-                space_left = chunk_size - current_len - prefix_buffer
-                if space_left <= 0:
+            if left >= 0:
+                stop = add_paragraph(left, "left")
+                if stop == True:
                     break
-                if len(p) > space_left:
-                    cutoff = p.rfind(" ", 0, space_left)
-                    if cutoff > 0:
-                        current_chunk.append(p[:cutoff])
-                        current_len += cutoff + 2
-                    else:
-                        current_chunk.append(p)
-                        current_len += len(p) + 2
-                    used.add(left)
-                    break
-                else:
-                    current_chunk.append(p)
-                    current_len += len(p) + 2
-                    used.add(left)
-                    left -= 1
-                    added = True
+                left -= 1
+
             # правый параграф
-            if right < total_paragraphs and right not in used:
-                p = paragraphs[right]
-                space_left = chunk_size - current_len - prefix_buffer
-                if space_left <= 0:
+            if right < total_paragraphs:
+                stop = add_paragraph(right, "right")
+                if stop == True:
                     break
-                if len(p) > space_left:
-                    cutoff = p.rfind(" ", 0, space_left)
-                    if cutoff > 0:
-                        current_chunk.append(p[:cutoff])
-                        current_len += cutoff + 2
-                    else:
-                        current_chunk.append(p)
-                        current_len += len(p) + 2
-                    used.add(right)
-                    break
-                else:
-                    current_chunk.append(p)
-                    current_len += len(p) + 2
-                    used.add(right)
-                    right += 1
-                    added = True
+                right += 1
+
             if not added:
                 break
 
