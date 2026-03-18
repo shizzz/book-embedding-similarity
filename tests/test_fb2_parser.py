@@ -1,12 +1,20 @@
 import unittest
 from pathlib import Path
 from lxml import etree
+from app.parsers.book import ParserConfig
 from app.parsers.book.fb2_parser import FB2BookParser
 from app.infrastructure.models import ChunkType
-from app.settings import ChunkingConfig
 
 DATA_DIR = Path(__file__).parent / "data"
 
+cnf = ParserConfig(
+   sections=9,
+   max_description_chars=2000,
+   min_chars=250,
+   prefix_buffer=15,
+   sections_ratio=0.6,
+   target_chars=24000
+)
 
 class TestFB2BookParser(unittest.TestCase):
     def _build_root(self, xml: bytes):
@@ -29,7 +37,7 @@ class TestFB2BookParser(unittest.TestCase):
         </FictionBook>
         """
         root = self._build_root(xml)
-        parser = FB2BookParser(filepath="dummy.fb2")
+        parser = FB2BookParser(filepath="dummy.fb2", cnf=cnf)
 
         paragraphs = parser._extract_paragraphs(root)
 
@@ -58,7 +66,7 @@ class TestFB2BookParser(unittest.TestCase):
         """.encode("utf-8")
 
         root = self._build_root(xml)
-        parser = FB2BookParser(filepath="dummy.fb2")
+        parser = FB2BookParser(filepath="dummy.fb2", cnf=cnf)
 
         max_chars = 40
         chunk = parser._get_description_chunk(root, max_description_chars=max_chars)
@@ -75,7 +83,7 @@ class TestFB2BookParser(unittest.TestCase):
         with fb2_path.open("rb") as f:
             data = f.read()
 
-        parser = FB2BookParser(filepath=str(fb2_path))
+        parser = FB2BookParser(filepath=str(fb2_path), cnf=cnf)
         parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
@@ -107,7 +115,7 @@ class TestFB2BookParser(unittest.TestCase):
         with fb2_path.open("rb") as f:
             data = f.read()
 
-        parser = FB2BookParser(filepath=str(fb2_path))
+        parser = FB2BookParser(filepath=str(fb2_path), cnf=cnf)
         parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
@@ -131,7 +139,7 @@ class TestFB2BookParser(unittest.TestCase):
         with fb2_path.open("rb") as f:
             data = f.read()
 
-        parser = FB2BookParser(filepath=str(fb2_path))
+        parser = FB2BookParser(filepath=str(fb2_path), cnf=cnf)
         parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
@@ -162,7 +170,7 @@ class TestFB2BookParser(unittest.TestCase):
         with fb2_path.open("rb") as f:
             data = f.read()
 
-        parser = FB2BookParser(filepath=str(fb2_path))
+        parser = FB2BookParser(filepath=str(fb2_path), cnf=cnf)
         parsed = parser.parse(data)
 
         # file_name should be set to the original filepath
@@ -176,7 +184,7 @@ class TestFB2BookParser(unittest.TestCase):
 
         # Chunks and text length should be populated
         self.assertIsNotNone(parsed.chunks)
-        self.assertGreaterEqual(len(parsed.chunks), 2 + ChunkingConfig.CHUNKS_PER_BOOK)
+        self.assertGreaterEqual(len(parsed.chunks), 2 + cnf.sections)
         types = {c.type for c in parsed.chunks}
         self.assertIn(ChunkType.TITLE, types)
         self.assertIn(ChunkType.DESCRIPTION, types)
@@ -184,12 +192,52 @@ class TestFB2BookParser(unittest.TestCase):
         self.assertGreater(parsed.book.text_length, 0)
 
         total_length  = 0
-        target_chunk_length = int(ChunkingConfig.ST_TARGET_CHARS * 0.95 / ChunkingConfig.CHUNKS_PER_BOOK)
+        bottom_limit = int(cnf.target_chars * 0.95 / cnf.sections)
+        top_limit = int(cnf.target_chars * 1.05 / cnf.sections)
         for chunk in parsed.chunks:
           if chunk.type == ChunkType.TEXT:
             total_length  += chunk.length
-            self.assertGreater(chunk.length, target_chunk_length)
-        self.assertGreater(total_length, ChunkingConfig.ST_TARGET_CHARS * 0.95)
+            self.assertGreater(chunk.length, bottom_limit)
+            self.assertLess(chunk.length, top_limit)
+        self.assertGreater(total_length, cnf.target_chars * 0.95)
+            
+    def test_book_with_long_p(self):
+        fb2_path = DATA_DIR / "193976.fb2"
+        self.assertTrue(fb2_path.is_file(), f"FB2 test file not found: {fb2_path}")
+
+        with fb2_path.open("rb") as f:
+            data = f.read()
+
+        parser = FB2BookParser(filepath=str(fb2_path), cnf=cnf)
+        parsed = parser.parse(data)
+
+        # file_name should be set to the original filepath
+        self.assertTrue(str(parsed.book.file_name).endswith("193976.fb2"))
+
+        # Metadata from the real FB2 file
+        self.assertEqual(parsed.book.title, "янeYhgjI pZAиюдбчfRu oDпyNAf")
+        self.assertEqual(parsed.book.uid, "ъфцмсsyI-vпйM-ёUзP-zSFm-аVndoWхkHеon")
+        self.assertEqual(parsed.book.authors, ["R.ё. dлyюVHчy"])
+        self.assertEqual(parsed.book.author, "R.ё. dлyюVHчy")
+
+        # Chunks and text length should be populated
+        self.assertIsNotNone(parsed.chunks)
+        self.assertGreaterEqual(len(parsed.chunks), 2 + cnf.sections)
+        types = {c.type for c in parsed.chunks}
+        self.assertIn(ChunkType.TITLE, types)
+        self.assertIn(ChunkType.DESCRIPTION, types)
+        self.assertIsNotNone(parsed.book.text_length)
+        self.assertGreater(parsed.book.text_length, 0)
+
+        total_length  = 0 
+        bottom_limit = int(cnf.target_chars * 0.95 / cnf.sections)
+        top_limit = int(cnf.target_chars * 1.05 / cnf.sections)
+        for chunk in parsed.chunks:
+          if chunk.type == ChunkType.TEXT:
+            total_length  += chunk.length
+            self.assertGreater(chunk.length, bottom_limit)
+            self.assertLess(chunk.length, top_limit)
+        self.assertGreater(total_length, cnf.target_chars * 0.95)
             
 if __name__ == "__main__":
     unittest.main()

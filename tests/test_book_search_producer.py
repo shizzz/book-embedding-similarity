@@ -81,7 +81,7 @@ class TestBookProducer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([t.name for t in produced], ["file1.fb2", "file2.fb2"])
         self.assertEqual([t.entity for t in produced], books)
 
-        await producer.count_task
+        await producer.count_total()
 
     async def test_process_existing_book_without_chunks_creates_chunk_task(self):
         book = Book(file_name="known.fb2", id=1, empty=False)
@@ -108,7 +108,7 @@ class TestBookProducer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(t.entity.book.file_name, book.file_name)
         self.assertEqual(t.entity.data, b"data")
 
-        await producer.count_task
+        await producer.count_total()
 
     async def test_process_new_book_with_data_creates_book_task_and_reserves_id(self):
         new_book = Book(file_name="new.fb2", id=None, empty=False)
@@ -134,7 +134,7 @@ class TestBookProducer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(t.entity.data, b"payload")
         self.assertEqual(producer._book_id, 43)
 
-        await producer.count_task
+        await producer.count_total()
 
     async def test_process_new_book_without_data_skips_task(self):
         new_book = Book(file_name="empty.fb2", id=None, empty=False)
@@ -153,8 +153,7 @@ class TestBookProducer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tasks, [])
         self.assertEqual(producer._book_id, 6)
 
-        await producer.count_task
-
+        await producer.count_total()
 
 if __name__ == "__main__":
     unittest.main()
