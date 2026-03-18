@@ -2,7 +2,7 @@ import asyncio
 import os
 import zipfile
 from datetime import datetime
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List, Dict
 from app.workers.stats import Stats
 from app.infrastructure.models import Book, BookSearchEngineType
 from .bookSearchEngine import BaseBookSearchEngine
@@ -11,6 +11,10 @@ from app.settings import PathsConfig
 class InpBookSearchEngine(BaseBookSearchEngine):
     def __init__(self, folder: str, stats: Stats = None):
         super().__init__(folder, stats)
+
+        self._archives: List[str] = []
+        self._current_archive: str | None = None
+        self._loading_tasks: dict[str, asyncio.Task] = {}
 
     # -----------------------------
     # Парсинг одного файла внутри ZIP
@@ -98,18 +102,6 @@ class InpBookSearchEngine(BaseBookSearchEngine):
     async def search_books(self) -> AsyncGenerator[Book, None]:
         zipf = await self._manager.open_zip(PathsConfig.INPX_FOLDER)
 
-        # if self._manager.is_remote:
-        #     for info in zipf.infolist():
-        #         if info.is_dir():
-        #             continue
-
-        #         archive_name = os.path.splitext(info.filename)[0] + ".zip"     
-        #         if self._should_skip_archive(archive_name):
-        #             continue
-
-        #         task = asyncio.create_task(self.fetch_with_semaphore(archive_name))
-        #         self._tasks.append(task)
-
         for info in zipf.infolist():
             if info.is_dir():
                 continue
@@ -121,6 +113,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
             )
 
             archive_name = os.path.splitext(info.filename)[0] + ".zip"
+            self._archives.append(archive_name)
 
             if self._should_skip_archive(archive_name):
                 continue
@@ -173,7 +166,43 @@ class InpBookSearchEngine(BaseBookSearchEngine):
 
                 total += 1
         return total
+    
+    async def _start_prefetch(self, archive: str) -> None:
+        task = self._loading_tasks.get(archive)
+        if task is not None and not task.done():
+            return
+
+        # запускаем фоновую загрузку
+        self._loading_tasks[archive] = asyncio.create_task(
+            self._manager.load_archive_to_memory(archive)
+        )
+
+    def _get_next_archive(self, current_archive: str) -> str | None:
+        try:
+            idx = self._archives.index(current_archive)
+            return self._archives[idx + 1]
+        except (ValueError, IndexError):
+            return 
 
     async def get_book_data(self, book: Book) -> bytes:
         archive_name, file_name = book.source_link.split("/", 1)
+
+        # --- 1. если переключились на новый архив ---
+        if archive_name != self._current_archive:
+            prev_archive = self._current_archive
+            self._current_archive = archive_name
+
+            # выгружаем предыдущий архив
+            if prev_archive is not None:
+                self._manager.unload_archive_from_memory(prev_archive)
+
+            # грузим текущий в память
+            await self._start_prefetch(archive_name)
+
+            # запускаем prefetch следующего
+            next = self._get_next_archive(archive_name)
+            if next:
+                await self._start_prefetch()
+
+        # --- 2. читаем файл ---
         return await self._manager.get_book_data(archive_name, file_name)

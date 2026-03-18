@@ -4,7 +4,7 @@ import zipfile
 import asyncio
 from urllib.parse import urlparse
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict
 from app.workers.stats import Stats
 from app.searchEngines.sources.connection import ConnectionFactory
 from app.settings import PathsConfig
@@ -33,6 +33,7 @@ class BookSourceManager:
         self._cache_dir = PathsConfig.CACHE_DIR
         os.makedirs(self._cache_dir, exist_ok=True)
         self._archive_locks: dict[str, asyncio.Lock] = {}
+        self._archive_bytes_cache: Dict[str, io.BytesIO] = {}
 
     @property
     def is_remote(self) -> bool:
@@ -91,21 +92,15 @@ class BookSourceManager:
                     return f.read()
             return await asyncio.to_thread(_read)
 
-    async def open_zip(
-        self,
-        archive_url: str
-    ) -> zipfile.ZipFile:
+    async def _ensure_archive_on_disk(self, archive_url: str) -> tuple[str, str]:
         """
-        Открывает zip-архив по полной ссылке.
-        Гарантирует, что архив скачан в кеш.
+        Гарантирует, что архив скачан на диск.
+        Возвращает (archive_name, local_path)
         """
-        # Получаем имя архива из URL
         archive_name = self.get_archive_name(archive_url)
         path = urlparse(archive_url).path
-
         local_path = os.path.join(self._cache_dir, archive_name)
 
-        # Блокировка для параллельного скачивания
         lock = self._archive_locks.get(archive_name)
         if lock is None:
             lock = asyncio.Lock()
@@ -113,8 +108,46 @@ class BookSourceManager:
 
         async with lock:
             if not os.path.exists(local_path):
-                # Используем приватный метод для скачивания полного URL
                 await self._download_archive(path, local_path)
+
+        return archive_name, local_path
+
+    def unload_archive_from_memory(self, archive_url: str) -> None:
+        archive_name = self.get_archive_name(archive_url)
+
+        buffer = self._archive_bytes_cache.pop(archive_name, None)
+        if buffer is not None:
+            buffer.close()
+
+    async def load_archive_to_memory(self, archive_url: str) -> None:
+        archive_name, local_path = await self._ensure_archive_on_disk(archive_url)
+
+        if archive_name in self._archive_bytes_cache:
+            return
+
+        # важно: после await могла появиться запись
+        if archive_name in self._archive_bytes_cache:
+            return
+
+        with open(local_path, "rb") as f:
+            data = f.read()
+
+        self._archive_bytes_cache[archive_name] = io.BytesIO(data)
+
+    async def open_zip(
+        self,
+        archive_url: str
+    ) -> zipfile.ZipFile:
+        archive_name = self.get_archive_name(archive_url)
+
+        # 1. memory cache
+        buffer = self._archive_bytes_cache.get(archive_name)
+        if buffer is not None:
+            buffer.seek(0)
+            return zipfile.ZipFile(buffer)
+
+        # 2. ensure disk
+        _, local_path = await self._ensure_archive_on_disk(archive_url)
 
         return zipfile.ZipFile(local_path)
 
@@ -126,13 +159,15 @@ class BookSourceManager:
         self,
         archive_name: str
     ) -> AsyncGenerator[zipfile.ZipFile, None]:
-        archive_path = await self._ensure_local(archive_name)
+        buffer = self._archive_bytes_cache.get(archive_name)
 
-        # Чтение файла в отдельном потоке, чтобы не блокировать asyncio
-        def _open_zip():
-            return zipfile.ZipFile(archive_path, "r")
-
-        zipf = await asyncio.to_thread(_open_zip)
+        if buffer is not None:
+            # читаем из памяти в отдельном потоке
+            zipf = await asyncio.to_thread(lambda: zipfile.ZipFile(io.BytesIO(buffer.getvalue()), "r"))
+        else:
+            # fallback: диск
+            archive_path = await self._ensure_local(archive_name)
+            zipf = await asyncio.to_thread(lambda: zipfile.ZipFile(archive_path, "r"))
 
         try:
             yield zipf
