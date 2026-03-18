@@ -35,7 +35,7 @@ class GenerateSimilarWorker(BaseWorker):
 
         dbPipeline = DbPipeline(
             threads=1,
-            batch_size=1000,
+            batch_size=10,
             router=self.router,
             registry=self.registry,
             stats=self.stats,

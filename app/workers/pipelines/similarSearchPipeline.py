@@ -63,7 +63,7 @@ class SimilarSearchPipeline(Pipeline):
 
         self._registry.register(Dataset.SIMILAR, self._save_async)
     
-    async def _save_async(self, router: DBRouter, tasks: List[List[Tuple[float, int, int]]], tx):
+    async def _save_async(self, router: DBRouter, tasks: List[List[Tuple[float, int, int]]]):
         def save(router: DBRouter, tasks: List[List[Tuple[float, int, int]]]):
             batch = []
             for task in tasks:
@@ -72,4 +72,4 @@ class SimilarSearchPipeline(Pipeline):
                 SimilarRepository(router).save(batch)
 
         async with router.meta_lock():
-            asyncio.to_thread(save, router, tasks)
+            await asyncio.to_thread(save, router, tasks)
