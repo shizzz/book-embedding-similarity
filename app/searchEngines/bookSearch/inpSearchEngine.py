@@ -202,7 +202,7 @@ class InpBookSearchEngine(BaseBookSearchEngine):
             # запускаем prefetch следующего
             next = self._get_next_archive(archive_name)
             if next:
-                await self._start_prefetch()
+                await self._start_prefetch(next)
 
         # --- 2. читаем файл ---
         return await self._manager.get_book_data(archive_name, file_name)
