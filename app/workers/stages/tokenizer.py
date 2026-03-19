@@ -27,10 +27,12 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
         self._repo = EmbeddingsRepository(router, model.info.uid)
         self._emb_to_chunk_id = self._repo.get_ids()
 
+        ALLOWED_CHUNK_TYPES  = {ChunkType.TITLE, ChunkType.DESCRIPTION, ChunkType.TEXT}
         factory = ChunkStrategyFactory()
         self._token_strategies: Dict[ChunkType, any] = {
             chunk_type: factory.create(chunk_type, self._tokenizer)
             for chunk_type in ChunkType
+            if chunk_type in ALLOWED_CHUNK_TYPES
         }
 
     async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[TokenChunk]]:
