@@ -382,6 +382,15 @@ class LiveUI(BaseUI):
             self._fmt_mb(self.model_info.estimate_mem_per_token_mb)
         )
 
+        left.add_row(
+            "Inc/Dec",
+            Text.assemble(
+                (str(self.model_info.increases), "green"),
+                ("/",),
+                (str(self.model_info.decreases), "red"),
+            )
+        )
+
         # GPU часть
         right = Table.grid(padding=(0, 1))
         right.add_column(style="cyan")

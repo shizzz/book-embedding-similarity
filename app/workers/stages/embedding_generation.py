@@ -90,33 +90,23 @@ class EmbeddingWorker(BaseQueueWorker):
                 divider += 1
 
                 # уменьшаем tokens_per_batch
-                await self._decrease_tokens(sum([chunk.length for chunk in batch]))
+                await self._decrease_tokens()
 
                 # защита от бесконечного деления
                 if divider > len(batch):
                     raise RuntimeError("Batch cannot be split further — still OOM")   
 
-    async def _decrease_tokens(self, current_tokens: int):
+    async def _decrease_tokens(self):
         async with self._tokens_lock:
             if self._model.info.tokens_per_batch <= 1:
                 return
 
-            self._vram_increasing = False
-
-            free = self._model.info.free_vram_mb
-            total = self._model.info.total_vram_mb
-            free_ratio = free / total
-
             new_val = int(self._model.info.tokens_per_batch * 0.98)
             new_val = max(1, new_val)
 
-            current_length = self._model.info.tokens_per_batch
+            self._vram_increasing = False
             self._model.info.tokens_per_batch = new_val
-
-            self.logger.warning(
-                    f"OOM with batch {current_tokens} tokens. Decreasing tokens_per_batch: {current_length} -> {new_val} "
-                    f"(free VRAM: {free}MB / {total}MB, ratio: {free_ratio:.2f})"
-                )
+            self._model.info.decreases +=1
 
     async def _increase_tokens(self, current_length: int):
         async with self._tokens_lock:
@@ -139,10 +129,7 @@ class EmbeddingWorker(BaseQueueWorker):
                 max_safe = max(current_length, proposed)  # не меньше текущего
                 self._model.info.tokens_per_batch = max_safe
                 self._vram_increase_iter = 0
-                self.logger.info(
-                    f"Increasing tokens_per_batch: {current_length} -> {max_safe} "
-                    f"(free VRAM: {free}MB / {total}MB, ratio: {free_ratio:.2f})"
-                )
+                self._model.info.increases +=1
             else:
                 self._vram_increasing = False
 

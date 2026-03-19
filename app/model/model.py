@@ -121,6 +121,8 @@ class ModelInfo:
     tokens_per_batch: int = None
     vram_usage_ratio: float = 0
     free_vram_ratio: float = 0
+    increases: int = 0
+    decreases: int = 0
 
     _free_vram_cache: int = None
     _total_vram_mb: int = None
