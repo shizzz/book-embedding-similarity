@@ -17,7 +17,7 @@ class DescriptionStrategy(ChunkStrategy):
             return []
 
         # если текст меньше max_tokens
-        if n <= max_tokens:
+        if n + len(self.prefix_tokens) <= max_tokens:
             return [self.prefix_tokens + tokens]
         else:
             sub_tokens = tokens[0:max_tokens - len(self.prefix_tokens)]
