@@ -48,7 +48,7 @@ class EmbeddingsRepository:
                     break
                 yield [Embedding.from_row(row) for row in rows]  # отдаём пачкой
 
-    def get_all_batch(self, batch_size: int = 1, order_by: list[str] = None):
+    def get_all_batch(self, batch_size: int = 1, order_by: list[str] = None, embedding_type: int = 2):
         order_by = order_by or []
         order_clause = ""
         if order_by:
@@ -62,8 +62,8 @@ class EmbeddingsRepository:
 
             for offset in range(0, total, batch_size):
                 cursor.execute(
-                    f"{GET_QUERY} WHERE [type] == 2 {order_clause} LIMIT ? OFFSET ?",
-                    (batch_size, offset)
+                    f"{GET_QUERY} WHERE [type] == ? {order_clause} LIMIT ? OFFSET ?",
+                    (embedding_type, batch_size, offset)
                 )
                 rows = cursor.fetchall()
                 if not rows:
@@ -173,8 +173,8 @@ class EmbeddingsRepository:
         conn.executemany(
             """
             INSERT OR REPLACE INTO embeddings
-            (id, source_id, chunk_id, seq, data, shape, type)
-            VALUES (?,?,?,?,?,?,?)
+            (id, source_id, chunk_id, seq, data, shape, type, name)
+            VALUES (?,?,?,?,?,?,?,?)
             """,
             [e.to_tuple() for e in embeddings]
         )

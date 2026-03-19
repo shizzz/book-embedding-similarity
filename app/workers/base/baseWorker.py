@@ -54,6 +54,8 @@ class BaseWorker(ABC):
             self._ui_task = asyncio.create_task(self.refresh_ui_loop())
 
         try:
+            await self.before_run()
+
             if self.pipelines:
                 await asyncio.gather(*(pipeline.setup_stages() for pipeline in self.pipelines))
                 
@@ -82,6 +84,9 @@ class BaseWorker(ABC):
     @abstractmethod
     async def setup_stages(self) -> None:
         raise NotImplementedError
+
+    async def before_run(self) -> None:
+        return
 
     async def after_run(self) -> None:
         return

@@ -28,7 +28,7 @@ class TaggerPipeline(Pipeline):
     async def setup_stages(self) -> None:
         channel_tokenizer = Channel(Stages.TOKENIZER, asyncio.Queue(10))
         channel_emb = Channel(Stages.EMBEDDING, asyncio.Queue(10))
-        channel_tagger = Channel(Stages.TAG, asyncio.Queue(10))
+        channel_tagger = self._input_channel or Channel(Stages.TAG, asyncio.Queue(10))
 
         genres_repo = GenresRepository(self._router)
 
@@ -36,7 +36,6 @@ class TaggerPipeline(Pipeline):
             repo=genres_repo,
             type=ChunkType.TAG,
             batch_size=10,
-            input_channel=self._input_channel,
             output_channels=[channel_tokenizer, channel_tagger],
             stats=self._stats,
             workers=PROD_THREADS,

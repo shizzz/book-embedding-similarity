@@ -13,8 +13,9 @@ class Embedding:
     data: Optional[np.ndarray] = None
     shape: Optional[int] = None
     type: Optional[ChunkType] = None
+    name: Optional[str] = None
 
-    def to_tuple(self) -> Tuple[int, int, int, int, np.ndarray, int, int]:
+    def to_tuple(self) -> Tuple[int, int, int, int, np.ndarray, int, int, str]:
         return (
             self.id, 
             self.source_id, 
@@ -22,7 +23,8 @@ class Embedding:
             self.seq, 
             self.data, 
             self.shape, 
-            self.type
+            self.type,
+            self.name
         )
 
     @staticmethod
