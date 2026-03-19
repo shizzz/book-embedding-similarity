@@ -6,8 +6,10 @@ from .book import Book
 
 class Action(IntEnum):
     GRAB = auto()
+    TOKENIZE = auto()
     PARSE = auto()
     EMBEDDING = auto()
+    TAG = auto()
     INDEX = auto()
     DB = auto()
     NONE = auto()
@@ -18,6 +20,8 @@ class Dataset(IntEnum):
     AUTHOR = auto()
     CHUNK = auto()
     SIMILAR = auto()
+    TAG = auto()
+    CENROID = auto()
 
 class BookAction(IntEnum):
     BOOK = auto()

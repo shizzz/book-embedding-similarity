@@ -1,22 +1,20 @@
 import asyncio
 import logging
-from app.workers.pipelines import EmbeddingPipeline, DbPipeline
+from app.workers.pipelines import TaggerPipeline, DbPipeline
 from app.workers.base import BaseWorker
-from app.workers.sources.databaseReporter import DatabaseReporter
 from app.infrastructure.models import Channel, Stages
 
 class GenerateTags(BaseWorker):
-    def __init__(self, batch: int):
-        super().__init__(name="Generate embeddings", logger=logging.getLogger(__name__))
+    def __init__(self):
+        super().__init__(name="Generate tags", logger=logging.getLogger(__name__))
 
     async def after_run(self) -> None:
-        report = DatabaseReporter(self.router, self.model_uid).generate()
-        self.ui.report(report)
+        pass
 
     async def setup_stages(self):
         channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
 
-        embPipeline = EmbeddingPipeline(
+        tagger_pipeline = TaggerPipeline(
             router=self.router,
             registry=self.registry,
             stats=self.stats,
@@ -24,12 +22,9 @@ class GenerateTags(BaseWorker):
             output_channels = [channel_db],
         )
 
-        self.model_uid = embPipeline.model.info.uid
-        self.ui.model_info = embPipeline.model.info
-
         dbPipeline = DbPipeline(
-            model_name=embPipeline.model.info.model_name,
-            model_uid=embPipeline.model.info.uid,
+            model_name=tagger_pipeline.model.info.model_name,
+            model_uid=tagger_pipeline.model.info.uid,
             threads=1,
             batch_size=256,
             router=self.router,
@@ -38,5 +33,5 @@ class GenerateTags(BaseWorker):
             logger=self.logger,
             input_channel=channel_db,
         )
-        self.pipelines.append(embPipeline)
+        self.pipelines.append(tagger_pipeline)
         self.pipelines.append(dbPipeline)

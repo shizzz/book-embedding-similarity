@@ -46,7 +46,7 @@ class FB2BookParser(BookParser):
                 chunks = []
             else:
                 for chunk in chunks:
-                    chunk.book_id = book.id
+                    chunk.source_id = book.id
 
         result = ParseResult(book=book, chunks=chunks)
         return result

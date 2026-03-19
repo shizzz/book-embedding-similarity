@@ -5,6 +5,9 @@ from .embeddings import EmbeddingsRepository
 from .authors import AuthorRepository
 from .model import ModelRepository
 from .chunk import ChunkRepository
+from .centroids import CentroidsRepository
+from .genres import GenresRepository
+from .bookTag import BookTagsRepository
 
 __all__ = [
     "BookRepository",
@@ -13,5 +16,8 @@ __all__ = [
     "EmbeddingsRepository",
     "AuthorRepository",
     "ModelRepository",
-    "ChunkRepository"
+    "ChunkRepository",
+    "CentroidsRepository",
+    "GenresRepository",
+    "BookTagsRepository"
 ]

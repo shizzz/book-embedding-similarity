@@ -3,12 +3,14 @@ from .chunk_strategy import ChunkStrategy
 from .description_strategy import DescriptionStrategy
 from .passage_strategy import PassageStrategy
 from .title_strategy import TitleStrategy
+from .tag_strategy import TagStrategy
 
 class ChunkStrategyFactory:
     _strategies: Dict[int, Type[ChunkStrategy]] = {
         0: TitleStrategy,
         1: DescriptionStrategy,
         2: PassageStrategy,
+        4: TagStrategy,
     }
 
     @classmethod

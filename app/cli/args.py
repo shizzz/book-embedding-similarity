@@ -1,11 +1,10 @@
 import argparse
-
 from .books.parser import register_books
 from .embedding.parser import register_embedding
 from .similar.parser import register_similar
 from .index.parser import register_index
 from .feedback.parser import register_feedback
-
+from .tag.parser import register_tag
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -19,5 +18,6 @@ def get_args() -> argparse.Namespace:
     register_similar(subparsers)
     register_index(subparsers)
     register_feedback(subparsers)
+    register_tag(subparsers)
 
     return parser.parse_args()

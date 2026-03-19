@@ -6,8 +6,8 @@ from .constants import ChunkType
 @dataclass
 class Chunk:
     text: str
-    book_id: int = None
-    chunk_id: Optional[int] = None
+    source_id: int = None
+    chunk_id: Optional[str] = None
     length: int = field(init=False)
     type: ChunkType = None
 
@@ -16,12 +16,12 @@ class Chunk:
 
     # --------- Mapper для meta.db ---------
     def to_tuple_meta(self) -> tuple:
-        return (self.chunk_id, self.book_id, self.type)
+        return (self.chunk_id, self.source_id, self.type)
 
     @staticmethod
     def from_meta_row(row) -> "Chunk":
         return Chunk(
-            book_id=row["book_id"],
+            source_id=row["book_id"],
             text="",
             chunk_id=row["id"]
         )
@@ -34,12 +34,12 @@ class Chunk:
 
     # --------- Mapper для chunks.db ---------
     def to_tuple_chunks(self) -> tuple:
-        return (self.chunk_id, self.book_id, Chunk.adapt_compressed_text(self.text), self.length, self.type)
+        return (self.chunk_id, self.source_id, Chunk.adapt_compressed_text(self.text), self.length, self.type)
 
     @staticmethod
     def from_chunks_row(row) -> "Chunk":
         return Chunk(
-            book_id=row["book_id"],
+            source_id=row["book_id"],
             text=row["data"],
             chunk_id=row["id"],
             type=row["type"]

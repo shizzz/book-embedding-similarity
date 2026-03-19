@@ -8,7 +8,16 @@ class ChunkType(IntEnum):
     TAG = 4
     CENTROID = 5
 
+    def supports_tokenization(self) -> bool:
+        return self in {
+            ChunkType.TITLE,
+            ChunkType.DESCRIPTION,
+            ChunkType.TEXT,
+            ChunkType.TAG,
+        }
+
 class Stages(StrEnum):
+    PRODUCER = "Producer"
     BOOK_SEARCH = "BookSearchProducer"
     PARSER = "Parser"
     SEARCH = "Search"

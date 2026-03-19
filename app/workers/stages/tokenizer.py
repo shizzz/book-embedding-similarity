@@ -27,12 +27,11 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
         self._repo = EmbeddingsRepository(router, model.info.uid)
         self._emb_to_chunk_id = self._repo.get_ids()
 
-        ALLOWED_CHUNK_TYPES  = {ChunkType.TITLE, ChunkType.DESCRIPTION, ChunkType.TEXT}
         factory = ChunkStrategyFactory()
         self._token_strategies: Dict[ChunkType, any] = {
             chunk_type: factory.create(chunk_type, self._tokenizer)
             for chunk_type in ChunkType
-            if chunk_type in ALLOWED_CHUNK_TYPES
+            if chunk_type.supports_tokenization()
         }
 
     async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[TokenChunk]]:
@@ -63,21 +62,21 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
             )
 
             for part in parts:
-                seq = chunk_seq_counter[(chunk.book_id, chunk.chunk_id)]
-                chunk_seq_counter[(chunk.book_id, chunk.chunk_id)] += 1
+                seq = chunk_seq_counter[(chunk.source_id, chunk.chunk_id)]
+                chunk_seq_counter[(chunk.source_id, chunk.chunk_id)] += 1
 
                 chunk_task = Task(
                     id=chunk.chunk_id,
-                    name=f"{chunk.book_id}:{chunk.chunk_id}",
+                    name=f"{chunk.source_id}:{chunk.chunk_id}",
                     entity=TokenChunk(
-                        book_id=chunk.book_id,
+                        book_id=chunk.source_id,
                         chunk_id=chunk.chunk_id,
                         type=chunk.type,
                         tokens=part,
                         seq=seq,
                         length=len(part)
                     ),
-                    routes=Action.EMBEDDING
+                    routes=[Action.EMBEDDING, Action.TAG]
                 )
 
                 result.append(chunk_task)

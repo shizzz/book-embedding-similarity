@@ -67,7 +67,7 @@ class Parser(BaseQueueWorker[BookTask]):
                 if len(chunks or []) > 0:
                     chunk_actions.append(Action.DB)
                     for chunk in chunks:
-                        chunk.book_id = book.id
+                        chunk.source_id = book.id
                         chunk.chunk_id = await self._reserve_id()
 
             if task.entity.data is None:      

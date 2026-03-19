@@ -20,6 +20,9 @@ def main():
     elif args.entity == "feedback":
         from app.cli.feedback import run
         run(args)
+    elif args.entity == "tag":
+        from app.cli.tag import run
+        run(args)
 
 if __name__ == "__main__":
     main()

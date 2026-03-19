@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS book_genres (
     book_id INTEGER NOT NULL,
     genre_id INTEGER NOT NULL,
     model_id INTEGER NOT NULL,
+    distance FLOAT NOT NULL,
 
     FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
     FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE CASCADE,

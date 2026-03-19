@@ -1,0 +1,2 @@
+ALTER TABLE embeddings
+ADD COLUMN name TEXT;
