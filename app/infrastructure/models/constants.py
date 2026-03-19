@@ -4,6 +4,9 @@ class ChunkType(IntEnum):
     TITLE = 0
     DESCRIPTION = 1
     TEXT = 2
+    MEAN = 3
+    TAG = 4
+    CENTROID = 5
 
 class Stages(StrEnum):
     BOOK_SEARCH = "BookSearchProducer"
@@ -15,6 +18,7 @@ class Stages(StrEnum):
     INDEX = "Index"
     CHUNK = "Chunk"
     EMBEDDING = "Embedding"
+    TAG = "TAG"
     DB = "DB"
 
 class BookSearchEngineType(IntEnum):

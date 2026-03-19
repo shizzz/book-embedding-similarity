@@ -37,14 +37,14 @@ class DBEmbeddingProvider(EmbeddingProvider):
 
         return result
 
-    def get_by_book_ids(
+    def get_by_source_ids(
         self,
-        book_ids: List[int],
+        source_ids: List[int],
         type: ChunkType = None
     ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         result = {}
 
-        for chunk in self._chunks(book_ids, self.SQLITE_MAX_VARS):
-            result.update(self._repo.get_by_book_ids(chunk, type))
+        for chunk in self._chunks(source_ids, self.SQLITE_MAX_VARS):
+            result.update(self._repo.get_by_source_ids(chunk, type))
 
         return result

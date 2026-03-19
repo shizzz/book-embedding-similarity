@@ -2,9 +2,9 @@ from typing import Protocol, Dict, Tuple, List
 import numpy as np
 
 class EmbeddingProvider(Protocol):
-    def get_by_book_ids(
+    def get_by_source_ids(
         self,
-        book_ids: List[int],
+        source_ids: List[int],
     ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         ...
 

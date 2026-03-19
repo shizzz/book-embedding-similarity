@@ -36,8 +36,3 @@ class EmbeddingProducer(BaseQueueWorker[Embedding]):
     async def count_total(self) -> None:
         total = self._repo.count()
         await self.stats.set_total(self.name, total)
-    
-    def reserve_id(self) -> int:
-        id = self._book_id
-        self._book_id += 1
-        return id

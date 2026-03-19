@@ -189,7 +189,7 @@ class EmbeddingWorker(BaseQueueWorker):
 
             emb = Embedding(
                 id=emb_id,
-                book_id=chunk.book_id,
+                source_id=chunk.book_id,
                 chunk_id=chunk.chunk_id,
                 seq=chunk.seq,
                 type=chunk.type,
@@ -199,7 +199,7 @@ class EmbeddingWorker(BaseQueueWorker):
 
             task = Task(
                 id=emb.id,
-                name=f"{emb.book_id},{emb.chunk_id},{emb.seq}",
+                name=f"{emb.source_id},{emb.chunk_id},{emb.seq}",
                 entity=emb,
                 routes=Action.DB,
                 dataset=Dataset.EMBEDDING,

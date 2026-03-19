@@ -19,7 +19,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         }
 
     def _get_mean(self, book_ids: List[int]):
-        data = self._emb_provider.get_by_book_ids(book_ids, ChunkType.TEXT)
+        data = self._emb_provider.get_by_source_ids(book_ids, ChunkType.TEXT)
 
         book_vectors = {}
         for emb_id, (vec, book_id, type) in data.items():
@@ -82,7 +82,7 @@ class IndexSimilarSearchEngine(SimilarSearchEngine):
         desired_books: int,
         top_k_agg: int = 5
     ) -> List[SearchResult]:
-        data = self._emb_provider.get_by_book_ids(book_ids, ChunkType.TEXT)
+        data = self._emb_provider.get_by_source_ids(book_ids, ChunkType.TEXT)
         if not data:
             return []
 

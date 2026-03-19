@@ -19,11 +19,11 @@ class HybridEmbeddingProvider(EmbeddingProvider):
         self._cache_data = cache_data or {}
         self._cache_meta = cache_meta or {}
 
-        # book_id -> type -> [embedding_ids]
+        # source_id -> type -> [embedding_ids]
         self._book_index = defaultdict(lambda: defaultdict(list))
 
-        for emb_id, (_, book_id, type_) in self._cache_data.items():
-            self._book_index[book_id][type_].append(emb_id)
+        for emb_id, (_, source_id, type_) in self._cache_data.items():
+            self._book_index[source_id][type_].append(emb_id)
 
     def get_by_ids(
         self,
@@ -64,28 +64,27 @@ class HybridEmbeddingProvider(EmbeddingProvider):
 
         return result
 
-    def get_by_book_ids(
+    def get_by_source_ids(
         self,
-        book_ids: List[int],
+        source_ids: List[int],
         type: Optional[ChunkType] = None
     ) -> Dict[int, Tuple[np.ndarray, int, int]]:
 
         result = {}
         cached_books = set()
 
-        for book_id in book_ids:
-
-            if book_id not in self._book_index:
+        for source_id in source_ids:
+            if source_id not in self._book_index:
                 continue
 
             if type is None:
                 emb_ids = (
                     eid
-                    for ids in self._book_index[book_id].values()
+                    for ids in self._book_index[source_id].values()
                     for eid in ids
                 )
             else:
-                emb_ids = self._book_index[book_id].get(type, [])
+                emb_ids = self._book_index[source_id].get(type, [])
 
             found = False
 
@@ -94,12 +93,12 @@ class HybridEmbeddingProvider(EmbeddingProvider):
                 found = True
 
             if found:
-                cached_books.add(book_id)
+                cached_books.add(source_id)
 
-        missing_books = [bid for bid in book_ids if bid not in cached_books]
+        missing_books = [bid for bid in source_ids if bid not in cached_books]
 
         if missing_books:
-            db_hits = self._db_provider.get_by_book_ids(missing_books, type)
+            db_hits = self._db_provider.get_by_source_ids(missing_books, type)
             result.update(db_hits)
 
         return result

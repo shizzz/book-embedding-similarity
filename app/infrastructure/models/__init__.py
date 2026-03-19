@@ -4,7 +4,6 @@ from .task import Task, BatchTask, Action, Dataset, BookAction, BookTask, Action
 from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar
 from .embedding import Embedding
-from .embeddingCache import EmbeddingCache
 from .chunk import Chunk
 from .constants import ChunkType, Stages, BookSearchEngineType, SimilarSearchEngineType, SearchIndexLevel
 from .report import Report
@@ -13,6 +12,7 @@ from .channel import Channel
 from .parse_result import ParseResult
 from .search_result import SearchResult
 from .tokenChunk import TokenChunk
+from .tag import Tag, BookTag
 
 __all__ = [
     "Book",
@@ -29,7 +29,6 @@ __all__ = [
     "Feedbacks",
     "Similar",
     "Embedding",
-    "EmbeddingCache",
     "Chunk",
     "Report",
     "ChunkType",
@@ -42,5 +41,7 @@ __all__ = [
     "SearchIndexLevel",
     "ParseResult",
     "SearchResult",
-    "TokenChunk"
+    "TokenChunk",
+    "Tag", 
+    "BookTag"
 ]

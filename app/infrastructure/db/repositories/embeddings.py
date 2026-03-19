@@ -6,17 +6,17 @@ from ..router import DBRouter
 from .model import ModelRepository
 from app.settings import ProcessConfig
 
-GET_QUERY: str = "SELECT id, book_id, chunk_id, seq, data, shape, type FROM embeddings"
-GET_QUERY_META: str = "SELECT id, book_id, chunk_id, seq, shape, type FROM embeddings"
+GET_QUERY: str = "SELECT id, source_id, chunk_id, seq, data, shape, type FROM embeddings"
+GET_QUERY_META: str = "SELECT id, source_id, chunk_id, seq, shape, type FROM embeddings"
 
 class EmbeddingsRepository:
     def __init__(self, router: DBRouter, model_uid: str = None):
         self.router = router
         self.model_uid = model_uid or ModelRepository(router).get_latest_uid(ProcessConfig.MODEL_NAME)[0]
 
-    def get(self, book_id: int) -> list[Embedding]:
+    def get(self, source_id: int) -> list[Embedding]:
         with self.router.embeddings(self.model_uid) as conn:
-            rows = conn.execute("SELECT * FROM embeddings WHERE book_id = ?", (book_id,)).fetchall()
+            rows = conn.execute("SELECT * FROM embeddings WHERE source_id = ?", (source_id,)).fetchall()
             return [Embedding.from_row(r) for r in rows]
         
     def get_shape(self) -> int:
@@ -76,7 +76,7 @@ class EmbeddingsRepository:
     ) -> dict[int, tuple[np.ndarray, int, int]]:
         """
         Возвращает:
-            embedding_id -> (vector, book_id, type)
+            embedding_id -> (vector, source_id, type)
         """
         if embedding_ids == []:
             return {}
@@ -95,10 +95,10 @@ class EmbeddingsRepository:
         return {
             embedding_id: (
                 data.reshape((shape,)) if shape else data,
-                book_id,
+                source_id,
                 type
             )
-            for embedding_id, book_id, chunk_id, seq, data, shape, type in rows
+            for embedding_id, source_id, chunk_id, seq, data, shape, type in rows
         }
 
     def get_by_ids_meta(
@@ -107,7 +107,7 @@ class EmbeddingsRepository:
     ) -> dict[int, tuple[None, int, int]]:
         """
         Возвращает:
-            embedding_id -> (vector, book_id, type)
+            embedding_id -> (vector, source_id, type)
         """
         if embedding_ids == []:
             return {}
@@ -124,20 +124,20 @@ class EmbeddingsRepository:
             rows = conn.execute(query, params).fetchall()
 
         return {
-            embedding_id: (None, book_id, type)
-            for embedding_id, book_id, chunk_id, seq, shape, type in rows
+            embedding_id: (None, source_id, type)
+            for embedding_id, source_id, chunk_id, seq, shape, type in rows
         }
 
-    def get_by_book_ids(
+    def get_by_source_ids(
         self,
-        book_ids: list[int],
+        source_ids: list[int],
         type: ChunkType = None
     ) -> dict[int, tuple[np.ndarray, int, int]]:
         """
         Возвращает:
-            embedding_id -> (vector, book_id, type)
+            embedding_id -> (vector, source_id, type)
         """
-        if not book_ids:
+        if not source_ids:
             return {}
 
         params = []
@@ -148,24 +148,24 @@ class EmbeddingsRepository:
             where = f" [type] == ? AND "
             params.append(type)
 
-        if book_ids is None:
+        if source_ids is None:
             query = f"{GET_QUERY} WHERE {where}"
         else:
-            placeholders = ",".join("?" for _ in book_ids)
-            query = f"{GET_QUERY} WHERE {where} book_id IN ({placeholders}) "
-            params.extend(book_ids)
+            placeholders = ",".join("?" for _ in source_ids)
+            query = f"{GET_QUERY} WHERE {where} source_id IN ({placeholders}) "
+            params.extend(source_ids)
 
         with self.router.embeddings(self.model_uid) as conn:
             rows = conn.execute(query, params).fetchall()
 
         result: dict[int, tuple[np.ndarray, int]] = {}
 
-        for embedding_id, book_id, chunk_id, seq, data, shape, type in rows:
+        for embedding_id, source_id, chunk_id, seq, data, shape, type in rows:
             vec = data
             if shape:
                 vec = vec.reshape((shape,))
 
-            result[embedding_id] = (vec, book_id, type)
+            result[embedding_id] = (vec, source_id, type)
 
         return result
 
@@ -173,7 +173,7 @@ class EmbeddingsRepository:
         conn.executemany(
             """
             INSERT OR REPLACE INTO embeddings
-            (id, book_id, chunk_id, seq, data, shape, type)
+            (id, source_id, chunk_id, seq, data, shape, type)
             VALUES (?,?,?,?,?,?,?)
             """,
             [e.to_tuple() for e in embeddings]
@@ -186,11 +186,11 @@ class EmbeddingsRepository:
         else:
             self._save_bulk(conn, embeddings)
 
-    def update(self, book_id: int, embedding: np.ndarray):
+    def update(self, source_id: int, embedding: np.ndarray):
         with self.router.embeddings(self.model_uid) as conn:
             conn.execute(
-                "UPDATE embeddings SET embedding = ? WHERE book_id = ?",
-                (embedding, book_id)
+                "UPDATE embeddings SET embedding = ? WHERE source_id = ?",
+                (embedding, source_id)
             )
 
     def count(self) -> int:

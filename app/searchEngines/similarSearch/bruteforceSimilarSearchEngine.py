@@ -23,7 +23,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
             return []
 
         repo = EmbeddingsRepository(self._router, self._model_uid)
-        source_embeddings = repo.get_by_book_ids(book_ids, ChunkType.TEXT)
+        source_embeddings = repo.get_by_source_ids(book_ids, ChunkType.TEXT)
         if not source_embeddings:
             return []
 
@@ -35,7 +35,7 @@ class BruteforceSimilarSearchEngine(SimilarSearchEngine):
 
             for batch in EmbeddingsBatchIterable(repo, self._batch_size):
                 for r in batch:
-                    if r.book_id == source.book_id:
+                    if r.source_id == source.book_id:
                         continue
 
                     score = float(np.dot(source_vec, r.data))

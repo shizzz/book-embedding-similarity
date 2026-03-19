@@ -8,13 +8,13 @@ class CacheEmbeddingProvider(EmbeddingProvider):
         self,
         data: Dict[int, Tuple[np.ndarray, int, int]]
     ):
-        # embedding_id -> (vector, book_id)
+        # embedding_id -> (vector, source_id)
         self._data = data
 
         # строим индекс
         self._book_index = defaultdict(list)
-        for emb_id, (_, book_id) in data.items():
-            self._book_index[book_id].append(emb_id)
+        for emb_id, (_, source_id) in data.items():
+            self._book_index[source_id].append(emb_id)
 
     def get_by_ids(
         self,
@@ -26,14 +26,14 @@ class CacheEmbeddingProvider(EmbeddingProvider):
             if emb_id in self._data
         }
 
-    def get_by_book_ids(
+    def get_by_source_ids(
         self,
-        book_ids: List[int],
+        source_ids: List[int],
     ) -> Dict[int, Tuple[np.ndarray, int, int]]:
         result = {}
 
-        for book_id in book_ids:
-            for emb_id in self._book_index.get(book_id, []):
+        for source_id in source_ids:
+            for emb_id in self._book_index.get(source_id, []):
                 result[emb_id] = self._data[emb_id]
 
         return result

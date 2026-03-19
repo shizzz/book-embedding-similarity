@@ -12,6 +12,7 @@ __all__ = [
     "Indexer",
     "SimilarStage",
     "TokenizerStage",
+    "TagProducer",
 ]
 
 __getattr__, __dir__, __all__ = lazy.attach(
@@ -27,6 +28,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "index_creation",
         "similar",
         "tokenizer",
+        "tag_producer",
     ],
     submod_attrs={
         "book_search_producer": ["BookProducer"],
@@ -39,6 +41,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "index_creation": ["Indexer"],
         "similar": ["SimilarStage"],
         "tokenizer": ["TokenizerStage"],
+        "tag_producer": ["TagProducer"],
     }
 )
 
@@ -54,3 +57,4 @@ if TYPE_CHECKING:
     from .index_creation import Indexer
     from .similar import SimilarStage
     from .tokenizer import TokenizerStage
+    from .tag_producer import TagProducer

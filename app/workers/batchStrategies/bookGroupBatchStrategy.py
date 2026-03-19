@@ -14,7 +14,7 @@ class BookEmbeddingBatchStrategy(BaseBatchStrategy):
         return str(self.books)
 
     def collect(self, task: Task[Embedding]) -> list[Task] | None:
-        book_id = task.entity.book_id
+        book_id = task.entity.source_id
 
         if not self.current_book:
             self.current_book_id = book_id

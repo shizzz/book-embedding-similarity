@@ -27,7 +27,7 @@ class EmbeddingMeger(BaseQueueWorker[BookTask]):
 
         for r in batch:
             vec = r.entity.data
-            grouped.setdefault(r.entity.book_id, []).append(vec)
+            grouped.setdefault(r.entity.source_id, []).append(vec)
 
         for book_id, vectors in grouped.items():
             stacked = np.vstack(vectors)
@@ -37,7 +37,7 @@ class EmbeddingMeger(BaseQueueWorker[BookTask]):
                 id=book_id,
                 name=str(book_id),
                 entity=Embedding(
-                    book_id=book_id,
+                    source_id=book_id,
                     data=merged,
                     shape=self.embedding_dim,
                 ),
