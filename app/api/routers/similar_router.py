@@ -1,15 +1,12 @@
-import asyncio
 import json
 import time
-
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
-
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
 from app.infrastructure.models import Feedbacks
 from app.utils import Html
-from app.services import TaskState #, Similarity
-from ..dependencies import executor, router as dbrouter
+#from app.services import TaskState, Similarity
+from ..dependencies import router as dbrouter#, executor
 from app.settings import PathsConfig
 
 router = APIRouter()
