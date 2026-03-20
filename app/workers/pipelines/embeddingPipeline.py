@@ -70,7 +70,7 @@ class EmbeddingPipeline(Pipeline):
         self._registry.register(Dataset.EMBEDDING, self._save_embeddings_async)
 
     async def _save_embeddings_async(self, router: DBRouter, emb: List[Embedding]):
-        def save(router: DBRouter, emb: List[Book]):
+        def save(router: DBRouter, emb: List[Embedding]):
             with router.transaction() as tx:
                 EmbeddingsRepository(router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
 

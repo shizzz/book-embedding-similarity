@@ -17,7 +17,7 @@ class TagProducer(BaseQueueWorker):
             self, 
             repo: GenresRepository | CentroidsRepository,
             type: ChunkType,
-            name: str = Stages.PRODUCER,
+            name: str = Stages.PRODUCER + "_tag",
             *args, 
             **kwargs
         ):

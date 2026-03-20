@@ -22,9 +22,6 @@ class BaseUI(ABC):
     async def update_total_async(self, total: int, idx: int = 0):
         pass
 
-    async def decrease_total_async(self, decrease: int = 1):
-        pass
-
     async def set_thread(self, worker_id: int, name: str):
         pass
 

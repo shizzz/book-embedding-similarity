@@ -14,6 +14,7 @@ __all__ = [
     "TokenizerStage",
     "TagProducer",
     "BookTagger",
+    "CentroidsProducer",
 ]
 
 __getattr__, __dir__, __all__ = lazy.attach(
@@ -31,6 +32,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "tokenizer",
         "tag_producer",
         "book_tagger",
+        "centroids_producer",
     ],
     submod_attrs={
         "book_search_producer": ["BookProducer"],
@@ -45,6 +47,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "tokenizer": ["TokenizerStage"],
         "tag_producer": ["TagProducer"],
         "book_tagger": ["BookTagger"],
+        "centroids_producer": ["CentroidsProducer"],
     }
 )
 
@@ -62,3 +65,4 @@ if TYPE_CHECKING:
     from .tokenizer import TokenizerStage
     from .tag_producer import TagProducer
     from .book_tagger import BookTagger
+    from .centroids_producer import CentroidsProducer

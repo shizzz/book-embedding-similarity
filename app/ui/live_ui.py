@@ -38,16 +38,7 @@ class LiveUI(BaseUI):
         self._label = title
         self._bars: Dict[int, Progress] = {}
         self._tasks: Dict[int, TaskID] = {}
-        self._speed_history = {} 
-
-        self.stats = {
-            "Total": 0,
-            "Remaining": 0,
-            "Done": 0,
-            "Errors": 0,
-        }
-        for i in range(1, max_workers + 1):
-            self.stats[f"Thread {i}"] = "-"
+        self._speed_history = {}
 
         self.lock = asyncio.Lock()
         self.console = Console()
@@ -175,13 +166,6 @@ class LiveUI(BaseUI):
 
         return table
 
-    def _make_info(self) -> Text:
-        info = Text()
-        for i in range(1, self._max_workers + 1):
-            key = f"Thread {i}"
-            info.append(f"{key}: {self.stats[key]}\n")
-        return info
-
     def _compute_speed(self, idx: int, count: int) -> str:
         now = perf_counter()
 
@@ -244,17 +228,11 @@ class LiveUI(BaseUI):
         self.live.start()
 
     async def set_thread(self, worker_id: int, name: str):
-        async with self.lock:
-            self.stats[f"Thread {worker_id}"] = name
         self.live.update(self.layout())
 
     async def done_async(self, idx: int = 0, count: int = 1):
         speed = self._compute_speed(idx, count)
         async with self.lock:
-            if idx == 0:
-                self.stats["Done"] += count
-                self.stats["Remaining"] -= count
-
             self._bars[idx].update(
                 task_id=self._tasks[idx],
                 advance=count,
@@ -273,35 +251,12 @@ class LiveUI(BaseUI):
 
     async def update_total_async(self, total: int, idx: int = 0):
         async with self.lock:
-            if idx == 0:
-                old_total = self.stats["Total"]
-                done = self.stats["Done"]
-
-                if old_total < 0:
-                    total = total + old_total
-
-                self.stats["Total"] = total
-                self.stats["Remaining"] = max(total - done, 0)
-
             self._bars[idx].update(self._tasks[idx], total=total)
 
     def update_total(self, total: int, idx: int = 0):
         self._bars[idx].update(self._tasks[idx], total=total)
 
-    async def decrease_total_async(self, decrease: int = 1):
-        async with self.lock:
-            old_total = self.stats["Total"]
-            total = old_total - decrease
-
-            self.stats["Total"] = total
-            self.stats["Remaining"] -= decrease
-
-            self._bars[0].update(self._tasks[0], total=total)
-
     async def error(self, idx: int = 0):
-        async with self.lock:
-            self.stats["Errors"] += 1
-
         self._bars[idx].update(self._tasks[idx], advance=1)
         self.live.update(self.layout())
 

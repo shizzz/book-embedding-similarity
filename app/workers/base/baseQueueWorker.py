@@ -20,7 +20,8 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         name: str = "Stage",
         workers: int = 1,
         logger: logging.Logger = None,
-        batch_strategy: Optional[Callable[[], BaseBatchStrategy]] = None
+        batch_strategy: Optional[Callable[[], BaseBatchStrategy]] = None,
+        producer_qsize: int = 10
     ):
         self.stats = stats
         self.name = name
@@ -32,7 +33,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         self._workers: List[asyncio.Task] = []
         self._flush_lock = asyncio.Lock()
 
-        self.input_channel = input_channel if input_channel else Channel("self", asyncio.Queue(10))
+        self.input_channel = input_channel if input_channel else Channel("self", asyncio.Queue(producer_qsize))
         self.logger = logger or self.get_logger(self.name)
 
         self.batch_strategy_factory = (

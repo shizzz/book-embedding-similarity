@@ -2,8 +2,8 @@ import asyncio
 from typing import List
 from app.model import Model
 from app.infrastructure.db import Migrator, DBRouter
-from app.infrastructure.db.repositories import BookTagsRepository, GenresRepository, ModelRepository
-from app.infrastructure.models import Channel, Stages, ChunkType, BookTag, Dataset
+from app.infrastructure.db.repositories import BookTagsRepository, GenresRepository, ModelRepository, EmbeddingsRepository
+from app.infrastructure.models import Channel, Stages, ChunkType, BookTag, Dataset, Embedding
 from app.workers.stages import TagProducer, TokenizerStage, EmbeddingWorker, BookTagger
 from .pipeline import Pipeline
 
@@ -83,6 +83,8 @@ class TaggerPipeline(Pipeline):
 
         self._registry.register(Dataset.TAG, self._save_tag_async)
         self._registry.register(Dataset.CENROID, self._save_centroid_async)
+        self._registry.register(Dataset.EMBEDDING, self._save_embeddings_async)
+
 
     def _save(self, router: DBRouter, tags: List[BookTag], table: str):
         BookTagsRepository(router, table).create_many(tags)
@@ -94,3 +96,11 @@ class TaggerPipeline(Pipeline):
     async def _save_centroid_async(self, router: DBRouter, tags: List[BookTag]):
         async with router.meta_lock():
             await asyncio.to_thread(self._save, router, tags, BookTagsRepository.CENTOIDS_TABLE)
+
+    async def _save_embeddings_async(self, router: DBRouter, emb: List[Embedding]):
+        def save(router: DBRouter, emb: List[Embedding]):
+            with router.transaction() as tx:
+                EmbeddingsRepository(router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
+
+        async with router.embeddings_lock(self.model.info.uid):
+            await asyncio.to_thread(save, router, emb)
