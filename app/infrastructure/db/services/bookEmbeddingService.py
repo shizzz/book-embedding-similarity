@@ -1,4 +1,5 @@
 import numpy as np
+from collections import defaultdict
 from app.infrastructure.providers import EmbeddingProvider
 from app.infrastructure.models import ChunkType
 
@@ -15,7 +16,6 @@ class BookEmbeddingService:
         ) -> dict[int, dict[ChunkType, np.ndarray]]:
         rows = self._repo.get_by_source_ids(book_ids)
 
-        from collections import defaultdict
         groups: dict[int, dict[ChunkType, list[np.ndarray]]] = defaultdict(lambda: defaultdict(list))
 
         for _, (vec, source_id, type) in rows.items():

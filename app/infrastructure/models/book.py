@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable, TypeVar, Iterator
+from .tag import Tag
 
 def safe_get(row, key, default=None):
     try:
@@ -25,6 +26,8 @@ class Book:
     source_length: int = None
     text_length: int = None
     empty: bool = None
+    tags: Optional[List[Tag]] = None
+    centroids: Optional[List[Tag]] = None
 
     T = TypeVar("T")
 

@@ -38,9 +38,6 @@ class BookPair:
         cand_map = embeddings.get(fb.candidate_id) or {}
         src_emb = src_map.get(ChunkType.TEXT)
         cand_emb = cand_map.get(ChunkType.TEXT)
-
-        if src_emb is None or cand_emb is None:
-            return None
         
         return cls(
             source=src,
@@ -72,9 +69,6 @@ class BookPair:
         cand_map = embeddings.get(searchResult.Candidate) or {}
         src_emb = src_map.get(ChunkType.TEXT)
         cand_emb = cand_map.get(ChunkType.TEXT)
-
-        if src_emb is None or cand_emb is None:
-            return None
         
         return cls(
             source=src,

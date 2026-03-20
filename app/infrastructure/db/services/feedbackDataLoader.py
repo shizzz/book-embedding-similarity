@@ -8,16 +8,23 @@ class PairDataLoader:
     def __init__(
             self, 
             book_provider: BookProvider, 
-            emb_provider: EmbeddingProvider
+            emb_provider: EmbeddingProvider,
+            # Оставляем как опцию, поскольку с тэгами получилось не то чтобы огненно
+            include_embeddings: bool = False
         ):
         self._book_provider = book_provider
         self._emb_service = BookEmbeddingService(emb_provider)
+        self._include_embeddings = include_embeddings
     
     def _load(
             self, 
             book_ids: list[int],
         ) -> tuple[dict[int, Book], dict[int, dict[ChunkType, np.ndarray]]]:
-        embeddings = self._emb_service.get_mean_embeddings(list[int](book_ids))
+        embeddings = {}
+
+        if self._include_embeddings:
+            embeddings = self._emb_service.get_mean_embeddings(list[int](book_ids))
+
         books = self._book_provider.get_many(list[int](book_ids))
 
         return books, embeddings
