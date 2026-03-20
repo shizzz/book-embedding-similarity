@@ -27,12 +27,12 @@ class CentroidsProducer(BaseQueueWorker):
         
         self._router = router
         self.ui = ui
+        self._id = EmbeddingsRepository(self._router).get_max_id()
 
     async def produce(self):
         d = 768
         K = 512
 
-        id = EmbeddingsRepository(self._router).get_max_id()
         batches = EmbeddingsBatchIterable(repo=EmbeddingsRepository(self._router), batch_size=10000)
         
         embeddings_data = []
@@ -53,17 +53,17 @@ class CentroidsProducer(BaseQueueWorker):
 
         self.logger.info("Spread clusters")
         for centro in cluster_centers:
-            id += 1
+            self._id += 1
             task = Task(
-                id=id,
-                name=str(id),
+                id=self._id,
+                name=str(self._id),
                 dataset=Dataset.EMBEDDING,
                 routes=[Action.DB, Action.TAG],
                 cost=centro.nbytes,
                 entity=Embedding(
-                    id=id,
-                    chunk_id=id,
-                    source_id=id,
+                    id=self._id,
+                    chunk_id=self._id,
+                    source_id=self._id,
                     data=centro,
                     seq=0,
                     shape=len(centro),

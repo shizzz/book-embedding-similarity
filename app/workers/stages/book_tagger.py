@@ -12,6 +12,7 @@ class BookTagger(BaseQueueWorker):
             self, 
             model_id: int,
             top_k: int = 1000,
+            threshold: float = 0.8,
             name: str = Stages.TAG,
             *args, 
             **kwargs
@@ -27,6 +28,7 @@ class BookTagger(BaseQueueWorker):
         self._unpacker = FaissId.unpack_book
         self.model_id = model_id
         self.top_k = top_k
+        self.threshold = threshold
 
     async def process(self, batch: List[Task[Embedding]], wid: int) -> List[BookTag]:
         """
@@ -34,7 +36,7 @@ class BookTagger(BaseQueueWorker):
         Используется to_thread, чтобы не блокировать event loop.
         """
         tag_embeddings = np.stack([e.entity.data for e in batch])  # shape (B, d)
-        tag_ids = [e.entity.id for e in batch]
+        tag_ids = [e.entity.source_id for e in batch]
         tag_types = [e.entity.type for e in batch]
 
         # Функция для синхронного поиска и постобработки
@@ -45,14 +47,11 @@ class BookTagger(BaseQueueWorker):
             D, I = self._chunk_index.search(tag_embeddings, k=self.top_k)  # D, I shape = (B, k)
 
             for tag_idx, tag_id in enumerate(tag_ids):
-                top_score = max(D[tag_idx])
-                adaptive_threshold = max(0.8, top_score * 0.9)
-
                 for score, packed_id in zip(D[tag_idx], I[tag_idx]):
                     if packed_id == -1:
                         continue
 
-                    if score < adaptive_threshold:
+                    if score < self.threshold:
                         continue
 
                     book_id = FaissId.unpack_book(packed_id)
