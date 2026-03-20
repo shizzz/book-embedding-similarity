@@ -42,7 +42,7 @@ class SimilarSearchEngine:
         self._emb_provider = HybridEmbeddingProvider(router)
         #cache = EmbeddingsRepository(self._router).get_by_ids()
         #self._emb_provider = HybridEmbeddingProvider(db_router=router, cache_data=cache)
-        self._data_loader = PairDataLoader(self._book_provider, self._emb_provider, False)
+        self._data_loader = PairDataLoader(self._book_provider, self._emb_provider)
 
     def find_similar_books(
         self,

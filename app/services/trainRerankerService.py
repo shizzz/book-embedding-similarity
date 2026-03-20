@@ -18,7 +18,7 @@ class TrainRerankerService:
         self._book_provider = HybridBookProvider(router)
         self._embedding_provider = HybridEmbeddingProvider(router)
         self._embedding_service = BookEmbeddingService(router)
-        self._feedbackDataLoader = PairDataLoader(self._book_provider, self._embedding_provider, False)
+        self._feedbackDataLoader = PairDataLoader(self._book_provider, self._embedding_provider)
         self._ui = ui
 
         tag_ids = GenresRepository(router).get_ids()
