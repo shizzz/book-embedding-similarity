@@ -9,12 +9,14 @@ from app.workers.stages import CentroidsProducer
 class GenerateTags(BaseWorker):
     def __init__(
             self,
+            centros: int,
             threshold: float
         ):
         super().__init__(name="Generate tags", logger=logging.getLogger(__name__))
 
         self._channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
         self._channel_tag = Channel(Stages.TAG, asyncio.Queue(2000))
+        self._centros = centros
         self._threshold = threshold
 
     async def after_run(self) -> None:
@@ -57,6 +59,7 @@ class GenerateTags(BaseWorker):
         centroid_producer_stage = CentroidsProducer(
             router=self.router,
             ui=self.ui,
+            centros=self._centros,
             output_channels=[self._channel_tag, self._channel_db],
             stats=self.stats,
             logger=self.logger, 

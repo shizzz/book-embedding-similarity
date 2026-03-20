@@ -15,8 +15,13 @@ def register_generate(subparsers):
     )
 
     parser.add_argument(
+        "--centros",
+        type=int,
+        help="Количество генерируемых центроидов"
+    )
+
+    parser.add_argument(
         "--trenshold",
-        required=True,
         type=float,
         help="Нижний порог совпадения тэгов достаточный для того, чтобы добавить в книгу"
     )

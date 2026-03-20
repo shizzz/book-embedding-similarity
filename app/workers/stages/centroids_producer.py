@@ -11,9 +11,10 @@ class CentroidsProducer(BaseQueueWorker):
     Создает центроиды имеющихся эмбеддингов
     """
     def __init__(
-            self, 
+            self,
             router: DBRouter,
             ui,
+            centros: int = 256,
             name: str = Stages.PRODUCER + "_Centroids",
             *args, 
             **kwargs
@@ -29,10 +30,11 @@ class CentroidsProducer(BaseQueueWorker):
         self.ui = ui
         self._id = EmbeddingsRepository(self._router).get_max_id()
         self._shape = EmbeddingsRepository(self._router).get_shape()
+        self._centros = centros
 
     async def produce(self):
         d = self._shape
-        K = 1024
+        K = self._centros
 
         batches = EmbeddingsBatchIterable(repo=EmbeddingsRepository(self._router), batch_size=10000)
         
