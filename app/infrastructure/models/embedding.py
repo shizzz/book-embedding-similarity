@@ -2,7 +2,10 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Optional
 from typing import Tuple
+from app.settings import ProcessConfig
 from .constants import ChunkType
+
+dtype = np.float16 if ProcessConfig.STORAGE_EMBEDDING_DTYPE == "float16" else np.float32
 
 @dataclass
 class Embedding:
@@ -38,3 +41,17 @@ class Embedding:
             shape=row["shape"],
             type=row["type"]
         )
+    
+    @staticmethod
+    def normalize(vec: np.ndarray) -> np.ndarray:
+        vec = vec.astype(np.float32)
+        
+        if vec.ndim == 1:
+            norm = np.linalg.norm(vec)
+            if norm < 1e-9:
+                return np.zeros_like(vec)
+            return vec / norm
+
+        norms = np.linalg.norm(vec, axis=1, keepdims=True)
+        norms[norms < 1e-9] = 1.0
+        return vec / norms

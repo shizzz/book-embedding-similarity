@@ -206,3 +206,10 @@ class EmbeddingsRepository:
             else:
                 start_id = row["seq"] + 1
             return start_id
+        
+    # ------------------------
+    # DELETE
+    # ------------------------
+    def delete_by_type(self, type: ChunkType) -> None:
+        with self.router.embeddings(self.model_uid) as conn:
+            conn.execute(f"DELETE FROM embeddings WHERE type = ?", (type,))

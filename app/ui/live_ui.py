@@ -62,7 +62,7 @@ class LiveUI(BaseUI):
         table.add_column("Pressure")
 
         stages = self.pipeline_stats.stages
-        stage_items = list(stages.items())
+        stage_items = self.pipeline_stats.get_ordered_stages(mode="topology")
 
         # -------------------------
         # определяем bottleneck

@@ -14,7 +14,7 @@ class BookProducer(BaseQueueWorker[BookTask]):
             self, 
             router: DBRouter,
             search_engine: BaseBookSearchEngine,
-            name: str = Stages.BOOK_SEARCH,
+            name: str = Stages.PRODUCER + "_book_search",
             *args, 
             **kwargs
         ):

@@ -11,11 +11,11 @@ PROD_THREADS: int = 2
 INDEX_THREADS: int = 1
 TOKENS_THREADS: int = 2
 EMB_THREADS: int = 2
-TOP_K: int = 1000
 
 class TaggerPipeline(Pipeline):
     def __init__(
         self,
+        threshold: float,
         *args, 
         **kwargs
     ):
@@ -27,6 +27,9 @@ class TaggerPipeline(Pipeline):
 
         BookTagsRepository(self._router, BookTagsRepository.GENRES_TABLE).delete_by_model(self._model_id)
         BookTagsRepository(self._router, BookTagsRepository.CENTOIDS_TABLE).delete_by_model(self._model_id)
+        EmbeddingsRepository(self._router, self.model.info.uid).delete_by_type(ChunkType.CENTROID)
+
+        self._threshold = threshold
 
     async def setup_stages(self) -> None:
         channel_tokenizer = Channel(Stages.TOKENIZER, asyncio.Queue(10))
@@ -74,7 +77,7 @@ class TaggerPipeline(Pipeline):
         # search and apply tags
         embedding_stage = BookTagger(
             model_id=self._model_id,
-            top_k=TOP_K,
+            threshold=self._threshold,
             input_channel=channel_tagger,
             output_channels=[*(self._output_channels or [])],
             stats=self._stats,

@@ -3,7 +3,6 @@ import numpy as np
 import zlib
 from app.settings import ProcessConfig
 
-dtype_model = np.float16 if ProcessConfig.MODEL_EMBEDDING_DTYPE == "float16" else np.float32
 dtype = np.float16 if ProcessConfig.STORAGE_EMBEDDING_DTYPE == "float16" else np.float32
 
 class SQLiteAdapters:
@@ -17,15 +16,8 @@ class SQLiteAdapters:
         cls._registered = True
 
         # ---------- NUMPY ----------
-        def normalize(vec: np.ndarray) -> np.ndarray:
-            vec = vec.astype(dtype)
-            norm = np.linalg.norm(vec)
-            if norm < 1e-9:
-                return np.zeros_like(vec, dtype=dtype)
-            return vec / norm
-
         def adapt_numpy(arr: np.ndarray) -> bytes:
-            return normalize(arr).tobytes()
+            return arr.astype(dtype).tobytes()
 
         def convert_numpy(blob: bytes) -> np.ndarray:
             return np.frombuffer(blob, dtype=dtype)

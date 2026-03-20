@@ -10,7 +10,7 @@ class DbChunkProducer(BaseQueueWorker[Chunk]):
     def __init__(
             self,
             router: DBRouter,
-            name: str = Stages.CHUNK,
+            name: str = Stages.PRODUCER + "_chunk",
             *args, 
             **kwargs
         ):

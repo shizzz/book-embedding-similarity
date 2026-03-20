@@ -7,17 +7,22 @@ from app.workers.base import BaseWorker
 from app.workers.stages import CentroidsProducer
 
 class GenerateTags(BaseWorker):
-    def __init__(self):
+    def __init__(
+            self,
+            threshold: float
+        ):
         super().__init__(name="Generate tags", logger=logging.getLogger(__name__))
 
         self._channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))
-        self._channel_tag = Channel(Stages.TAG, asyncio.Queue(10))
+        self._channel_tag = Channel(Stages.TAG, asyncio.Queue(2000))
+        self._threshold = threshold
 
     async def after_run(self) -> None:
         pass
 
     async def setup_stages(self):
         tagger_pipeline = TaggerPipeline(
+            threshold=self._threshold,
             router=self.router,
             registry=self.registry,
             stats=self.stats,

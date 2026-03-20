@@ -1,7 +1,6 @@
 import asyncio
 from app.workers import GenerateTags
-from app.infrastructure.models.constants import SearchIndexLevel
 
 def run(args):
-    worker = GenerateTags()
+    worker = GenerateTags(threshold=args.trenshold)
     asyncio.run(worker.run())

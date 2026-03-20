@@ -12,7 +12,7 @@ class BookTagger(BaseQueueWorker):
             self, 
             model_id: int,
             top_k: int = 1000,
-            threshold: float = 0.8,
+            threshold: float = 0.1,
             name: str = Stages.TAG,
             *args, 
             **kwargs
@@ -44,14 +44,17 @@ class BookTagger(BaseQueueWorker):
             result_dict: dict[int, BookTag] = {}
 
             # Поиск в Faiss
-            D, I = self._chunk_index.search(tag_embeddings, k=self.top_k)  # D, I shape = (B, k)
+            lims, D_flat, I_flat = self._chunk_index.range_search(tag_embeddings, self.threshold)
 
             for tag_idx, tag_id in enumerate(tag_ids):
-                for score, packed_id in zip(D[tag_idx], I[tag_idx]):
-                    if packed_id == -1:
-                        continue
+                start = lims[tag_idx]
+                end = lims[tag_idx + 1]
 
-                    if score < self.threshold:
+                scores = D_flat[start:end]
+                packed_ids = I_flat[start:end]
+
+                for score, packed_id in zip(scores, packed_ids):
+                    if packed_id == -1:
                         continue
 
                     book_id = FaissId.unpack_book(packed_id)
@@ -59,12 +62,12 @@ class BookTagger(BaseQueueWorker):
                     # Оставляем только максимальный score для каждой книги
                     if book_id not in result_dict or score > result_dict[book_id].distance:
                         result_dict[book_id] = BookTag(
-                                book_id=int(book_id), 
-                                genre_id=int(tag_id),
-                                model_id=self.model_id,
-                                distance=float(score),
-                                type=tag_types[tag_idx],
-                            )
+                            book_id=int(book_id),
+                            genre_id=int(tag_id),
+                            model_id=self.model_id,
+                            distance=float(score),
+                            type=tag_types[tag_idx],
+                        )
 
             return list(result_dict.values())
 

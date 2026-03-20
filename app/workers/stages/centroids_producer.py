@@ -28,10 +28,11 @@ class CentroidsProducer(BaseQueueWorker):
         self._router = router
         self.ui = ui
         self._id = EmbeddingsRepository(self._router).get_max_id()
+        self._shape = EmbeddingsRepository(self._router).get_shape()
 
     async def produce(self):
-        d = 768
-        K = 512
+        d = self._shape
+        K = 1024
 
         batches = EmbeddingsBatchIterable(repo=EmbeddingsRepository(self._router), batch_size=10000)
         
@@ -46,7 +47,9 @@ class CentroidsProducer(BaseQueueWorker):
         self.logger.info("Train KMeans")
         kmeans.train(embeddings_data)
 
+        self.logger.info("Norm clusters")
         cluster_centers = kmeans.centroids.copy()
+        faiss.normalize_L2(cluster_centers)
 
         self.logger.info("Clear RAM")
         del embeddings_data

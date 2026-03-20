@@ -13,7 +13,7 @@ class EmbeddingProducer(BaseQueueWorker[Embedding]):
     def __init__(
             self,
             router: DBRouter,
-            name: str = Stages.EMBEDDING,
+            name: str = Stages.PRODUCER + "_embedding",
             *args, 
             **kwargs
         ):

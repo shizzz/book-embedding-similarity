@@ -13,3 +13,10 @@ def register_generate(subparsers):
         "generate",
         help="Генерация тэгов"
     )
+
+    parser.add_argument(
+        "--trenshold",
+        required=True,
+        type=float,
+        help="Нижний порог совпадения тэгов достаточный для того, чтобы добавить в книгу"
+    )

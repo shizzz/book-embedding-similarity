@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from app.infrastructure.db import DBRouter
 from app.infrastructure.models.tag import BookTag
 
@@ -36,6 +36,29 @@ class BookTagsRepository:
     # ------------------------
     # READ
     # ------------------------
+    def get_many(self, book_ids: List[int]) -> Dict[int, List[BookTag]]:
+        if not book_ids:
+            return {}
+
+        placeholders = ",".join("?" for _ in book_ids)
+        query = f"""
+            SELECT id, book_id, genre_id, model_id, distance
+            FROM {self.table}
+            WHERE book_id IN ({placeholders})
+        """
+
+        with self.router.meta() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, book_ids)
+            rows = cursor.fetchall()
+
+        result: Dict[int, List[BookTag]] = {book_id: [] for book_id in book_ids}
+        for row in rows:
+            tag = BookTag.from_row(row)
+            result[tag.book_id].append(tag)
+
+        return result
+    
     def get_by_book(self, book_id: int) -> List[BookTag]:
         """
         Получение всех тегов (BookTag) для конкретной книги.

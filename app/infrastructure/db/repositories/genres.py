@@ -103,6 +103,11 @@ class GenresRepository:
                 )
             )
 
+    def get_ids(self) -> list[int]:
+        with self.router.meta() as conn:
+            rows = conn.execute("SELECT id FROM genres").fetchall()
+            return [r[0] for r in rows]
+
     # ------------------------
     # DELETE
     # ------------------------

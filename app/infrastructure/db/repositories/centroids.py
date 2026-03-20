@@ -43,6 +43,11 @@ class CentroidsRepository:
 
                 yield Tag.from_row(row)
 
+    def get_ids(self) -> list[int]:
+        with self.router.embeddings(self.model_uid) as conn:
+            rows = conn.execute("SELECT source_id FROM embeddings WHERE [type] = ?", (ChunkType.CENTROID,)).fetchall()
+            return [r[0] for r in rows]
+        
     # ------------------------
     # COUNT
     # ------------------------
