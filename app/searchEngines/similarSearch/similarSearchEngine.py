@@ -86,7 +86,7 @@ class SimilarSearchEngine:
         if not self._reranker or not self._reranker.model:
             return pairs
 
-        extractor = RerankerFeatureExtractor()
+        extractor = self._feature_extractor
         X = []
         valid_pairs = []
 
