@@ -57,9 +57,9 @@ class BookTagsRepository:
     # ------------------------
     # DELETE
     # ------------------------
-    def delete_by_book(self, book_id: int) -> None:
+    def delete_by_model(self, model_id: int) -> None:
         """
-        Удаление всех тегов для книги
+        Удаление всех тегов для модели
         """
         with self.router.meta() as conn:
-            conn.execute(f"DELETE FROM {self.table} WHERE book_id = ?", (book_id,))
+            conn.execute(f"DELETE FROM {self.table} WHERE model_id = ?", (model_id,))

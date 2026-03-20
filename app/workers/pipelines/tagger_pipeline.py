@@ -25,6 +25,9 @@ class TaggerPipeline(Pipeline):
         Migrator(self._router).migrate_all([self.model.info.uid])
         self._model_id = ModelRepository(self._router).get_or_create(self.model.info.uid, self.model.info.model_name)
 
+        BookTagsRepository(self._router, BookTagsRepository.GENRES_TABLE).delete_by_model(self._model_id)
+        BookTagsRepository(self._router, BookTagsRepository.CENTOIDS_TABLE).delete_by_model(self._model_id)
+
     async def setup_stages(self) -> None:
         channel_tokenizer = Channel(Stages.TOKENIZER, asyncio.Queue(10))
         channel_emb = Channel(Stages.EMBEDDING, asyncio.Queue(10))
