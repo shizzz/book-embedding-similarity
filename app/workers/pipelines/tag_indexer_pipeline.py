@@ -68,7 +68,6 @@ class TagIndexerPipeline(Pipeline):
 
             output_channels=centroids_out_channels,
         )
-        self.pool.append(centroid_producer_stage)
 
         # human readable route
         tag_producer_stage = TagProducer(
@@ -82,9 +81,8 @@ class TagIndexerPipeline(Pipeline):
 
             output_channels=[channel_tokenizer],
         )
-        self.pool.append(tag_producer_stage)
 
-        embedding_stage = TokenizerStage(
+        token_stage = TokenizerStage(
             model=self.model,
             router=self._router,
             
@@ -96,7 +94,6 @@ class TagIndexerPipeline(Pipeline):
             input_channel=channel_tokenizer,
             output_channels=[channel_emb],
         )
-        self.pool.append(embedding_stage)
 
         embedding_stage = EmbeddingWorker(
             model=self.model,
@@ -110,7 +107,6 @@ class TagIndexerPipeline(Pipeline):
             input_channel=channel_emb,
             output_channels=tag_out_channels,
         )
-        self.pool.append(embedding_stage)
 
         # Indexes
         tag_indexer = Indexer(
@@ -126,7 +122,6 @@ class TagIndexerPipeline(Pipeline):
             input_channel=channel_tags,
             output_channels=[*(self._output_channels or [])],
         )
-        self.pool.append(tag_indexer)
 
         centroid_indexer = Indexer(
             router=self._router,
@@ -141,6 +136,12 @@ class TagIndexerPipeline(Pipeline):
             input_channel=channel_centroids,
             output_channels=[*(self._output_channels or [])],
         )
+
+        self.pool.append(centroid_producer_stage)
+        self.pool.append(tag_producer_stage)
+        self.pool.append(token_stage)
+        self.pool.append(embedding_stage)
+        self.pool.append(tag_indexer)
         self.pool.append(centroid_indexer)
 
         self._registry.register(Dataset.EMBEDDING, self._save_embeddings_async)

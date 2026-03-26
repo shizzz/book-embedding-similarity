@@ -36,7 +36,6 @@ class TaggerPipeline(Pipeline):
             input_channel=self._input_channel,
             output_channels=[channel_tag, channel_centroids],
         )
-        self.pool.append(emb_stage)
 
         tagger_tag = BookTagger(
             model_id=self._model_id,
@@ -51,7 +50,6 @@ class TaggerPipeline(Pipeline):
             input_channel=channel_tag,
             output_channels=[*(self._output_channels or [])],
         )
-        self.pool.append(tagger_tag)
 
         tagger_centroid = BookTagger(
             model_id=self._model_id,
@@ -66,6 +64,9 @@ class TaggerPipeline(Pipeline):
             input_channel=channel_centroids,
             output_channels=[*(self._output_channels or [])],
         )
+
+        self.pool.append(emb_stage)
+        self.pool.append(tagger_tag)
         self.pool.append(tagger_centroid)
 
         self._registry.register(Dataset.TAG, self._save_tag_async)

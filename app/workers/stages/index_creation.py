@@ -6,7 +6,7 @@ from app.hnsw import FaissId
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, EmbeddingsRepository
 from app.workers.base import BaseQueueWorker
-from app.infrastructure.models import Task, Action, Embedding, Stages, IndexLevel
+from app.infrastructure.models import Task, Action, Embedding, Stages, IndexLevel, Channel
 from app.settings import PathsConfig, ProcessConfig, IndexConfig
 
 class Indexer(BaseQueueWorker[Embedding]):
@@ -35,6 +35,9 @@ class Indexer(BaseQueueWorker[Embedding]):
             self._get_entity_id = lambda emb: FaissId.pack(emb.source_id, emb.id)
         else:
             raise TypeError("Unknown index type")
+        
+    def route(self, task: Task, channels: list[Channel]) -> list[Channel]:
+        return [ch for ch in channels if ch.downstream != Stages.DB]
 
     def create_index(self, shape: int):
         base_index = faiss.IndexHNSWFlat(
@@ -68,7 +71,7 @@ class Indexer(BaseQueueWorker[Embedding]):
             result_append(
                 Task(
                     id=entity_id,
-                    name=str(entity_id),
+                    name="Index added",
                     entity=entity_id,
                     routes=Action.NONE
                 )

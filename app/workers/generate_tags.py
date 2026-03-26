@@ -30,8 +30,10 @@ class GenerateTags(BaseWorker):
     async def before_run(self) -> None:
         BookTagsRepository(self.router, BookTagsRepository.GENRES_TABLE).delete_by_model(self._model_id)
         BookTagsRepository(self.router, BookTagsRepository.CENTOIDS_TABLE).delete_by_model(self._model_id)
-        EmbeddingsRepository(self.router, self._model_uid).delete_by_type(ChunkType.CENTROID)
-        EmbeddingsRepository(self.router, self._model_uid).delete_by_type(ChunkType.TAG)
+        
+        if self._recreate:
+            EmbeddingsRepository(self.router, self._model_uid).delete_by_type(ChunkType.CENTROID)
+            EmbeddingsRepository(self.router, self._model_uid).delete_by_type(ChunkType.TAG)
 
     async def setup_stages(self):
         tag_indexer_pipeline = TagIndexerPipeline(
