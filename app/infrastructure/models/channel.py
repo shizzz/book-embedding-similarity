@@ -18,8 +18,12 @@ class Channel:
         async with self._lock:
             self.producers += 1
 
+            if self.producers > 0:
+                self.upstream_done.clear()
+
     async def done(self) -> None:
         async with self._lock:
             self.producers -= 1
+            
             if self.producers <= 0:
                 self.upstream_done.set()

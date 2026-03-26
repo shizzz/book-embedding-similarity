@@ -36,10 +36,13 @@ class Pipeline(ABC):
 
         self.pool: list[BaseQueueWorker] = []
 
-    def get_start_tasks(self) -> list:
+    async def get_start_tasks(self) -> list:
         if self._upstream_done is None:
             return [worker.start() for worker in self.pool]
-        return []
+        else:
+            for ch in self._output_channels:
+                await ch.add_upstream()
+            return []
 
     def get_wait_tasks(self) -> list:
         if self._upstream_done is None:
@@ -49,6 +52,10 @@ class Pipeline(ABC):
     async def _exec_with_upstream(self):
         await self._upstream_done.wait()
         await asyncio.gather(*(worker.start() for worker in self.pool))
+        
+        for ch in self._output_channels:
+            await ch.done()
+
         await asyncio.gather(*(worker.wait() for worker in self.pool))
 
     @abstractmethod

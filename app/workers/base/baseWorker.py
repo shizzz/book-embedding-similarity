@@ -60,7 +60,11 @@ class BaseWorker(ABC):
                 await asyncio.gather(*(pipeline.setup_stages() for pipeline in self.pipelines))
                 
                 # Сначала стартовые задачи всех pipeline
-                start_tasks = [t for p in self.pipelines for t in p.get_start_tasks()]
+                start_tasks_nested = await asyncio.gather(
+                    *(p.get_start_tasks() for p in self.pipelines)
+                )
+
+                start_tasks = [t for sublist in start_tasks_nested for t in sublist]
                 if start_tasks:
                     await asyncio.gather(*start_tasks)
 

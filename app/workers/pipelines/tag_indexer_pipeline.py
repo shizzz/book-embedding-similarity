@@ -1,7 +1,9 @@
 import asyncio
+from typing import List
 from app.model import Model
+from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import GenresRepository, ModelRepository, EmbeddingsRepository
-from app.infrastructure.models import Channel, Stages, ChunkType, IndexLevel
+from app.infrastructure.models import Embedding, Channel, Stages, ChunkType, IndexLevel, Dataset
 from app.workers.stages import TagProducer, TokenizerStage, EmbeddingWorker, Indexer, CentroidsProducer
 from .pipeline import Pipeline
 from app.settings import PathsConfig, ProcessConfig
@@ -37,12 +39,23 @@ class TagIndexerPipeline(Pipeline):
             for ch in self._output_channels:
                 ch.upstream_done.set()
             return
-        
         channel_tokenizer = Channel(Stages.TOKENIZER, asyncio.Queue(10))
         channel_emb = Channel(Stages.EMBEDDING, asyncio.Queue(10))
         channel_tags = Channel(f"{Stages.INDEX}_{IndexLevel.TAGS}", asyncio.Queue(10))
         channel_centroids = Channel(f"{Stages.INDEX}_{IndexLevel.CENTROIDS}", asyncio.Queue(10))
 
+        tag_out_channels = [channel_tags]
+        centroids_out_channels = [channel_centroids]
+
+        db_channel = next(
+            (ch for ch in self._output_channels if ch.downstream == Stages.DB),
+            None
+        )
+
+        if db_channel:
+            tag_out_channels.append(db_channel)
+            centroids_out_channels.append(db_channel)
+        
         genres_repo = GenresRepository(self._router)
         
         # centroids route
@@ -53,24 +66,9 @@ class TagIndexerPipeline(Pipeline):
             stats=self._stats,
             logger=self._logger, 
 
-            output_channels=[channel_centroids],
+            output_channels=centroids_out_channels,
         )
         self.pool.append(centroid_producer_stage)
-
-        centroid_indexer = Indexer(
-            router=self._router,
-            level=IndexLevel.CENTROIDS,
-            shape=self._shape,
-
-            batch_size=20000,
-            stats=self._stats,
-            workers=INDEX_THREADS,
-            logger = self._logger,
-
-            input_channel=channel_centroids,
-            output_channels=[*(self._output_channels or [])],
-        )
-        self.pool.append(centroid_indexer)
 
         # human readable route
         tag_producer_stage = TagProducer(
@@ -110,10 +108,11 @@ class TagIndexerPipeline(Pipeline):
             logger = self._logger,
 
             input_channel=channel_emb,
-            output_channels=[channel_tags],
+            output_channels=tag_out_channels,
         )
         self.pool.append(embedding_stage)
 
+        # Indexes
         tag_indexer = Indexer(
             router=self._router,
             shape=self._shape,
@@ -128,3 +127,28 @@ class TagIndexerPipeline(Pipeline):
             output_channels=[*(self._output_channels or [])],
         )
         self.pool.append(tag_indexer)
+
+        centroid_indexer = Indexer(
+            router=self._router,
+            level=IndexLevel.CENTROIDS,
+            shape=self._shape,
+
+            batch_size=20000,
+            stats=self._stats,
+            workers=INDEX_THREADS,
+            logger = self._logger,
+
+            input_channel=channel_centroids,
+            output_channels=[*(self._output_channels or [])],
+        )
+        self.pool.append(centroid_indexer)
+
+        self._registry.register(Dataset.EMBEDDING, self._save_embeddings_async)
+
+    async def _save_embeddings_async(self, router: DBRouter, emb: List[Embedding]):
+        def save(router: DBRouter, emb: List[Embedding]):
+            with router.transaction() as tx:
+                EmbeddingsRepository(router, self.model.info.uid).save_bulk(emb, conn=tx.embeddings(self.model.info.uid))
+
+        async with router.embeddings_lock(self.model.info.uid):
+            await asyncio.to_thread(save, router, emb)

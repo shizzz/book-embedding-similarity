@@ -1,7 +1,8 @@
 import asyncio
 import logging
 from typing import List
-from app.infrastructure.models import Channel, Stages, Task
+from app.infrastructure.db.repositories import BookTagsRepository, EmbeddingsRepository
+from app.infrastructure.models import Channel, Stages, ChunkType
 from app.workers.pipelines import TagIndexerPipeline, TaggerPipeline, DbPipeline
 from app.workers.base import BaseWorker
 
@@ -20,8 +21,17 @@ class GenerateTags(BaseWorker):
         self._threshold = threshold
         self._recreate = recreate
 
+        self._model_uid = None
+        self._model_id = None
+
     async def after_run(self) -> None:
         pass
+
+    async def before_run(self) -> None:
+        BookTagsRepository(self.router, BookTagsRepository.GENRES_TABLE).delete_by_model(self._model_id)
+        BookTagsRepository(self.router, BookTagsRepository.CENTOIDS_TABLE).delete_by_model(self._model_id)
+        EmbeddingsRepository(self.router, self._model_uid).delete_by_type(ChunkType.CENTROID)
+        EmbeddingsRepository(self.router, self._model_uid).delete_by_type(ChunkType.TAG)
 
     async def setup_stages(self):
         tag_indexer_pipeline = TagIndexerPipeline(
@@ -33,8 +43,11 @@ class GenerateTags(BaseWorker):
             stats=self.stats,
             logger=self.logger,
 
-            output_channels = [self._channel_tag],
+            output_channels = [self._channel_tag, self._channel_db],
         )
+
+        self._model_id = tag_indexer_pipeline.model_id
+        self._model_uid = tag_indexer_pipeline.model.info.uid
 
         tagger_pipeline = TaggerPipeline(
             threshold=self._threshold,
@@ -53,7 +66,7 @@ class GenerateTags(BaseWorker):
             model_name=tag_indexer_pipeline.model.info.model_name,
             model_uid=tag_indexer_pipeline.model.info.uid,
             threads=1,
-            batch_size=1024,
+            batch_size=20000,
 
             router=self.router,
             registry=self.registry,
@@ -66,8 +79,3 @@ class GenerateTags(BaseWorker):
         self.pipelines.append(tag_indexer_pipeline)
         self.pipelines.append(tagger_pipeline)
         self.pipelines.append(dbPipeline)
-
-    async def _enqueue_task(self, tasks: List[Task]):
-        for task in tasks:
-            await self._channel_db.queue.put(task)
-            await self._channel_tag.queue.put(task)

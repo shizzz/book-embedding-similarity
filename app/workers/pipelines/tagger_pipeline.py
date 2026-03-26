@@ -17,9 +17,6 @@ class TaggerPipeline(Pipeline):
         **kwargs
     ):
         super().__init__(name="indexer", *args, **kwargs)
-        
-        BookTagsRepository(self._router, BookTagsRepository.GENRES_TABLE).delete_by_model(model_id)
-        BookTagsRepository(self._router, BookTagsRepository.CENTOIDS_TABLE).delete_by_model(model_id)
 
         self._threshold = threshold
         self._model_id = model_id
@@ -46,7 +43,7 @@ class TaggerPipeline(Pipeline):
             type=IndexLevel.TAGS,
             threshold=self._threshold,
             
-            batch_size=100,
+            batch_size=50,
             workers=THREADS,
             stats=self._stats,
             logger=self._logger,
@@ -61,7 +58,7 @@ class TaggerPipeline(Pipeline):
             type=IndexLevel.CENTROIDS,
             threshold=self._threshold,
             
-            batch_size=100,
+            batch_size=50,
             workers=THREADS,
             stats=self._stats,
             logger=self._logger,
