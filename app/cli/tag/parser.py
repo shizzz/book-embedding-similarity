@@ -15,6 +15,12 @@ def register_generate(subparsers):
     )
 
     parser.add_argument(
+        "--recreate",
+        action="store_true",
+        help="Создать индексы заново, даже если он уже создан"
+    )
+
+    parser.add_argument(
         "--centros",
         type=int,
         help="Количество генерируемых центроидов"

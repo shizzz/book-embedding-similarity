@@ -1,3 +1,4 @@
+import asyncio
 import time
 from abc import ABC
 from app.infrastructure.models import StageStats
@@ -146,3 +147,46 @@ class Stats(ABC):
 
         # fallback
         return stage_items
+    
+    def atqdm(self, iterable, total: int, desc: str):
+        stats = self
+
+        class _ATqdm:
+            async def __aiter__(self_inner):
+                await stats.register_stage(desc)
+                await stats.set_total(desc, total)
+
+                try:
+                    if hasattr(iterable, "__aiter__"):
+                        async for item in iterable:
+                            yield item
+                            await stats.done(desc, self_inner._count(item))
+
+                    else:
+                        loop = asyncio.get_running_loop()
+                        iterator = iter(iterable)
+
+                        def safe_next(it):
+                            try:
+                                return True, next(it)
+                            except StopIteration:
+                                return False, None
+
+                        while True:
+                            has_item, item = await loop.run_in_executor(
+                                None, safe_next, iterator
+                            )
+
+                            if not has_item:
+                                break
+
+                            yield item
+                            await stats.done(desc, self_inner._count(item))
+
+                finally:
+                    await stats.unregister_stage(desc)
+
+            def _count(self_inner, item):
+                return len(item) if hasattr(item, "__len__") else 1
+
+        return _ATqdm()

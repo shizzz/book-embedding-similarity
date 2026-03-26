@@ -51,3 +51,13 @@ class SearchIndexLevel(StrEnum):
 
     def __str__(self):
         return self.name
+    
+class IndexLevel(StrEnum):
+    CHUNK = "chunk" #: генерируем индекс для всех имеющихся текстовых кусков
+    DOCUMENT = "document" #: при создании индекса, сливаем все текстовые куски в один mean вектор
+    BOTH = "both"  #: генерировать оба
+    CENTROIDS = "centroids"  #: индекс центроидов
+    TAGS = "tags"  #: индекс тэгов
+
+    def __str__(self):
+        return self.value

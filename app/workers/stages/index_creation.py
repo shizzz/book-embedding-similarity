@@ -6,8 +6,8 @@ from app.hnsw import FaissId
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, EmbeddingsRepository
 from app.workers.base import BaseQueueWorker
-from app.infrastructure.models import Task, Action, Embedding, Stages
-from app.settings import PathsConfig, ProcessConfig, IndexConfig, IndexLevel
+from app.infrastructure.models import Task, Action, Embedding, Stages, IndexLevel
+from app.settings import PathsConfig, ProcessConfig, IndexConfig
 
 class Indexer(BaseQueueWorker[Embedding]):
     def __init__(
@@ -19,7 +19,7 @@ class Indexer(BaseQueueWorker[Embedding]):
             *args, 
             **kwargs
         ):
-        super().__init__(name=f"{name}_{level.value}", *args, **kwargs)
+        super().__init__(name=f"{name}_{level}", *args, **kwargs)
 
         self.level = level
         self.embedding_dim = shape
@@ -29,10 +29,10 @@ class Indexer(BaseQueueWorker[Embedding]):
         self._book_repo = BookRepository(router)
         self._emb_repo = EmbeddingsRepository(router)
 
-        if level == IndexLevel.DOCUMENT:
-            self._get_entity_id = lambda emb: emb.book_id
+        if level in [IndexLevel.DOCUMENT, IndexLevel.CENTROIDS, IndexLevel.TAGS]:
+            self._get_entity_id = lambda emb: emb.source_id
         elif level == IndexLevel.CHUNK:
-            self._get_entity_id = lambda emb: FaissId.pack(emb.book_id, emb.id)
+            self._get_entity_id = lambda emb: FaissId.pack(emb.source_id, emb.id)
         else:
             raise TypeError("Unknown index type")
 
@@ -86,17 +86,18 @@ class Indexer(BaseQueueWorker[Embedding]):
         return result
 
     async def count_total(self) -> None:
-        total = None
         if self.level == IndexLevel.DOCUMENT:
             total = self._book_repo.count()
         elif self.level == IndexLevel.CHUNK:
             total = self._emb_repo.count()
+        else:
+            total = None
 
         if total:
             await self.stats.set_total(self.name, total)
 
     async def fin(self):
-        path = PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level.value}.faiss"
+        path = PathsConfig.DATA_DIR / f"{ProcessConfig.MODEL_NAME}.{self.level}.faiss"
         tmp = path.with_suffix(".tmp")
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -104,4 +105,4 @@ class Indexer(BaseQueueWorker[Embedding]):
         tmp.replace(path)
         
         if self.logger:
-            self.logger.info(f"{self.level} индекс построен: {self._count} книг, dim={self.embedding_dim}")
+            self.logger.info(f"{self.level} индекс построен: {self._count} элементов, dim={self.embedding_dim}")

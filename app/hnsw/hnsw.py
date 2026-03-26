@@ -1,8 +1,8 @@
 import os
 import faiss
 from typing import List
-from app.infrastructure.models import BookRegistry, Book
-from app.settings import PathsConfig, ProcessConfig, IndexConfig, IndexLevel
+from app.infrastructure.models import BookRegistry, Book, IndexLevel
+from app.settings import PathsConfig, ProcessConfig, IndexConfig
 from .trainers.rerankerTrainer import RerankerTrainer
 try:
     from tqdm import tqdm

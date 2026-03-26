@@ -5,7 +5,7 @@ from .feedback import FeedbackReq, Feedback, Feedbacks
 from .similar import Similar
 from .embedding import Embedding
 from .chunk import Chunk
-from .constants import ChunkType, Stages, BookSearchEngineType, SimilarSearchEngineType, SearchIndexLevel
+from .constants import ChunkType, Stages, BookSearchEngineType, SimilarSearchEngineType, SearchIndexLevel, IndexLevel
 from .report import Report
 from .stage_stats import StageStats
 from .channel import Channel
@@ -39,6 +39,7 @@ __all__ = [
     "BookSearchEngineType",
     "SimilarSearchEngineType",
     "SearchIndexLevel",
+    "IndexLevel",
     "ParseResult",
     "SearchResult",
     "TokenChunk",

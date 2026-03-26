@@ -6,11 +6,6 @@ import os
 # ==========================
 # ==== ENUMS ===============
 # ==========================
-class IndexLevel(str, Enum):
-    CHUNK = "chunk" #: генерируем индекс для всех имеющихся текстовых кусков
-    DOCUMENT = "document" #: при создании индекса, сливаем все текстовые куски в один mean вектор
-    BOTH = "both"  #: генерировать оба
-
 class KnownModels(str, Enum):
     all_MiniLM_L6_v2 = "all-MiniLM-L6-v2"  #: Очень плохой результат, но хорошо для тестов
     multilingual_e5_base = "intfloat/multilingual-e5-base"  #: Теоретически оптимальный вариант
@@ -81,7 +76,6 @@ class ChunkingConfig:
 # ==========================
 @dataclass(frozen=True)
 class IndexConfig:
-    BUILD_INDEX_LEVEL:IndexLevel=os.getenv("BUILD_INDEX_LEVEL", IndexLevel.BOTH.value).lower()  #: Тип создаваемого индекса
     HNSW_MMAP=bool(os.getenv("HNSW_MMAP", False))  #: Не загружаем индекс в память, читаем с диска
     HNSW_M=int(os.getenv("HNSW_M", 32))  #: Максимальное количество связей (соседей) на уровне графа
     HNSW_EF_CONSTRUCTION=int(os.getenv("HNSW_EF_CONSTRUCTION", 200))  #: Размер списка кандидатов при построении графа

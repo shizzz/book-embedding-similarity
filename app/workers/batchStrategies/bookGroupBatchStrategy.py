@@ -60,8 +60,8 @@ class BookEmbeddingBatchStrategy(BaseBatchStrategy):
         last = None
         count = 0
         for t in self.books_buffer:
-            if t.entity.book_id != last:
+            if t.entity.source_id != last:
                 count += 1
-                last = t.entity.book_id
+                last = t.entity.source_id
 
         return count

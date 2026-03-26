@@ -1,3 +1,4 @@
+import asyncio
 import faiss
 from typing import List
 from app.workers.base import BaseQueueWorker
@@ -6,6 +7,8 @@ from app.infrastructure.db.iterables import EmbeddingsBatchIterable
 from app.infrastructure.db.repositories import EmbeddingsRepository
 from app.infrastructure.models import Task, Stages, Action, ChunkType, Embedding, Dataset
 
+BATCH: int = 10000
+
 class CentroidsProducer(BaseQueueWorker):
     """
     Создает центроиды имеющихся эмбеддингов
@@ -13,7 +16,6 @@ class CentroidsProducer(BaseQueueWorker):
     def __init__(
             self,
             router: DBRouter,
-            ui,
             centros: int = 256,
             name: str = Stages.PRODUCER + "_Centroids",
             *args, 
@@ -27,7 +29,6 @@ class CentroidsProducer(BaseQueueWorker):
         )
         
         self._router = router
-        self.ui = ui
         self._id = EmbeddingsRepository(self._router).get_max_id()
         self._shape = EmbeddingsRepository(self._router).get_shape()
         self._centros = centros
@@ -36,22 +37,26 @@ class CentroidsProducer(BaseQueueWorker):
         d = self._shape
         K = self._centros
 
-        batches = EmbeddingsBatchIterable(repo=EmbeddingsRepository(self._router), batch_size=10000)
+        batches = EmbeddingsBatchIterable(repo=EmbeddingsRepository(self._router), batch_size=BATCH)
         
         embeddings_data = []
-        for batch in self.ui.tqdm(batches, total=len(batches), desc="Load embeddings"):
+        async for batch in self.stats.atqdm(batches, total=len(batches) * BATCH, desc="Load embeddings"):
             for e in batch:
                 embeddings_data.append(e.data)
 
         self.logger.info("Create KMeans")
-        kmeans = faiss.Kmeans(d, K, niter=20, verbose=False)
+
+        def _train():
+            kmeans = faiss.Kmeans(d, K, niter=20, verbose=False)
+            kmeans.train(embeddings_data)
+
+            cluster_centers = kmeans.centroids.copy()
+            faiss.normalize_L2(cluster_centers)
+
+            return cluster_centers
 
         self.logger.info("Train KMeans")
-        kmeans.train(embeddings_data)
-
-        self.logger.info("Norm clusters")
-        cluster_centers = kmeans.centroids.copy()
-        faiss.normalize_L2(cluster_centers)
+        cluster_centers = await asyncio.to_thread(_train)
 
         self.logger.info("Clear RAM")
         del embeddings_data
@@ -63,7 +68,7 @@ class CentroidsProducer(BaseQueueWorker):
                 id=self._id,
                 name=str(self._id),
                 dataset=Dataset.EMBEDDING,
-                routes=[Action.DB, Action.TAG],
+                routes=[Action.INDEX, Action.DB],
                 cost=centro.nbytes,
                 entity=Embedding(
                     id=self._id,

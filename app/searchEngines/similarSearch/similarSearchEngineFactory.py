@@ -2,11 +2,10 @@ from faiss import IndexIDMap
 from app.hnsw import IndexManager
 from app.hnsw.rerankers import LightGBMReranker
 from app.infrastructure.db import DBRouter
-from app.infrastructure.models import SimilarSearchEngineType, SearchIndexLevel
+from app.infrastructure.models import SimilarSearchEngineType, SearchIndexLevel, IndexLevel
 from .similarSearchEngine import SimilarSearchEngine
 from .indexSimilarSearchEngine import IndexSimilarSearchEngine
 from .bruteforceSimilarSearchEngine import BruteforceSimilarSearchEngine
-from app.settings import IndexLevel
 
 class SimilarSearchEngineFactory:
     @classmethod

@@ -28,7 +28,7 @@ class TagProducer(BaseQueueWorker):
         if isinstance(repo, GenresRepository):
             self._action = Action.TOKENIZE
         else:
-            self._action = Action.TAG
+            self._action = Action.INDEX
 
     async def produce(self):
         for tag in self._repo.get_all(self._type):

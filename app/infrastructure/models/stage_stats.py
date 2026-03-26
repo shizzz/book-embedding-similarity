@@ -15,9 +15,15 @@ class StageStats:
         self.finished: bool = False
         self.speed_value: float = 0
         self.batch_size: str = None
+        self._eta_value: str = "-"
 
     def start(self):
         self.start_time = time.time()
+
+    def finish(self):
+        _ = self.speed
+        _ = self.eta
+        self.finished = True
 
     @property
     def percent(self) -> str:
@@ -28,6 +34,9 @@ class StageStats:
 
     @property
     def speed(self) -> str:
+        if self.finished:
+            return f"{self.speed_value:.2f}/s" if self.speed_value else "-"
+
         if not self.start_time:
             return "-"
         elapsed = time.time() - self.start_time
@@ -40,22 +49,25 @@ class StageStats:
 
     @property
     def eta(self) -> str:
+        if self.finished:
+            return self._eta_value
+
         if self.total is None or not self.start_time:
             return "-"
-        
+
         remaining = self.total - self.processed
         elapsed = time.time() - self.start_time
-        
+
         if self.processed == 0 or elapsed == 0:
             return "-"
-        
+
         rate = self.processed / elapsed
         remaining_seconds = int(remaining / rate)
-        
-        days, rem = divmod(remaining_seconds, 86400)  # 24*3600
+
+        days, rem = divmod(remaining_seconds, 86400)
         hours, rem = divmod(rem, 3600)
         minutes, seconds = divmod(rem, 60)
-        
+
         parts = []
         if days > 0:
             parts.append(f"{days}d")
@@ -64,5 +76,6 @@ class StageStats:
         if minutes > 0 or hours > 0 or days > 0:
             parts.append(f"{minutes}m")
         parts.append(f"{seconds}s")
-        
-        return " ".join(parts)
+
+        self._eta_value = " ".join(parts)
+        return self._eta_value

@@ -1,8 +1,7 @@
 import asyncio
 from app.infrastructure.db.repositories import EmbeddingsRepository
-from app.infrastructure.models import Channel, Stages
+from app.infrastructure.models import Channel, Stages, IndexLevel
 from app.workers.stages import EmbeddingProducer, EmbeddingMeger, Indexer
-from app.settings import IndexLevel
 from .pipeline import Pipeline
 
 THREADS: int = 2
@@ -20,7 +19,6 @@ class IndexPipeline(Pipeline):
         self.shape = EmbeddingsRepository(self._router).get_shape()
 
     async def setup_stages(self) -> None:
-
         emb_channels: list[Channel] = []
         if self.level == IndexLevel.BOTH or self.level == IndexLevel.DOCUMENT:
             emb_channel_document = Channel(Stages.MERGER, asyncio.Queue(maxsize=10000))
@@ -79,3 +77,6 @@ class IndexPipeline(Pipeline):
                 logger = self._logger, 
             )
             self.pool.append(chunk_index_stage)
+
+    def route(self, item, channels: list[Channel]) -> list[Channel]:
+        return []

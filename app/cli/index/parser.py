@@ -1,5 +1,4 @@
-from argparse import _SubParsersAction, ArgumentParser
-from app.settings import IndexLevel
+from app.infrastructure.models import IndexLevel
 
 def register_index(subparsers):
     parser = subparsers.add_parser(
