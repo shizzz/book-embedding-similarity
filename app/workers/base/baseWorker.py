@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from app.settings import ProcessConfig
-from app.ui.live_ui import LiveUI
+from app.ui.live_ui import LiveUI, BaseUI
 from app.workers.sources import ConsoleHandler
 from app.workers.stats import PipelineStats
 from app.workers.pipelines import Pipeline
@@ -23,13 +23,14 @@ class BaseWorker(ABC):
         *,
         stats: PipelineStats = None,
         name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
+        ui: BaseUI = None
     ):
         if name is not None:
             self.name = name
 
         self.stats = stats or PipelineStats()
-        self.ui = LiveUI(
+        self.ui = ui or LiveUI(
             max_workers=ProcessConfig.MAX_WORKERS,
             title=self.name,
             stats=self.stats

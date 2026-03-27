@@ -1,142 +1,224 @@
 const jobsContainer = document.getElementById("jobs");
 
+const COMMAND_GROUPS = {
+    "Generation": [
+        {
+            entity: "tag",
+            command: "generate",
+            label: "Generate tags",
+            args: { centros: 512, threshold: 0.0, recreate: true }
+        },
+        {
+            entity: "embedding",
+            command: "generate",
+            label: "Generate embeddings",
+            args: { type: "default" }
+        }
+    ],
+    "Indexing": [
+        { entity: "index", command: "run", label: "Run index", args: { mode: "full" } }
+    ],
+    "Analysis": [
+        { entity: "similar", command: "run", label: "Find similar", args: { top_k: 10 } }
+    ]
+};
+
+// ------------------- Render Command Groups -------------------
+function renderCommandGroups() {
+    const container = document.getElementById("command-groups");
+    container.innerHTML = '';
+
+    for (const [groupName, commands] of Object.entries(COMMAND_GROUPS)) {
+        const groupDiv = document.createElement("div");
+        groupDiv.classList.add("command-group");
+
+        // заголовок группы с раскрытием
+        const h3 = document.createElement("h3");
+        h3.textContent = groupName + " ▼";
+        h3.style.cursor = "pointer";
+        h3.onclick = () => {
+            groupDiv.classList.toggle("collapsed");
+            h3.textContent = groupDiv.classList.contains("collapsed")
+                ? groupName + " ▶"
+                : groupName + " ▼";
+        };
+        groupDiv.appendChild(h3);
+
+        const commandsDiv = document.createElement("div");
+        commandsDiv.classList.add("commands");
+
+        commands.forEach(cmd => {
+            const cmdDiv = document.createElement("div");
+            cmdDiv.classList.add("command");
+
+            // input’ы для аргументов
+            for (const [key, value] of Object.entries(cmd.args)) {
+                const label = document.createElement("label");
+                label.textContent = key;
+                label.style.marginRight = "10px";
+                label.style.display = "flex";
+                label.style.flexDirection = "column";
+
+                let input;
+                if (typeof value === "boolean") {
+                    input = document.createElement("input");
+                    input.type = "checkbox";
+                    input.checked = value;
+                } else if (typeof value === "number") {
+                    input = document.createElement("input");
+                    input.type = "number";
+                    input.value = value;
+                } else {
+                    input = document.createElement("input");
+                    input.type = "text";
+                    input.value = value;
+                }
+                input.name = key;
+                label.appendChild(input);
+                cmdDiv.appendChild(label);
+            }
+
+            // кнопка запуска
+            const btn = document.createElement("button");
+            btn.textContent = cmd.label;
+            btn.onclick = () => {
+                const args = {};
+                cmdDiv.querySelectorAll("input").forEach(input => {
+                    if (input.type === "checkbox") args[input.name] = input.checked;
+                    else if (input.type === "number") args[input.name] = Number(input.value);
+                    else args[input.name] = input.value;
+                });
+                runJob(cmd.entity, cmd.command, args);
+            };
+            btn.dataset.entity = cmd.entity;
+            btn.dataset.command = cmd.command;
+
+            cmdDiv.appendChild(btn);
+
+            commandsDiv.appendChild(cmdDiv);
+        });
+
+        groupDiv.appendChild(commandsDiv);
+        container.appendChild(groupDiv);
+    }
+}
+
+// ------------------- Jobs -------------------
 async function fetchJobs() {
     const res = await fetch("/jobs/");
     const jobsData = await res.json();
 
-    const jobsContainer = document.getElementById("jobs");
-
     const existingJobs = {};
-    jobsContainer.querySelectorAll(".job").forEach(div => {
-        const id = div.dataset.jobId;
-        existingJobs[id] = div;
-    });
+    jobsContainer.querySelectorAll(".job").forEach(div => existingJobs[div.dataset.jobId] = div);
 
     for (const [id, job] of Object.entries(jobsData)) {
-        // Пропускаем пустой job
+        // пропускаем пустые job
         const hasContent = (job.status && job.status.trim() !== "") ||
                            (job.message && job.message.trim() !== "") ||
-                           (job.stats && Object.keys(job.stats.stages).length > 0);
+                           (job.stats && Object.keys(job.stats?.stages ?? {}).length > 0);
         if (!hasContent) {
-            // Если div уже есть, удаляем его
-            if (existingJobs[id]) {
-                existingJobs[id].remove();
-            }
+            existingJobs[id]?.remove();
             continue;
         }
 
         let div;
         if (existingJobs[id]) {
-            // уже есть — используем существующий
             div = existingJobs[id];
-            div.innerHTML = `
-                <div><b>${id}</b></div>
-                <div>Status: ${job.status}</div>
-                ${job.message ? `<div>Message: ${job.message}</div>` : ""}
-                <pre id="stats-${id}"></pre>
-            `;
+            div.innerHTML = renderJobHTML(id, job);
         } else {
-            // создаём новый div
             div = document.createElement("div");
             div.className = "job";
             div.dataset.jobId = id;
-            div.innerHTML = `
-                <div><b>${id}</b></div>
-                <div>Status: ${job.status}</div>
-                ${job.message ? `<div>Message: ${job.message}</div>` : ""}
-                <pre id="stats-${id}"></pre>
-            `;
+            div.innerHTML = renderJobHTML(id, job);
             jobsContainer.appendChild(div);
         }
 
-        // отрисуем таблицу по стадиям
         renderJobStats(id, job.stats);
     }
 
     for (const id of Object.keys(existingJobs)) {
-        if (!jobsData[id]) {
-            existingJobs[id].remove();
-        }
+        if (!jobsData[id]) existingJobs[id].remove();
     }
+}
+
+function renderJobHTML(id, job) {
+    return `
+        <div><b>${id}</b></div>
+        <div>Status: ${job.status}</div>
+        ${job.message ? `<div>Message: ${job.message}</div>` : ""}
+        <div class="progress"><div class="bar" id="bar-${id}"></div></div>
+        <pre id="stats-${id}"></pre>
+    `;
 }
 
 function subscribe(jobId) {
     const ws = new WebSocket(`ws://${location.host}/ws/${jobId}`);
-
-    ws.onmessage = (event) => {
+    ws.onmessage = event => {
         const data = JSON.parse(event.data);
-
-        // прогресс
         let progress = 0;
 
         if (data.stats?.stages) {
             const stages = Object.values(data.stats.stages);
-
-            if (stages.length > 0) {
-                const s = stages[0];
-                progress = s.progress ? s.progress * 100 : 0;
-            }
+            if (stages.length > 0) progress = stages[0].progress ? stages[0].progress * 100 : 0;
         }
 
         const bar = document.getElementById(`bar-${jobId}`);
-        if (bar) {
-            bar.style.width = progress + "%";
-        }
+        if (bar) bar.style.width = progress + "%";
 
         const stats = document.getElementById(`stats-${jobId}`);
-        if (stats) {
-            stats.textContent = JSON.stringify(data.stats, null, 2);
-        }
+        if (stats) stats.textContent = JSON.stringify(data.stats, null, 2);
     };
 }
 
 async function runJob(entity, command, args) {
-    const res = await fetch("/jobs/run", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            entity,
-            command,
-            args
-        })
-    });
+    // ищем **именно эту кнопку**
+    const btn = document.querySelector(`.command button[data-entity="${entity}"][data-command="${command}"]`);
+    if (btn) {
+        btn.disabled = true;
+        const origText = btn.textContent;
+        btn.textContent = "Running…";
+    }
 
-    const data = await res.json();
-    fetchJobs();
+    try {
+        const res = await fetch("/jobs/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entity, command, args })
+        });
+        const data = await res.json();
+        console.log(data);
+        fetchJobs();
+    } catch (err) {
+        console.error(err);
+        alert("Ошибка при запуске команды!");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = origText;
+        }
+    }
 }
 
 function renderJobStats(id, stats) {
     const statsContainer = document.getElementById(`stats-${id}`);
     if (!stats) {
-        statsContainer.innerHTML = "-";
+        statsContainer.textContent = "-";
         return;
     }
 
     const table = document.createElement("table");
     table.className = "job-table";
-
-    // заголовки
     table.innerHTML = `
         <tr>
-            <th>Stage</th>
-            <th>Progress</th>
-            <th>Processed</th>
-            <th>Total</th>
-            <th>Queued</th>
-            <th>Errors</th>
-            <th>Speed</th>
-            <th>ETA</th>
-            <th>Status</th>
-            <th>Pressure</th>
+            <th>Stage</th><th>Progress</th><th>Processed</th><th>Total</th>
+            <th>Queued</th><th>Errors</th><th>Speed</th><th>ETA</th>
+            <th>Status</th><th>Pressure</th>
         </tr>
     `;
 
-    const stages = stats.stages;
+    const stages = stats.stages ?? {};
     for (const [stageName, st] of Object.entries(stages)) {
         const row = document.createElement("tr");
-
         const progressPct = st.total ? (st.processed / st.total) * 100 : 0;
         const progressBar = `<div class="bar-inner" style="width:${progressPct}%">${st.progress}</div>`;
 
@@ -152,9 +234,7 @@ function renderJobStats(id, stats) {
             <td>${st.finished ? "✓" : "RUN"}</td>
             <td>${(st.speed > 0 ? (st.queue / st.speed).toFixed(1) : 0)}</td>
         `;
-
-        row.style.color = (st.queue / st.speed > 1 && !st.finished) ? "orange" : "inherit";
-
+        row.style.color = (st.speed && st.queue / st.speed > 1 && !st.finished) ? "orange" : "inherit";
         table.appendChild(row);
     }
 
@@ -162,8 +242,9 @@ function renderJobStats(id, stats) {
     statsContainer.appendChild(table);
 }
 
-// автообновление списка
+// автообновление
 setInterval(fetchJobs, 3000);
 
-// первый запуск
+// запуск
+renderCommandGroups();
 fetchJobs();

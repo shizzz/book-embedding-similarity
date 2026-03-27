@@ -27,7 +27,7 @@ def register_generate(subparsers):
     )
 
     parser.add_argument(
-        "--trenshold",
+        "--threshold",
         type=float,
         help="Нижний порог совпадения тэгов достаточный для того, чтобы добавить в книгу"
     )

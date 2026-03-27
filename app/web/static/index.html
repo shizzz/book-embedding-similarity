@@ -1,23 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Jobs UI</title>
+    <title>Jobs Dashboard</title>
     <link rel="stylesheet" href="/static/styles.css?v={{ css_hash }}">
 </head>
 <body>
 
 <h1>🚀 Jobs Dashboard</h1>
 
-<div class="controls">
-    <button onclick="runJob('tag', 'generate', {centros:512, trenshold:0.0, recreate:true})">Generate tags</button>
-    <button onclick="runJob('embedding', 'generate')">Generate embeddings</button>
-</div>
+<div id="command-groups"></div>
 
 <h2>Jobs</h2>
-<div id="jobs"></div>
+<pre id="jobs"></pre>
 
 <script src="/static/app.js?v={{ js_hash }}"></script>
-
 </body>
 </html>

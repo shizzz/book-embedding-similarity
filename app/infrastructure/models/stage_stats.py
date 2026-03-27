@@ -81,16 +81,13 @@ class StageStats:
         return self._eta_value
 
     def to_dict(self):
-        elapsed = time.time() - self.start_time if self.start_time else 0
-        speed = self.processed / elapsed if elapsed > 0 else 0
-        eta = (self.total - self.processed) / speed if self.total and speed > 0 else None
-
         return {
             "name": self.name,
             "total": self.total,
             "processed": self.processed,
             "errors": self.errors,
-            "progress": self.percent,  # <- вот тут
-            "speed": speed,
-            "eta": eta,
+            "queue": self.queue,
+            "progress": self.percent,
+            "speed": self.speed,
+            "eta": self.eta,
         }

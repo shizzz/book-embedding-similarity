@@ -59,7 +59,7 @@ class CentroidsProducer(BaseQueueWorker):
         cluster_centers = await asyncio.to_thread(_train)
 
         self.logger.info("Clear RAM")
-        #del embeddings_data
+        del embeddings_data
 
         self.logger.info("Spread clusters")
         for centro in cluster_centers:
