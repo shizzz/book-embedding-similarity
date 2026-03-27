@@ -16,3 +16,6 @@ class EdgeStats:
         if elapsed == 0:
             return "-"
         return f"{self.count / elapsed:.2f}/s"
+
+    def to_dict(self):
+        return {"count": self.count}
