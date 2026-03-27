@@ -4,6 +4,7 @@ from abc import ABC
 from typing import Optional, Generic, List, Callable
 from app.workers.stats import Stats, NullStats
 from app.workers.batchStrategies import CountBatchStrategy, BaseBatchStrategy
+from app.workers.skipStrategies import BaseSkipStrategy, DummySkipStrategy
 from app.common.types import TEntity
 from app.infrastructure.models import Task, Channel
 
@@ -21,6 +22,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         workers: int = 1,
         logger: logging.Logger = None,
         batch_strategy: Optional[Callable[[], BaseBatchStrategy]] = None,
+        skip_strategy: Optional[BaseSkipStrategy] = DummySkipStrategy(),
         producer_qsize: int = 10
     ):
         self.stats = stats
@@ -43,6 +45,7 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
         )
 
         self._strategies: dict[int, BaseBatchStrategy] = {}
+        self._skip_strategy = skip_strategy
 
     async def start(self):
         await self.stats.register_stage(self.name, self._workers_count, self.input_channel.queue.maxsize)
@@ -108,6 +111,9 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                 break
 
             try:
+                if self._skip_strategy.skip(task):
+                    await self._set_done()
+                    continue
                 batch = strategy.collect(task)
                 if batch:
                     await self._process_batch(batch, wid)
@@ -115,8 +121,11 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
                 await self.stats.error(self.name)
                 self.logger.exception(e)
             finally:
-                await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
-                self.input_channel.queue.task_done()
+                await self._set_done()
+
+    async def _set_done(self):
+        await self.stats.queue_size(self.name, self.input_channel.queue.qsize())
+        self.input_channel.queue.task_done()
 
     async def _process_batch(self, batch: List[Task], wid: int):
         results = await self.process(batch, wid)

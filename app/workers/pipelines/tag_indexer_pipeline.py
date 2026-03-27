@@ -84,7 +84,6 @@ class TagIndexerPipeline(Pipeline):
 
         token_stage = TokenizerStage(
             model=self.model,
-            router=self._router,
             
             stats=self._stats,
             batch_size=1,

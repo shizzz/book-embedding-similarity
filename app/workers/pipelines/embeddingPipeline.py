@@ -3,9 +3,10 @@ from typing import List
 from app.model import Model
 from app.infrastructure.db import Migrator, DBRouter
 from app.infrastructure.db.repositories import ModelRepository, EmbeddingsRepository
-from app.infrastructure.models import Channel, Stages, Dataset, Book, Embedding, BookSearchEngineType
+from app.infrastructure.models import Channel, Stages, Dataset, Embedding, BookSearchEngineType
 from app.searchEngines.bookSearch import BookSearchEngineFactory
 from app.workers.stages import DbChunkProducer, EmbeddingWorker, TokenizerStage
+from app.workers.skipStrategies import SkipIfInSetStrategy
 from .pipeline import Pipeline
 
 TOKENS_THREADS: int = 4
@@ -42,18 +43,24 @@ class EmbeddingPipeline(Pipeline):
             self.pool.append(chunk_stage)
         else:
             channel_tokenizer = self._input_channel
-        
-        embedding_stage = TokenizerStage(
+
+        emb_to_chunk_id = EmbeddingsRepository(self._router, self.model.info.uid).get_ids()
+        tokenizer_skip_strategy = SkipIfInSetStrategy(
+            key_fn=lambda c: c.chunk_id,
+            values_set=emb_to_chunk_id
+        )
+        tokenizer_stage = TokenizerStage(
             model=self.model,
-            router=self._router,
-            input_channel=channel_tokenizer,
-            output_channels=[channel_emb],
+
             stats=self._stats,
             batch_size=64,
             workers=TOKENS_THREADS,
-            logger = self._logger, 
+            logger=self._logger,
+            skip_strategy=tokenizer_skip_strategy,
+
+            input_channel=channel_tokenizer,
+            output_channels=[channel_emb],
         )
-        self.pool.append(embedding_stage)
 
         embedding_stage = EmbeddingWorker(
             model=self.model,
@@ -65,6 +72,8 @@ class EmbeddingPipeline(Pipeline):
             workers=EMB_THREADS,
             logger = self._logger, 
         )
+
+        self.pool.append(tokenizer_stage)
         self.pool.append(embedding_stage)
 
         self._registry.register(Dataset.EMBEDDING, self._save_embeddings_async)

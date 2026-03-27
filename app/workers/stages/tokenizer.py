@@ -12,7 +12,6 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
     def __init__(
         self,
         model: Model,
-        router: DBRouter,
         name: str = Stages.TOKENIZER,
         *args,
         **kwargs
@@ -24,9 +23,6 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
         self._min_tokens = max(100, int(self._max_tokens * 0.15))
         self._overlap = model.info.st_overlap
 
-        self._repo = EmbeddingsRepository(router, model.info.uid)
-        self._emb_to_chunk_id = self._repo.get_ids()
-
         factory = ChunkStrategyFactory()
         self._token_strategies: Dict[ChunkType, any] = {
             chunk_type: factory.create(chunk_type, self._tokenizer)
@@ -35,14 +31,11 @@ class TokenizerStage(BaseQueueWorker[Chunk]):
         }
 
     async def process(self, batch: List[Task[Chunk]], wid: int) -> List[Task[TokenChunk]]:
-        chunks = [t.entity for t in batch if t.entity.chunk_id not in self._emb_to_chunk_id]
-        if not chunks:
-            return None
-        
         result: List[Task[TokenChunk]] = []
         chunk_seq_counter = defaultdict(int)
 
-        for chunk in chunks:
+        for task in batch:
+            chunk = task.entity
             strategy = self._token_strategies[ChunkType(chunk.type)]
 
             encoded = await asyncio.to_thread(

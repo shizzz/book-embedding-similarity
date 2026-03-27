@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Generator
+from collections.abc import Iterable
 from ...models.embedding import Embedding
 from ...models.chunk import ChunkType
 from ..router import DBRouter
@@ -31,44 +32,45 @@ class EmbeddingsRepository:
             rows = conn.execute("SELECT DISTINCT chunk_id FROM embeddings").fetchall()
             return {r[0] for r in rows}
         
-    def get_all(self, embedding_type: int = None, batch_size: int = 100) -> Generator[list[Embedding], None, None]:
+    def get_all(
+        self,
+        embedding_type: ChunkType | Iterable[ChunkType] | None = None,
+        batch_size: int = 100,
+        order_by: list[str] | None = None,
+    ) -> Generator[list[Embedding], None, None]:
+        order_by = order_by or []
+
         query = GET_QUERY
-        params = ()
+        params: list = []
+
+        # WHERE
         if embedding_type is not None:
-            query += " WHERE [type] = ?"
-            params = (embedding_type,)
+            if isinstance(embedding_type, Iterable) and not isinstance(embedding_type, (str, bytes)):
+                types = list(embedding_type)
+                if types:  # не пустой список
+                    placeholders = ", ".join(["?"] * len(types))
+                    query += f" WHERE [type] IN ({placeholders})"
+                    params.extend(types)
+                else:
+                    # пустой список → ничего не вернётся
+                    query += " WHERE 1 = 0"
+            else:
+                query += " WHERE [type] = ?"
+                params.append(embedding_type)
+
+        # ORDER BY
+        if order_by:
+            query += " ORDER BY " + ", ".join(order_by)
 
         with self.router.embeddings(self.model_uid) as conn:
             cursor = conn.cursor()
             cursor.execute(query, params)
 
             while True:
-                rows = cursor.fetchmany(batch_size)  # берём пачку
+                rows = cursor.fetchmany(batch_size)
                 if not rows:
                     break
-                yield [Embedding.from_row(row) for row in rows]  # отдаём пачкой
-
-    def get_all_batch(self, batch_size: int = 1, order_by: list[str] = None, embedding_type: int = 2):
-        order_by = order_by or []
-        order_clause = ""
-        if order_by:
-            # Sanitize column names if necessary to prevent SQL injection
-            order_clause = " ORDER BY " + ", ".join(order_by)
-
-        with self.router.embeddings(self.model_uid) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM embeddings")
-            total = cursor.fetchone()[0]
-
-            for offset in range(0, total, batch_size):
-                cursor.execute(
-                    f"{GET_QUERY} WHERE [type] == ? {order_clause} LIMIT ? OFFSET ?",
-                    (embedding_type, batch_size, offset)
-                )
-                rows = cursor.fetchall()
-                if not rows:
-                    break
-                yield [Embedding.from_row(r) for r in rows]
+                yield [Embedding.from_row(row) for row in rows]
 
     def get_by_ids(
         self,
