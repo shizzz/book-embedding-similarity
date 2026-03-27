@@ -7,8 +7,8 @@ from app.workers.pipelines import BookScanPipeline, DbPipeline
 from app.workers.base import BaseWorker
 
 class ParseBooks(BaseWorker):
-    def __init__(self, config: ParserConfig):
-        super().__init__(name="Parse books", logger=logging.getLogger(__name__))
+    def __init__(self, config: ParserConfig, *args, **kwargs):
+        super().__init__(name="Parse books", logger=logging.getLogger(__name__), *args, **kwargs)
         
         Migrator(self.router).migrate_meta()
         Migrator(self.router).migrate_chunks()

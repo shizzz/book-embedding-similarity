@@ -9,9 +9,10 @@ class GenerateSimilarWorker(BaseWorker):
         self,
         level: SearchIndexLevel,
         top_k: int,
-        exclude_same_authors: bool
+        exclude_same_authors: bool,
+        *args, **kwargs
     ):
-        super().__init__(name="Generate similar", logger=logging.getLogger(__name__))
+        super().__init__(name="Generate similar", logger=logging.getLogger(__name__), *args, **kwargs)
         self._level = level
         self._top_k = top_k
         self._exclude_same_authors = exclude_same_authors

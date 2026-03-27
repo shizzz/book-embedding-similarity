@@ -7,8 +7,8 @@ from app.workers.sources.databaseReporter import DatabaseReporter
 from app.infrastructure.models import Channel, Stages
 
 class GenerateAll(BaseWorker):
-    def __init__(self, batch: int):
-        super().__init__(name="Generate all", logger=logging.getLogger(__name__))
+    def __init__(self, batch: int, *args, **kwargs):
+        super().__init__(name="Generate all", logger=logging.getLogger(__name__), *args, **kwargs)
 
     async def after_run(self) -> None:
         report = DatabaseReporter(self.router, self.model_uid).generate()

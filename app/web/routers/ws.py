@@ -15,6 +15,12 @@ async def websocket_endpoint(ws: WebSocket, job_id: str):
             await asyncio.sleep(1)
 
             if job_id in jobs:
-                await ws.send_json(jobs[job_id])
+                await ws.send_json(serialize_job(jobs[job_id]))
     finally:
         subscribers[job_id].remove(ws)
+
+def serialize_job(job):
+    return {
+        **job,
+        "stats": job["stats"].to_dict() if job.get("stats") else None
+    }

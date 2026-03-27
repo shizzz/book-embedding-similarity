@@ -5,12 +5,14 @@ from app.infrastructure.models import StageStats
 from .edges import EdgeStats
 
 class Stats(ABC):
-    def __init__(self, job_id: str, notifier):
+    def __init__(self, job_id: str = None, notifier = None):
         self.job_id = job_id
         self.notifier = notifier
         self.stages: dict[str, StageStats] = {}
         self.edges: dict[tuple[str, str], EdgeStats] = {}
         self.start_time = time.time()
+        self.status = None
+        self.message = None
     
     async def register_stage(self, name: str, workers: int = 1, queue_max_size: int = 0):
         pass
@@ -42,16 +44,11 @@ class Stats(ABC):
     async def finish(self, stage: str):
         pass
 
+    def to_dict(self):
+        pass
+
     async def notify(self):
         await self.notifier(self.job_id, self.to_dict())
-
-    def to_dict(self):
-        return {
-            "job_id": self.job_id,
-            "uptime": time.time() - self.start_time,
-            "stages": {k: v.to_dict() for k, v in self.stages.items()},
-            "edges": {f"{k[0]}->{k[1]}": v.to_dict() for k, v in self.edges.items()},
-        }
     
     @property
     def runtime(self) -> str:

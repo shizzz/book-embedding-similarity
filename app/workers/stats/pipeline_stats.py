@@ -4,7 +4,9 @@ from .stats import Stats
 from .edges import EdgeStats
 
 class PipelineStats(Stats):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         self.stages: dict[str, StageStats] = {}
         self.edges: dict[tuple[str, str], EdgeStats] = {}
         self._lock = asyncio.Lock()
@@ -91,3 +93,15 @@ class PipelineStats(Stats):
         st, lock = self._get_stage_lock(stage)
         async with lock:
             st.finished = True
+
+    def to_dict(self):
+        return {
+            "stages": {
+                name: stage.to_dict()
+                for name, stage in self.stages.items()
+            },
+            "edges": {
+                f"{k[0]}->{k[1]}": v.to_dict() if hasattr(v, "to_dict") else {}
+                for k, v in self.edges.items()
+            }
+        }

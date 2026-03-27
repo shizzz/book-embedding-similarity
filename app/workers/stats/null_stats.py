@@ -1,6 +1,9 @@
 from .stats import Stats
 
 class NullStats(Stats):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def __getattr__(self, name):
         async def dummy(*args, **kwargs):
             return None

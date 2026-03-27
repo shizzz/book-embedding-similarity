@@ -7,8 +7,8 @@ from app.workers.base import BaseWorker
 from app.settings import ProcessConfig
 
 class GenerateIndexWorker(BaseWorker):
-    def __init__(self, level: IndexLevel):
-        super().__init__(name="Generate index", logger=logging.getLogger(__name__))
+    def __init__(self, level: IndexLevel, *args, **kwargs):
+        super().__init__(name="Generate index", logger=logging.getLogger(__name__), *args, **kwargs)
 
         model_settings = ProcessConfig.MODEL_NAME
         uid, model_db = ModelRepository(self.router).get_latest_uid(ProcessConfig.MODEL_NAME)

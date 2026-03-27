@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import List
 from app.infrastructure.db.repositories import BookTagsRepository, EmbeddingsRepository
 from app.infrastructure.models import Channel, Stages, ChunkType
 from app.workers.pipelines import TagIndexerPipeline, TaggerPipeline, DbPipeline
@@ -11,9 +10,11 @@ class GenerateTags(BaseWorker):
             self,
             centros: int,
             threshold: float,
-            recreate: bool
+            recreate: bool,
+            *args,
+            **kwargs
         ):
-        super().__init__(name="Generate tags", logger=logging.getLogger(__name__))
+        super().__init__(name="Generate tags", logger=logging.getLogger(__name__), *args, **kwargs)
 
         self._channel_tag = Channel(Stages.TAG, asyncio.Queue(maxsize=0))
         self._channel_db = Channel(Stages.DB, asyncio.Queue(maxsize=400))

@@ -21,3 +21,33 @@ body {
     width: 0%;
     background: green;
 }
+
+.job-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.job-table th, .job-table td {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.job-table th {
+    background: #f0f0f0;
+}
+
+.progress-cell {
+    width: 150px;
+}
+
+.bar-inner {
+    height: 16px;
+    background: green;
+    text-align: right;
+    color: white;
+    font-size: 0.8em;
+    line-height: 16px;
+}
