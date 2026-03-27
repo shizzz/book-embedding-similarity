@@ -7,6 +7,7 @@ from app.services import SimilarSearchService
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository
 from app.settings import PathsConfig
+from app.workers.stats import Stats
 from app.utils import to_similar_list
 
 def make_lib_url(file_name: str) -> str:
@@ -39,6 +40,8 @@ async def run(
     file: str,
     level: SearchIndexLevel,
     top: int = 100,
+    stats: Stats = None,
+    
 ):
     start = time.perf_counter()
     router = DBRouter()

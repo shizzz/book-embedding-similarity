@@ -1,12 +1,11 @@
 
 import asyncio
-from app.settings import ProcessConfig
+from app.workers.stats import Stats
 from app.workers import GenerateEmbeddings
 
-def run(args):
-    queue_size = ProcessConfig.MAX_WORKERS * 3
-
+def run(args, stats: Stats = None):
     worker = GenerateEmbeddings(
-        batch=args.batch
+        batch=args.batch,
+        stats=stats
     )
     asyncio.run(worker.run())

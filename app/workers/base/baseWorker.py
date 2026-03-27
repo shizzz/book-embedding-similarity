@@ -18,11 +18,17 @@ class BaseWorker(ABC):
 
     name: str = "Worker"
 
-    def __init__(self, *, name: Optional[str] = None, logger: Optional[logging.Logger] = None):
+    def __init__(
+        self,
+        *,
+        stats: PipelineStats = None,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None
+    ):
         if name is not None:
             self.name = name
 
-        self.stats = PipelineStats()
+        self.stats = stats or PipelineStats()
         self.ui = LiveUI(
             max_workers=ProcessConfig.MAX_WORKERS,
             title=self.name,

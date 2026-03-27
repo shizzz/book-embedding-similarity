@@ -4,6 +4,7 @@ from typing import Optional, List
 from app.infrastructure.db import DBRouter
 from app.infrastructure.db.repositories import BookRepository, SimilarRepository, FeedbackRepository
 from app.infrastructure.models import Book
+from app.workers.stats import Stats
 from app.settings import OtherConfig
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -12,7 +13,7 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 
 router = DBRouter()
 
-def run(args):
+def run(args, stats: Stats = None):
     book_file = args.book
     ai_api = args.ai
 

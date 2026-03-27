@@ -51,7 +51,7 @@ class TagProducer(BaseQueueWorker):
                         cost=len(b.entity.name_ru) * 2,
                         entity=Chunk(
                             source_id=b.entity.id,
-                            chunk_id=b.entity.name_ru,
+                            chunk_id=b.entity.id,
                             text=b.entity.name_ru,
                             type=ChunkType.TAG
                         ),
