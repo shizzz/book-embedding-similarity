@@ -10,7 +10,6 @@ from rich.progress import (
     Progress,
     TaskID
 )
-from time import perf_counter
 from .ui import BaseUI
 from app.workers.stats import Stats
 from app.infrastructure.models import Report
@@ -25,7 +24,6 @@ class LiveUI(BaseUI):
         ):
         self.live: Live = None
         self.pipeline_stats: Stats = stats
-        self.model_info = None
         self._max_workers = max_workers
         self._show_table = show_table
         
@@ -169,31 +167,31 @@ class LiveUI(BaseUI):
         left.add_column(style="cyan")
         left.add_column()
 
-        left.add_row("Model", self.model_info.model_name or "-")
-        left.add_row("UID", self.model_info.uid or "-")
+        left.add_row("Model", self.pipeline_stats.model_info.model_name or "-")
+        left.add_row("UID", self.pipeline_stats.model_info.uid or "-")
 
-        overlap_pct = int(self.model_info.st_overlap / self.model_info.max_seq_length * 100)
+        overlap_pct = int(self.pipeline_stats.model_info.st_overlap / self.pipeline_stats.model_info.max_seq_length * 100)
 
-        left.add_row("Chunk size", f"{self.model_info.max_seq_length}")
-        left.add_row("Overlap", f"{self.model_info.st_overlap} ({overlap_pct}%)")
+        left.add_row("Chunk size", f"{self.pipeline_stats.model_info.max_seq_length}")
+        left.add_row("Overlap", f"{self.pipeline_stats.model_info.st_overlap} ({overlap_pct}%)")
 
         batch_style = "green"
         left.add_row(
             "Batch tokens",
-            Text(str(self.model_info.tokens_per_batch), style=batch_style)
+            Text(str(self.pipeline_stats.model_info.tokens_per_batch), style=batch_style)
         )
 
         left.add_row(
             "Mem/token est",
-            self._fmt_mb(self.model_info.estimate_mem_per_token_mb)
+            self._fmt_mb(self.pipeline_stats.model_info.estimate_mem_per_token_mb)
         )
 
         left.add_row(
             "Inc/Dec",
             Text.assemble(
-                (str(self.model_info.increases), "green"),
+                (str(self.pipeline_stats.model_info.increases), "green"),
                 ("/",),
-                (str(self.model_info.decreases), "red"),
+                (str(self.pipeline_stats.model_info.decreases), "red"),
             )
         )
 
@@ -202,17 +200,17 @@ class LiveUI(BaseUI):
         right.add_column(style="cyan")
         right.add_column()
 
-        cuda_text = Text("YES", style="green") if self.model_info.cuda_available else Text("NO", style="red")
+        cuda_text = Text("YES", style="green") if self.pipeline_stats.model_info.cuda_available else Text("NO", style="red")
         right.add_row("CUDA", cuda_text)
 
-        if self.model_info.cuda_available:
+        if self.pipeline_stats.model_info.cuda_available:
 
-            right.add_row("CUDA ver", self.model_info.cuda_version)
-            right.add_row("GPU", self.model_info.gpu_name)
-            right.add_row("GPU count", str(self.model_info.gpu_count))
+            right.add_row("CUDA ver", self.pipeline_stats.model_info.cuda_version)
+            right.add_row("GPU", self.pipeline_stats.model_info.gpu_name)
+            right.add_row("GPU count", str(self.pipeline_stats.model_info.gpu_count))
 
-            free = self.model_info.free_vram_mb
-            total = self.model_info.total_vram_mb
+            free = self.pipeline_stats.model_info.free_vram_mb
+            total = self.pipeline_stats.model_info.total_vram_mb
 
             if free and total:
                 used = total - free
@@ -230,14 +228,14 @@ class LiveUI(BaseUI):
                 right.add_row("", bar)
 
                 temp_style = "green"
-                if self.model_info.temp > 75:
+                if self.pipeline_stats.model_info.temp > 75:
                     temp_style = "yellow"
-                if self.model_info.temp > 85:
+                if self.pipeline_stats.model_info.temp > 85:
                     temp_style = "red"
 
                 right.add_row(
                     "GPU temp",
-                    Text(f"{self.model_info.temp}°C", style=temp_style)
+                    Text(f"{self.pipeline_stats.model_info.temp}°C", style=temp_style)
                 )
 
         grid = Table.grid(expand=True)
@@ -254,7 +252,7 @@ class LiveUI(BaseUI):
             if self._show_table:
                 grid.add_row(self._make_stats_table())
                 grid.add_row(self._make_edges_table())
-                if self.model_info:
+                if self.pipeline_stats.model_info:
                     grid.add_row(self._make_model_info())
                 #grid.add_row(self._make_info())
 

@@ -37,7 +37,7 @@ class GenerateAll(BaseWorker):
         )
 
         self.model_uid = embPipeline.model.info.uid
-        self.ui.model_info = embPipeline.model.info
+        self.stats.model_info = embPipeline.model.info
 
         dbPipeline = DbPipeline(
             model_name=embPipeline.model.info.model_name,

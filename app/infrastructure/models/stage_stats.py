@@ -90,4 +90,5 @@ class StageStats:
             "progress": self.percent,
             "speed": self.speed,
             "eta": self.eta,
+            "finished": self.finished
         }

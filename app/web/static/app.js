@@ -175,7 +175,6 @@ function renderJobHTML(id, job) {
         <div><b>${id}</b></div>
         <div>Status: ${job.status}</div>
         ${job.message ? `<div>Message: ${job.message}</div>` : ""}
-        <div class="progress"><div class="bar" id="bar-${id}"></div></div>
         <pre id="stats-${id}"></pre>
     `;
 }
@@ -266,8 +265,130 @@ function renderJobStats(id, stats) {
         table.appendChild(row);
     }
 
+    const edgesHTML = renderEdges(stats);
+    const modelHTML = renderModelInfo(stats.model);
+    
     statsContainer.innerHTML = "";
     statsContainer.appendChild(table);
+
+    if (edgesHTML) {
+        const div = document.createElement("div");
+        div.innerHTML = `<h4>Edges</h4>${edgesHTML}`;
+        statsContainer.appendChild(div);
+    }
+
+    if (modelHTML) {
+        const div = document.createElement("div");
+        div.innerHTML = modelHTML;
+        statsContainer.appendChild(div);
+    }
+}
+
+function renderEdges(stats) {
+    if (!stats.edges) return "";
+
+    const table = document.createElement("table");
+    table.className = "job-table";
+    table.innerHTML = `
+        <tr>
+            <th>From</th>
+            <th>To</th>
+            <th>Count</th>
+            <th>Speed</th>
+        </tr>
+    `;
+
+    for (const key in stats.edges) {
+        const edge = stats.edges[key];
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${edge.upstream}</td>
+            <td>${edge.downstream}</td>
+            <td>${edge.count}</td>
+            <td>${edge.speed}</td>
+        `;
+
+        table.appendChild(row);
+    }
+
+    return table.outerHTML;
+}
+
+function renderModelInfo(model) {
+    if (!model) return "";
+
+    const overlapPct = model.max_seq_length
+        ? Math.round((model.st_overlap / model.max_seq_length) * 100)
+        : 0;
+
+    const cuda = model.cuda_available
+        ? `<span class="ok">YES</span>`
+        : `<span class="bad">NO</span>`;
+
+    let gpuBlock = "";
+
+    if (model.cuda_available) {
+        const used = model.total_vram_mb - model.free_vram_mb;
+        const pct = model.total_vram_mb
+            ? (used / model.total_vram_mb) * 100
+            : 0;
+
+        gpuBlock = `
+            <tr><td>CUDA ver</td><td>${model.cuda_version}</td></tr>
+            <tr><td>GPU</td><td>${model.gpu_name}</td></tr>
+            <tr><td>GPU count</td><td>${model.gpu_count}</td></tr>
+            <tr><td>VRAM</td><td>${used} / ${model.total_vram_mb} MB</td></tr>
+            <tr>
+                <td></td>
+                <td>
+                    <div class="progress">
+                        <div class="bar-inner" style="width:${pct}%"></div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>Temp</td>
+                <td class="${getTempClass(model.temp)}">${model.temp}°C</td>
+            </tr>
+        `;
+    }
+
+    return `
+        <div class="model-panel">
+            <h4>Embedding Model</h4>
+            <div class="model-grid">
+
+                <table>
+                    <tr><td>Model</td><td>${model.model_name || "-"}</td></tr>
+                    <tr><td>UID</td><td>${model.uid || "-"}</td></tr>
+                    <tr><td>Chunk size</td><td>${model.max_seq_length}</td></tr>
+                    <tr><td>Overlap</td><td>${model.st_overlap} (${overlapPct}%)</td></tr>
+                    <tr><td>Batch tokens</td><td class="ok">${model.tokens_per_batch}</td></tr>
+                    <tr><td>Mem/token</td><td>${model.estimate_mem_per_token_mb}</td></tr>
+                    <tr>
+                        <td>Inc/Dec</td>
+                        <td>
+                            <span class="ok">${model.increases}</span> /
+                            <span class="bad">${model.decreases}</span>
+                        </td>
+                    </tr>
+                </table>
+
+                <table>
+                    <tr><td>CUDA</td><td>${cuda}</td></tr>
+                    ${gpuBlock}
+                </table>
+
+            </div>
+        </div>
+    `;
+}
+
+function getTempClass(temp) {
+    if (temp > 85) return "bad";
+    if (temp > 75) return "warn";
+    return "ok";
 }
 
 // запуск

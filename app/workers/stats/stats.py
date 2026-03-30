@@ -8,6 +8,7 @@ class Stats(ABC):
     def __init__(self, job_id: str = None, notifier = None):
         self.job_id = job_id
         self.notifier = notifier
+        self.model_info = None
         self.stages: dict[str, StageStats] = {}
         self.edges: dict[tuple[str, str], EdgeStats] = {}
         self.start_time = time.time()

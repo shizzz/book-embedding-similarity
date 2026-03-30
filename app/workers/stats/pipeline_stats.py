@@ -95,7 +95,7 @@ class PipelineStats(Stats):
             st.finished = True
 
     def to_dict(self):
-        return {
+        data = {
             "stages": {
                 name: stage.to_dict()
                 for name, stage in self.stages.items()
@@ -103,5 +103,30 @@ class PipelineStats(Stats):
             "edges": {
                 f"{k[0]}->{k[1]}": v.to_dict() if hasattr(v, "to_dict") else {}
                 for k, v in self.edges.items()
-            }
+            },
         }
+
+        if self.model_info:
+            data["model"] = {
+                "model_name": self.model_info.model_name,
+                "uid": self.model_info.uid,
+                "max_seq_length": self.model_info.max_seq_length,
+                "cuda_available": self.model_info.cuda_available,
+                "cuda_version": self.model_info.cuda_version,
+                "gpu_count": self.model_info.gpu_count,
+                "gpu_name": self.model_info.gpu_name,
+                "st_chunk_size": self.model_info.st_chunk_size,
+                "st_overlap": self.model_info.st_overlap,
+                "st_batch_size": self.model_info.st_batch_size,
+                "estimate_mem_per_token_mb": self.model_info.estimate_mem_per_token_mb,
+                "tokens_per_batch": self.model_info.tokens_per_batch,
+                "vram_usage_ratio": self.model_info.vram_usage_ratio,
+                "free_vram_ratio": self.model_info.free_vram_ratio,
+                "increases": self.model_info.increases,
+                "decreases": self.model_info.decreases,
+                "temp": self.model_info.temp,
+                "free_vram_mb": self.model_info.free_vram_mb,
+                "total_vram_mb": self.model_info.total_vram_mb,
+            }
+
+        return data

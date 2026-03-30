@@ -18,4 +18,9 @@ class EdgeStats:
         return f"{self.count / elapsed:.2f}/s"
 
     def to_dict(self):
-        return {"count": self.count}
+        return {
+            "upstream": self.upstream,
+            "downstream": self.downstream,
+            "count": self.count,
+            "speed": self.speed,
+        }

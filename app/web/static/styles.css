@@ -93,7 +93,6 @@ h1, h2, h3 {
     padding: 15px;
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    max-height: 400px;
     overflow-y: auto;
 }
 
@@ -154,4 +153,43 @@ h1, h2, h3 {
 
 .progress-cell {
     width: 150px;
+}
+
+.model-panel {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #ddd;
+}
+
+.model-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.model-panel table {
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.model-panel td:first-child {
+    color: #666;
+    width: 40%;
+}
+
+.ok {
+    color: #2e7d32;
+    font-weight: bold;
+}
+
+.warn {
+    color: #f9a825;
+    font-weight: bold;
+}
+
+.bad {
+    color: #c62828;
+    font-weight: bold;
 }

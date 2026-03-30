@@ -112,7 +112,6 @@ class BaseQueueWorker(ABC, Generic[TEntity]):
 
             try:
                 if self._skip_strategy.skip(task):
-                    await self._set_done()
                     continue
                 batch = strategy.collect(task)
                 if batch:
