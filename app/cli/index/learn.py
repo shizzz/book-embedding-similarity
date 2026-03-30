@@ -4,7 +4,7 @@ from app.services import TrainRerankerService
 from app.infrastructure.db import DBRouter
 from app.workers.stats import Stats
 
-def run(args, stats: Stats = None):
+async def run(args, stats: Stats = None):
     router = DBRouter()
     ui = LiveUI(
         max_workers = 0,

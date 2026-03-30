@@ -13,6 +13,7 @@ async def run(data: dict = Body(...)):
     command = data["command"]
     args = data.get("args", {})
     args["command"] = command
+    args["disable_ui"] = True
 
     asyncio.create_task(run_job(job_id, entity, args))
 

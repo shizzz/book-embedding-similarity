@@ -1,11 +1,11 @@
-
-import asyncio
+from app.ui import DummyUI
 from app.workers.stats import Stats
 from app.workers import GenerateEmbeddings
 
-def run(args, stats: Stats = None):
+async def run(args, stats: Stats = None):
     worker = GenerateEmbeddings(
         batch=args.batch,
-        stats=stats
+        stats=stats,
+        ui=DummyUI() if args.disable_ui else None,
     )
-    asyncio.run(worker.run())
+    await worker.run()

@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
+import asyncio
 from .args import get_args
+
+runners = {
+    "books": "app.cli.books",
+    "embedding": "app.cli.embedding",
+    "similar": "app.cli.similar",
+    "index": "app.cli.index",
+    "feedback": "app.cli.feedback",
+    "tag": "app.cli.tag",
+}
 
 def main():
     args = get_args()
+    module_path = runners.get(args.entity)
 
-    # Обработка команд
-    if args.entity == "books":
-        from app.cli.books import run
-        run(args)
-    if args.entity == "embedding":
-        from app.cli.embedding import run
-        run(args)
-    elif args.entity == "similar":
-        from app.cli.similar import run
-        run(args)
-    elif args.entity == "index":
-        from app.cli.index import run
-        run(args)
-    elif args.entity == "feedback":
-        from app.cli.feedback import run
-        run(args)
-    elif args.entity == "tag":
-        from app.cli.tag import run
-        run(args)
+    if not module_path:
+        raise ValueError(f"Unknown entity: {args.entity}")
+
+    module = __import__(module_path, fromlist=["run"])
+    runner = module.run(args)
+
+    if runner:
+        asyncio.run(runner)
 
 if __name__ == "__main__":
     main()

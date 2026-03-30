@@ -1,9 +1,9 @@
-import asyncio
+from app.ui import DummyUI
 from app.workers.stats import Stats
 from app.workers import GenerateSimilarWorker
 from app.infrastructure.models.constants import SearchIndexLevel
 
-def run(args, stats: Stats = None):
+async def run(args, stats: Stats = None):
     level = args.level or SearchIndexLevel.CHUNK
     top = args.top or 100
     exclude_same_authors = args.exclude_same_authors or True
@@ -13,5 +13,6 @@ def run(args, stats: Stats = None):
         top_k=top,
         exclude_same_authors=exclude_same_authors,
         stats=stats,
+        ui=DummyUI() if args.disable_ui else None,
     )
-    asyncio.run(worker.run())
+    await worker.run()

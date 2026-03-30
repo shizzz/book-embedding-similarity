@@ -200,7 +200,6 @@ function subscribe(jobId) {
 }
 
 async function runJob(entity, command, args) {
-    // ищем **именно эту кнопку**
     const btn = document.querySelector(`.command button[data-entity="${entity}"][data-command="${command}"]`);
     if (btn) {
         btn.disabled = true;

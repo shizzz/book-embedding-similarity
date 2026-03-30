@@ -13,7 +13,7 @@ logging.getLogger("openai").setLevel(logging.WARNING)
 
 router = DBRouter()
 
-def run(args, stats: Stats = None):
+async def run(args, stats: Stats = None):
     book_file = args.book
     ai_api = args.ai
 

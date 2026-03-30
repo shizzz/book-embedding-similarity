@@ -1,6 +1,6 @@
 from .storage import jobs, subscribers
 from app.workers.stats import PipelineStats
-from typing import Any, Optional
+from typing import  Optional
 from types import SimpleNamespace
 
 async def notify(job_id: str, stats_data: Optional[dict] = None):
@@ -50,8 +50,8 @@ async def execute_cli(entity: str, data: dict, stats: dict):
         await run(args, stats)
 
     elif entity == "tag":
-        from app.cli.tag.generate import async_run
-        await async_run(args, stats)
+        from app.cli.tag import run
+        await run(args, stats)
 
     elif entity == "index":
         from app.cli.index import run
