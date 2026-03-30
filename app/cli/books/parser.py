@@ -18,37 +18,43 @@ def register_generate(subparsers):
     parser.add_argument(
         "--target-chars",
         type=int,
-        help="Целевое количество символов"
+        help="Целевое количество символов",
+        default=16000,
     )
 
     parser.add_argument(
         "--min-chars",
         type=int,
-        help="Минимальное количество символов"
+        help="Минимальное количество символов",
+        default=250,
     )
 
     parser.add_argument(
         "--max-description-chars",
         type=int,
-        help="Максимальная длина описания"
+        help="Максимальная длина описания",
+        default=1800,
     )
 
     parser.add_argument(
         "--chunks",
         type=int,
-        help="Целевое количество частей на книгу"
+        help="Целевое количество частей на книгу",
+        default=9,
     )
 
     parser.add_argument(
         "--prefix-buffer",
         type=int,
-        help="Размер буфера префикса"
+        help="Размер буфера префикса",
+        default=15,
     )
 
     parser.add_argument(
         "--sections-ratio",
         type=float,
-        help="Регулирует деление книги на части. Если target-chars больше чем количество символов книги * sections-ratio, chunks будет занижаться"
+        help="Регулирует деление книги на части. Если target-chars больше чем количество символов книги * sections-ratio, chunks будет занижаться",
+        default=0.6,
     )
 
 def register_anonymize(subparsers):

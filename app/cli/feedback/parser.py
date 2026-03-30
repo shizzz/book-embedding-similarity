@@ -1,5 +1,3 @@
-from argparse import _SubParsersAction, ArgumentParser
-
 def register_feedback(subparsers):
     parser = subparsers.add_parser(
         "feedback",
@@ -13,19 +11,20 @@ def register_feedback(subparsers):
 def register_generate(subparsers):
     parser = subparsers.add_parser(
         "generate",
-        help="Генерация отзывов"
+        help="Генерация отзывов",
     )
 
     parser.add_argument(
         "--ai",
         choices=["chatgpt", "deepseek", "lm_studio"],
         required=True,
-        help="AI api для генерации отзывов"
+        help="AI api для генерации отзывов",
+        default="chatgpt",
     )
 
     parser.add_argument(
         "--book",
         type=str,
         required=True,
-        help="Книга, для которой генерируем feedback"
+        help="Книга, для которой генерируем feedback",
     )

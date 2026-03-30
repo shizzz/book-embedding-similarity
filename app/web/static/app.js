@@ -1,27 +1,11 @@
 const jobsContainer = document.getElementById("jobs");
 
-const COMMAND_GROUPS = {
-    "Generation": [
-        {
-            entity: "tag",
-            command: "generate",
-            label: "Generate tags",
-            args: { centros: 512, threshold: 0.0, recreate: true }
-        },
-        {
-            entity: "embedding",
-            command: "generate",
-            label: "Generate embeddings",
-            args: { type: "default" }
-        }
-    ],
-    "Indexing": [
-        { entity: "index", command: "run", label: "Run index", args: { mode: "full" } }
-    ],
-    "Analysis": [
-        { entity: "similar", command: "run", label: "Find similar", args: { top_k: 10 } }
-    ]
-};
+let COMMAND_GROUPS = {};
+
+async function loadCommandGroups() {
+    const res = await fetch("/commands");
+    COMMAND_GROUPS = await res.json();
+}
 
 // ------------------- Render Command Groups -------------------
 function renderCommandGroups() {
@@ -31,6 +15,7 @@ function renderCommandGroups() {
     for (const [groupName, commands] of Object.entries(COMMAND_GROUPS)) {
         const groupDiv = document.createElement("div");
         groupDiv.classList.add("command-group");
+        groupDiv.classList.add("collapsed");
 
         // заголовок группы с раскрытием
         const h3 = document.createElement("h3");
@@ -52,28 +37,61 @@ function renderCommandGroups() {
             cmdDiv.classList.add("command");
 
             // input’ы для аргументов
-            for (const [key, value] of Object.entries(cmd.args)) {
+            for (const [key, meta] of Object.entries(cmd.args || {})) {
                 const label = document.createElement("label");
                 label.textContent = key;
-                label.style.marginRight = "10px";
-                label.style.display = "flex";
-                label.style.flexDirection = "column";
 
                 let input;
-                if (typeof value === "boolean") {
+
+                // --- select (choices) ---
+                if (meta.choices) {
+                    input = document.createElement("select");
+
+                    meta.choices.forEach(opt => {
+                        const option = document.createElement("option");
+                        option.value = opt;
+                        option.textContent = opt;
+                        input.appendChild(option);
+                    });
+
+                    if (meta.default) input.value = meta.default;
+                }
+
+                // --- boolean ---
+                else if (meta.type === "bool") {
                     input = document.createElement("input");
                     input.type = "checkbox";
-                    input.checked = value;
-                } else if (typeof value === "number") {
+                    input.checked = meta.default;
+                }
+
+                // --- number ---
+                else if (meta.type === "int" || meta.type === "float") {
                     input = document.createElement("input");
                     input.type = "number";
-                    input.value = value;
-                } else {
+                    input.value = meta.default ?? 0;
+                }
+
+                // --- list ---
+                else if (meta.type === "list") {
                     input = document.createElement("input");
                     input.type = "text";
-                    input.value = value;
+                    input.value = (meta.default || []).join(",");
+                    input.placeholder = "a,b,c";
                 }
+
+                // --- string ---
+                else {
+                    input = document.createElement("input");
+                    input.type = "text";
+                    input.value = meta.default ?? "";
+                }
+
+                if (meta.required) {
+                    input.required = true;
+                }
+
                 input.name = key;
+
                 label.appendChild(input);
                 cmdDiv.appendChild(label);
             }
@@ -83,10 +101,21 @@ function renderCommandGroups() {
             btn.textContent = cmd.label;
             btn.onclick = () => {
                 const args = {};
-                cmdDiv.querySelectorAll("input").forEach(input => {
-                    if (input.type === "checkbox") args[input.name] = input.checked;
-                    else if (input.type === "number") args[input.name] = Number(input.value);
-                    else args[input.name] = input.value;
+                cmdDiv.querySelectorAll("input, select").forEach(input => {
+                    if (input.type === "checkbox") {
+                        args[input.name] = input.checked;
+                    } else if (input.type === "number") {
+                        args[input.name] = Number(input.value);
+                    } else if (input.tagName === "SELECT") {
+                        args[input.name] = input.value;
+                    } else {
+                        // list support
+                        if (input.value.includes(",")) {
+                            args[input.name] = input.value.split(",").map(v => v.trim());
+                        } else {
+                            args[input.name] = input.value;
+                        }
+                    }
                 });
                 runJob(cmd.entity, cmd.command, args);
             };
@@ -242,9 +271,14 @@ function renderJobStats(id, stats) {
     statsContainer.appendChild(table);
 }
 
+// запуск
+async function init() {
+    await loadCommandGroups();
+    renderCommandGroups();
+    fetchJobs();
+}
+
 // автообновление
 setInterval(fetchJobs, 3000);
 
-// запуск
-renderCommandGroups();
-fetchJobs();
+init();

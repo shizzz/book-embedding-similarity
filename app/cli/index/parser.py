@@ -21,7 +21,8 @@ def register_generate(subparsers):
         "--level",
         choices=[IndexLevel.CHUNK, IndexLevel.DOCUMENT, IndexLevel.BOTH],
         required=True,
-        help="Создаваемые индексы: CHUNK, DOCUMENT, Оба"
+        help="Создаваемые индексы: CHUNK, DOCUMENT, Оба",
+        default=IndexLevel.BOTH,
     )
 
 def register_learn(subparsers):

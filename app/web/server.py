@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-from app.web.routers import jobs, ws
+from app.web.routers import jobs, ws, commands
 from app.settings import PathsConfig
 
 STATIC_VERSION = str(int(time.time()))
@@ -31,3 +31,4 @@ async def index(request: Request):
 
 app.include_router(jobs.router)
 app.include_router(ws.router)
+app.include_router(commands.router)

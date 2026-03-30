@@ -19,12 +19,14 @@ def register_generate(subparsers):
         "--batch",
         type=int,
         help="Количество одновременно обрабатываемых книг",
-        required=False
+        required=False,
+        default=100,
     )
 
     parser.add_argument(
         "-s",
         "--skip-embeddings",
         action="store_true",
-        help="Пропустить генерацию самих ембеддингов"
+        help="Пропустить генерацию самих ембеддингов",
+        default=False,
     )

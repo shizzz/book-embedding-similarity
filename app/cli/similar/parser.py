@@ -30,7 +30,8 @@ def register_generate(subparsers):
         "--top",
         type=int,
         help="Количество результатов на одну книгу",
-        required=False
+        required=False,
+        default=100
     )
 
     parser.add_argument(
@@ -38,7 +39,8 @@ def register_generate(subparsers):
         "--exclude_same_authors",
         type=bool,
         help="Исключать из результатов книги того же автора",
-        required=False
+        required=False,
+        default=True,
     )
 
 def register_get(subparsers):
@@ -52,24 +54,28 @@ def register_get(subparsers):
         "--top",
         type=int,
         help="Количество результатов на одну книгу",
-        required=False
+        required=False,
+        default=100,
     )
 
     parser.add_argument(
         "--mode",
         choices=[SimilarSearchEngineType.INDEX, SimilarSearchEngineType.BRUTEFORCE],
         required=True,
-        help="Режим: index или bruteforce"
+        help="Режим: index или bruteforce",
+        default=SimilarSearchEngineType.INDEX,
     )
 
     parser.add_argument(
         "--level",
         choices=[SearchIndexLevel.CHUNK, SearchIndexLevel.DOCUMENT],
         required=True,
-        help="Уровень поиска: CHUNK - поиск по частям, DOCUMENT - все части сливаются в один mean"
+        help="Уровень поиска: CHUNK - поиск по частям, DOCUMENT - все части сливаются в один mean",
+        default=SearchIndexLevel.CHUNK,
     )
 
     parser.add_argument(
         "file",
-        help="Наименование файла книги"
+        help="Наименование файла книги",
+        default=100
     )

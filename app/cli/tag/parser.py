@@ -17,17 +17,20 @@ def register_generate(subparsers):
     parser.add_argument(
         "--recreate",
         action="store_true",
-        help="Создать индексы заново, даже если он уже создан"
+        help="Создать индексы заново, даже если он уже создан",
+        default=False
     )
 
     parser.add_argument(
         "--centros",
         type=int,
-        help="Количество генерируемых центроидов"
+        help="Количество генерируемых центроидов",
+        default=512
     )
 
     parser.add_argument(
         "--threshold",
         type=float,
-        help="Нижний порог совпадения тэгов достаточный для того, чтобы добавить в книгу"
+        help="Нижний порог совпадения тэгов достаточный для того, чтобы добавить в книгу",
+        default=0.0
     )

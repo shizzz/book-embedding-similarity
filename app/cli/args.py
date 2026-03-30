@@ -7,6 +7,9 @@ from .feedback.parser import register_feedback
 from .tag.parser import register_tag
 
 def get_args() -> argparse.Namespace:
+    return build_parser().parse_args()
+
+def build_parser():
     parser = argparse.ArgumentParser(
         description="CLI для sim: генерация эмбеддингов, поиск похожих и др."
     )
@@ -20,4 +23,4 @@ def get_args() -> argparse.Namespace:
     register_feedback(subparsers)
     register_tag(subparsers)
 
-    return parser.parse_args()
+    return parser
