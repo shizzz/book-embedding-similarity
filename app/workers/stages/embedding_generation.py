@@ -125,13 +125,11 @@ class EmbeddingWorker(BaseQueueWorker):
             # только если свободной памяти достаточно
             if free_ratio > self._model.info.free_vram_ratio:
                 # расчет безопасного увеличения с учетом текущего батча
-                proposed = int(self._model.info.tokens_per_batch * 1.05)
+                proposed = int(self._model.info.tokens_per_batch * 1.01)
                 max_safe = max(current_length, proposed)  # не меньше текущего
                 self._model.info.tokens_per_batch = max_safe
                 self._vram_increase_iter = 0
                 self._model.info.increases +=1
-            else:
-                self._vram_increasing = False
 
     @staticmethod
     def _mean_pooling(last_hidden_state, attention_mask):
